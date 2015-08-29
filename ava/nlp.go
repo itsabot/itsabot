@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"io/ioutil"
 	"log"
-	"os"
 	"path"
 	"strings"
 )
@@ -18,6 +16,13 @@ type StructuredInput struct {
 
 type wMap map[string]int8
 
+const (
+	nlNoun = iota + 1
+	nlVerb
+	nlPreposition
+	nlName
+)
+
 var wordType map[string]int8 = map[string]int8{
 	"nouns.txt":        nlNoun,
 	"verbs.txt":        nlVerb,
@@ -25,21 +30,13 @@ var wordType map[string]int8 = map[string]int8{
 	"names.txt":        nlName,
 }
 
-const (
-	nlNoun = iota + 1
-	nlVerb
-	nlPreposition
-	nlName
-	nlArticle
-)
-
 func loadDictionary() (wMap, error) {
+	dict := wMap{}
 	baseDir := path.Join("data", "lang-en")
 	files, err := ioutil.ReadDir(baseDir)
 	if err != nil {
-		return c, err
+		return dict, err
 	}
-	var dict wMap
 	for _, file := range files {
 		content, err := ioutil.ReadFile(path.Join(baseDir, file.Name()))
 		if err != nil {
@@ -53,56 +50,9 @@ func loadDictionary() (wMap, error) {
 	return dict, nil
 }
 
-func labelTrainingData(fp string) error {
-	var data []string
-
-	f, err := os.Open(fp)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		t := scanner.Text()
-		if t[0:1] != "//" || t[0] == "\n" {
-			data = append(data, delabelSentence(t))
-		}
-	}
-	return nil
-}
-
-// TODO: HERE
-func delabelSentence(s string) StructuredInput {
-	var ss StructuredInput
-	var labelF, wordF bool
-
-	for _, l := range s {
-		switch l {
-		case '_':
-			labelF = true
-		case '(':
-			continue
-		case ')':
-			wordF = false
-		case 'C':
-			if labelF {
-				labelF = false
-			}
-		default:
-			if labelF {
-				ss.Command
-			}
-			if wordF {
-				word = append(word, l)
-			} else if labelF {
-
-			}
-		}
-	}
-}
-
 func buildStructuredInput(nl string) StructuredInput {
 	var si StructuredInput
+
 	sentences := strings.Split(nl, ".")
 	for _, sent := range sentences {
 		si = si.add(parseSentence(sent))
@@ -111,18 +61,11 @@ func buildStructuredInput(nl string) StructuredInput {
 }
 
 func parseSentence(s string) StructuredInput {
-	var si StructuredInput
-	s := strings.NewReplacer(
-		"!", "",
-		".", "",
-		",", "",
-		"\"", "",
-		"'", "",
-		"-", "",
-	)
+	si := StructuredInput{Sentence: s}
 	words := strings.Fields(s)
-	for i, word := range words {
-		si = si.addIfFound(word, words, i)
+	for _, word := range words {
+		key := strings.ToLower(word)
+		si = si.addIfFound(key, word)
 	}
 	return si
 }
@@ -140,32 +83,25 @@ func (s StructuredInput) add(ns StructuredInput) StructuredInput {
 	return s
 }
 
-func (s StructuredInput) addIfFound(word string, words []string, index int) StructuredInput {
-	w := dict[word]
+func (s StructuredInput) addIfFound(key, word string) StructuredInput {
+	w := dict[key]
 	switch w {
 	case nlVerb:
+		if s.Command != "" {
+			log.Println("warning: overriding command", s.Command)
+		}
 		s.Command = word
 	case nlNoun:
 		s.Objects = append(s.Objects, word)
 	case nlName:
 		s.Actors = append(s.Actors, word)
-	default:
-		log.Println("word not found:", word)
 	}
 	return s
-}
-
-type verbContext struct {
-	verb       string
-	verbIndex  int
-	directObjs []string
 }
 
 // TODO
 // breakCompoundSent splits compound sentences into different sentences for
 // ease of parsing.
-func breakCompoundSent(sentence []string) [][]string {
-	for _, s := range sentences {
-
-	}
+func breakCompoundSent(sentences []string) [][]string {
+	return [][]string{}
 }

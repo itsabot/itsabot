@@ -1,72 +1,62 @@
 package main
 
 import (
-	"io/ioutil"
-	"log"
-	"path"
+	"bufio"
+	"os"
+	"regexp"
 	"strings"
-
-	"github.com/jbrukh/bayesian"
-	_ "github.com/lib/pq"
 )
 
-// trainedClassifier will load data from the DB if available. Otherwise it
-// trains on the local data in the /training folder.
-func trainedClassifier(bc map[string]bayesian.Class) (*bayesian.Classifier, error) {
-	c, err := newTrainedClassifier(bc)
-	return c, err
-	/*
-		read := []byte{}
-		reader := bytes.NewReader(read)
-		err := db.Get(&reader, "SELECT data FROM training")
-		log.Println("READER", reader)
+// delabelTrainingData generates StructuredInputs from training files for the
+// purpose of testing and machine learning.
+func delabelTrainingData(fp string) ([]StructuredInput, error) {
+	var data []StructuredInput
 
-			if err == sql.ErrNoRows {
-			log.Println("no classifier data found in DB. Creating new classifier.")
-			buf := []byte{}
-			b := bytes.NewBuffer(buf)
-			err := c.WriteTo(b)
-			if err != nil {
-				log.Fatalln("couldn't write classifier to buffer", err)
-			}
-
-			_, err = db.Exec("INSERT INTO training (data) VALUES ($1)", b.Bytes())
-			if err != nil {
-				log.Fatalln("couldn't save classifer to DB", err)
-			}
-		} else {
-			c, err = bayesian.NewClassifierFromReader(reader)
+	f, err := os.Open(fp)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		t := scanner.Text()
+		if len(t) >= 2 && t[0:2] != "//" {
+			data = append(data, delabelSentence(t))
 		}
-		return c, err
-	*/
+	}
+	return data, nil
 }
 
-// newTrainedClassifier trains on the local data in the /training folder.
-// There's no reason to call this function directly. It's instead used as a
-// fallback within trainedClassifier() if no trained classifier can be found.
-func newTrainedClassifier(bc map[string]bayesian.Class) (*bayesian.Classifier, error) {
-	var vals []bayesian.Class
-	for _, v := range bc {
-		vals = append(vals, v)
-	}
-	c := bayesian.NewClassifier(vals...)
+// delabelSentence removes the sentence labels and builds a StructuredInput
+// struct. This is used among training data. Note that compound sentences, e.g.
+// "Order an Uber, and build a bridge," are not supported in this function.
+func delabelSentence(s string) StructuredInput {
+	var si StructuredInput
 
-	files, err := ioutil.ReadDir("training")
-	if err != nil {
-		return c, err
+	rcmd := regexp.MustCompile(`_C\([\w\s-_/]+\)`)
+	robj := regexp.MustCompile(`_O\([\w\s-_/]+\)`)
+	ract := regexp.MustCompile(`_A\([\w\s-_/]+\)`)
+	cmd := rcmd.FindString(s)
+	obj := robj.FindAllString(s, -1)
+	act := ract.FindAllString(s, -1)
+	sr := strings.NewReplacer(
+		"_C(", "",
+		"_A(", "",
+		"_O(", "",
+		")", "")
+	si.Sentence = sr.Replace(s)
+	if len(cmd) > 3 {
+		si.Command = cmd[3 : len(cmd)-1]
 	}
-
-	for _, file := range files {
-		log.Println("reading", file.Name())
-		d, err := ioutil.ReadFile(path.Join("training", file.Name()))
-		if err != nil {
-			log.Fatalln("error reading file", file.Name(), err)
+	for _, o := range obj {
+		if len(o) > 3 {
+			si.Objects = append(si.Objects, o[3:len(o)-1])
 		}
-		data := strings.Split(string(d), " ")
-		cat := bc[strings.TrimSuffix(file.Name(), ".train")]
-		log.Println("data", data)
-		log.Println("cat", cat)
-		c.Learn(data, cat)
 	}
-	return c, err
+	for _, a := range act {
+		if len(a) > 3 {
+			si.Actors = append(si.Actors, a[3:len(a)-1])
+		}
+	}
+	return si
 }

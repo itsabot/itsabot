@@ -73,26 +73,28 @@ func main() {
 }
 
 func startServer(port string) {
+	var err error
+
 	db = connectDB()
-
 	// Load packages
-	bc, err := loadConfig("packages.conf")
-	if err != nil {
-		log.Fatalln("could not load package", err)
-	}
+	/*
+		bc, err := loadConfig("packages.conf")
+		if err != nil {
+			log.Fatalln("could not load package", err)
+		}
+	*/
 	// TODO: ensure all installed
-
 	//loadModel("data/mitie_ner.dat")
 	dict, err = loadDictionary()
 	if err != nil {
 		log.Fatalln("could not load dictionaries", err)
 	}
-
-	classifier, err = trainedClassifier(bc)
-	if err != nil {
-		log.Fatalln("could not retrieve trained classifier", err)
-	}
-
+	/*
+		classifier, err = trainedClassifier(bc)
+		if err != nil {
+			log.Fatalln("could not retrieve trained classifier", err)
+		}
+	*/
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
@@ -115,9 +117,10 @@ func loadConfig(p string) (map[string]bayesian.Class, error) {
 // Content can belong to multiple classes. Route returns []string,
 // which is used by os.Exec to run the commands.
 func route(content string) []string {
+	var pkgs []string
+
 	cn := strings.Fields(content)
 	probs, _, _ := classifier.ProbScores(cn)
-	var pkgs []string
 	for i, prob := range probs {
 		log.Println("Class probability:", prob, string(classifier.Classes[i]))
 		if prob > ClassifierThreshold {
@@ -132,7 +135,6 @@ func connectDB() *sqlx.DB {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 	return db
 	// Run schema while testing
 }
@@ -141,7 +143,6 @@ func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger())
 	e.Use(mw.Gzip())
 	e.Use(mw.Recover())
-
 	e.Post("/", handlerMain)
 }
 
@@ -150,18 +151,15 @@ func handlerMain(c *echo.Context) error {
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
-
 	// Route with Bayes
 	pkgs := route(cmd)
 	log.Println("routing to", pkgs)
-
 	// Update state machine
 	// Save last command. Save nouns/context.
 	// NOTE: This has a JDK 8 dependency, which I'll aim to remove in subsequent versions.
 	// Grab objects of prepositions (times), people, organizations, locations.
 	si := buildStructuredInput(cmd)
 	log.Println("structured input", si)
-
 	// Send to packages
 	ret := ""
 	for _, pkg := range pkgs {
@@ -173,12 +171,10 @@ func handlerMain(c *echo.Context) error {
 		}
 		ret += string(out) + "\n\n"
 	}
-
 	err := c.HTML(http.StatusOK, ret)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
