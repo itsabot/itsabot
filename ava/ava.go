@@ -122,7 +122,9 @@ func route(content string) []string {
 	cn := strings.Fields(content)
 	probs, _, _ := classifier.ProbScores(cn)
 	for i, prob := range probs {
-		log.Println("Class probability:", prob, string(classifier.Classes[i]))
+		log.Println("Class probability:",
+			prob,
+			string(classifier.Classes[i]))
 		if prob > ClassifierThreshold {
 			pkgs = append(pkgs, string(classifier.Classes[i]))
 		}
@@ -131,7 +133,8 @@ func route(content string) []string {
 }
 
 func connectDB() *sqlx.DB {
-	db, err := sqlx.Connect("postgres", "user=egtann dbname=ava sslmode=disable")
+	db, err := sqlx.Connect("postgres",
+		"user=egtann dbname=ava sslmode=disable")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -156,8 +159,9 @@ func handlerMain(c *echo.Context) error {
 	log.Println("routing to", pkgs)
 	// Update state machine
 	// Save last command. Save nouns/context.
-	// NOTE: This has a JDK 8 dependency, which I'll aim to remove in subsequent versions.
-	// Grab objects of prepositions (times), people, organizations, locations.
+	// NOTE: This has a JDK 8 dependency, which I'll aim to remove in
+	// subsequent versions. Grab objects of prepositions (times), people,
+	// organizations, locations.
 	si := buildStructuredInput(cmd)
 	log.Println("structured input", si)
 	// Send to packages
