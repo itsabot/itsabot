@@ -12,10 +12,6 @@ var test *testing.T
 func TestBuildTrainingData(t *testing.T) {
 	var err error
 
-	dict, err = loadDictionary()
-	if err != nil {
-		log.Fatalln("failed loading dict", err)
-	}
 	si, err := delabelTrainingData(path.Join("training", "imperative.txt"))
 	if err != nil {
 		log.Println("failed delabeling training data", err)

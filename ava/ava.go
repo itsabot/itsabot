@@ -28,8 +28,6 @@ var db *sqlx.DB
 
 var ErrInvalidCommand = errors.New("invalid command")
 
-var dict wMap
-
 // NOTE: Arbitrary. Will be adjusted with learning data.
 const ClassifierThreshold = 0.7
 
@@ -73,8 +71,6 @@ func main() {
 }
 
 func startServer(port string) {
-	var err error
-
 	db = connectDB()
 	// Load packages
 	/*
@@ -85,10 +81,12 @@ func startServer(port string) {
 	*/
 	// TODO: ensure all installed
 	//loadModel("data/mitie_ner.dat")
-	dict, err = loadDictionary()
-	if err != nil {
-		log.Fatalln("could not load dictionaries", err)
-	}
+	/*
+		dict, err = loadDictionary()
+		if err != nil {
+			log.Fatalln("could not load dictionaries", err)
+		}
+	*/
 	/*
 		classifier, err = trainedClassifier(bc)
 		if err != nil {
