@@ -6,11 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 
 	"github.com/codegangsta/cli"
+	fnlp "github.com/egtann/freeling/nlp"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
@@ -18,18 +18,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// #cgo CFLAGS: -I .
-// #cgo LDFLAGS: -L . -lmitie
-// #include <mitie.h>
-import "C"
-
-var classifier *bayesian.Classifier
 var db *sqlx.DB
+var nlp *fnlp.NLPEngine
 
 var ErrInvalidCommand = errors.New("invalid command")
-
-// NOTE: Arbitrary. Will be adjusted with learning data.
-const ClassifierThreshold = 0.7
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
@@ -79,20 +71,8 @@ func startServer(port string) {
 			log.Fatalln("could not load package", err)
 		}
 	*/
-	// TODO: ensure all installed
-	//loadModel("data/mitie_ner.dat")
-	/*
-		dict, err = loadDictionary()
-		if err != nil {
-			log.Fatalln("could not load dictionaries", err)
-		}
-	*/
-	/*
-		classifier, err = trainedClassifier(bc)
-		if err != nil {
-			log.Fatalln("could not retrieve trained classifier", err)
-		}
-	*/
+	opts := fnlp.NewNLPOptions(path.Join(".", "data"), "en", func() { log.Println("hit") })
+	nlp = fnlp.NewNLPEngine(opts)
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
@@ -117,16 +97,6 @@ func loadConfig(p string) (map[string]bayesian.Class, error) {
 func route(content string) []string {
 	var pkgs []string
 
-	cn := strings.Fields(content)
-	probs, _, _ := classifier.ProbScores(cn)
-	for i, prob := range probs {
-		log.Println("Class probability:",
-			prob,
-			string(classifier.Classes[i]))
-		if prob > ClassifierThreshold {
-			pkgs = append(pkgs, string(classifier.Classes[i]))
-		}
-	}
 	return pkgs
 }
 
@@ -152,38 +122,28 @@ func handlerMain(c *echo.Context) error {
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
-	// Route with Bayes
-	pkgs := route(cmd)
-	log.Println("routing to", pkgs)
 	// Update state machine
-	// Save last command. Save nouns/context.
-	// NOTE: This has a JDK 8 dependency, which I'll aim to remove in
-	// subsequent versions. Grab objects of prepositions (times), people,
-	// organizations, locations.
+	// Save last command (save structured input)
+
 	si := buildStructuredInput(cmd)
 	log.Println("structured input", si)
+
 	// Send to packages
 	ret := ""
-	for _, pkg := range pkgs {
-		path := path.Join("packages", pkg)
-		out, err := exec.Command(path, cmd).CombinedOutput()
-		if err != nil {
-			log.Println("unable to run package", err)
-			return err
+	/*
+		for _, pkg := range pkgs {
+			path := path.Join("packages", pkg)
+			out, err := exec.Command(path, cmd).CombinedOutput()
+			if err != nil {
+				log.Println("unable to run package", err)
+				return err
+			}
+			ret += string(out) + "\n\n"
 		}
-		ret += string(out) + "\n\n"
-	}
+	*/
 	err := c.HTML(http.StatusOK, ret)
 	if err != nil {
 		return err
 	}
 	return nil
-}
-
-func loadModel(p string) {
-	ner := C.mitie_load_named_entity_extractor(C.CString(p))
-	if ner == nil {
-		log.Println("unable to load model file")
-		return
-	}
 }

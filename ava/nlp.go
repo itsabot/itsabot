@@ -1,8 +1,12 @@
 package main
 
 import (
+	"container/list"
 	"log"
 	"strings"
+
+	"github.com/egtann/freeling/models"
+	fnlp "github.com/egtann/freeling/nlp"
 )
 
 type StructuredInput struct {
@@ -42,6 +46,58 @@ func parseSentence(s string) StructuredInput {
 	var buf string
 	var fndType int
 
+	body := ""
+	tokens := list.New()
+	if nlp.Tokenizer != nil {
+		nlp.Tokenizer.Tokenize(s, 0, tokens)
+	}
+	sentences := list.New()
+
+	if nlp.Splitter != nil {
+		sid := nlp.Splitter.OpenSession()
+		nlp.Splitter.Split(sid, tokens, true, sentences)
+		nlp.Splitter.CloseSession(sid)
+	}
+
+	for ss := sentences.Front(); ss != nil; ss = ss.Next() {
+		s := ss.Value.(*fnlp.Sentence)
+		if nlp.Morfo != nil {
+			nlp.Morfo.Analyze(s)
+		}
+		if nlp.Sense != nil {
+			nlp.Sense.Analyze(s)
+		}
+		if nlp.Tagger != nil {
+			nlp.Tagger.Analyze(s)
+		}
+		if nlp.ShallowParser != nil {
+			nlp.ShallowParser.Analyze(s)
+		}
+	}
+	if nlp.Dsb != nil {
+		nlp.Dsb.Analyze(sentences)
+	}
+	entities := make(map[string]int64)
+	for ss := sentences.Front(); ss != nil; ss = ss.Next() {
+		se := models.NewSentenceEntity()
+		body := ""
+		s := ss.Value.(*fnlp.Sentence)
+		for ww := s.Front(); ww != nil; ww = ww.Next() {
+			w := ww.Value.(*fnlp.Word)
+			a := w.Front().Value.(*fnlp.Analysis)
+			te := models.NewTokenEntity(w.getForm(), a.getLemma(), a.getTag(), a.getProb())
+			if a.getTag() == "NP" {
+				entities[w.getForm()]++
+			}
+			body += w.getForm() + " "
+			se.AddTokenEntity(te)
+		}
+		body = strings.Trim(body, " ")
+		se.SetBody(body)
+		se.SetSentence(s)
+	}
+	log.Println("BODY", body)
+
 	si := StructuredInput{Sentence: s}
 	words := strings.Fields(s)
 	for _, word := range words {
@@ -77,40 +133,6 @@ func (s StructuredInput) add(ns StructuredInput) StructuredInput {
 
 func (s StructuredInput) addIfFound(k, w string, buf *string) (StructuredInput,
 	int) {
-	//engine := freeling.NewEngine()
-	//engine.InitNLP()
-	/*
-		found := dict[k]
-		if found == 0 {
-			//found = dict[inflect.Singularize(k)]
-		}
-		switch found {
-		case nlVerb:
-			if s.Command != "" {
-				log.Println("warning: overriding command", s.Command)
-			}
-			s.Command = w
-		case nlNoun:
-			if len(*buf) > 0 {
-				obj := s.Objects[len(s.Objects)-1]
-				s.Objects[len(s.Objects)-1] = *buf + " " + obj
-			}
-			s.Objects = append(s.Objects, w)
-		case nlName:
-			if len(*buf) > 0 {
-				obj := s.Actors[len(s.Actors)-1]
-				s.Actors[len(s.Actors)-1] = *buf + " " + obj
-			}
-			s.Actors = append(s.Actors, w)
-		case 0:
-			if len(*buf) == 0 {
-				*buf = w
-			} else {
-				*buf += " " + w
-			}
-		}
-		return s, int(found)
-	*/
 	return s, 0
 }
 
@@ -120,25 +142,3 @@ func (s StructuredInput) addIfFound(k, w string, buf *string) (StructuredInput,
 func breakCompoundSent(sentences []string) [][]string {
 	return [][]string{}
 }
-
-/*
-func loadDictionary() (wMap, error) {
-	dict := wMap{}
-	baseDir := path.Join("data", "lang-en")
-	files, err := ioutil.ReadDir(baseDir)
-	if err != nil {
-		return dict, err
-	}
-	for _, file := range files {
-		content, err := ioutil.ReadFile(path.Join(baseDir, file.Name()))
-		if err != nil {
-			return dict, err
-		}
-		words := strings.Split(string(content), "\n")
-		for _, word := range words {
-			dict[word] = wordType[file.Name()]
-		}
-	}
-	return dict, nil
-}
-*/
