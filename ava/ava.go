@@ -1,16 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"errors"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/codegangsta/cli"
-	fnlp "github.com/egtann/freeling/nlp"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
@@ -19,9 +20,13 @@ import (
 )
 
 var db *sqlx.DB
-var nlp *fnlp.NLPEngine
+var bayes *bayesian.Classifier
 
-var ErrInvalidCommand = errors.New("invalid command")
+var (
+	ErrInvalidClass        = errors.New("invalid class")
+	ErrInvalidCommand      = errors.New("invalid command")
+	ErrInvalidOddParameter = errors.New("parameter count must be even")
+)
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
@@ -63,6 +68,7 @@ func main() {
 }
 
 func startServer(port string) {
+	var err error
 	db = connectDB()
 	// Load packages
 	/*
@@ -71,24 +77,21 @@ func startServer(port string) {
 			log.Fatalln("could not load package", err)
 		}
 	*/
-	opts := fnlp.NewNLPOptions(path.Join(".", "data"), "en", func() { log.Println("hit") })
-	nlp = fnlp.NewNLPEngine(opts)
+	bayes, err = loadClassifier(bayes)
+	if err != nil {
+		log.Fatalln("error loading classifier", err)
+	}
+	/*
+		si, err := classify(bayes, "train _C(Order) _O(an Uber).")
+		if err != nil {
+			log.Fatalln("error classifying sentence", err)
+		}
+		log.Println(si)
+	*/
+
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
-}
-
-func loadConfig(p string) (map[string]bayesian.Class, error) {
-	bc := map[string]bayesian.Class{}
-	content, err := ioutil.ReadFile(p)
-	if err != nil {
-		return bc, err
-	}
-	pkgs := strings.Split(string(content), "\n")
-	for _, pkg := range pkgs {
-		bc[pkg] = bayesian.Class(pkg)
-	}
-	return bc, nil
 }
 
 // route will determine what kind of request it is based on text.
@@ -118,18 +121,27 @@ func initRoutes(e *echo.Echo) {
 }
 
 func handlerMain(c *echo.Context) error {
+	var ret string
+	var err error
+	si := &StructuredInput{}
 	cmd := c.Form("cmd")
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
+	if strings.ToLower(cmd)[0:5] == "train" {
+		if err := train(bayes, cmd[7:]); err != nil {
+			return err
+		}
+		goto Response
+	}
+	si, err = classify(bayes, cmd)
+	if err != nil {
+		log.Fatalln("error classifying sentence", err)
+	}
+	ret = si.String()
 	// Update state machine
 	// Save last command (save structured input)
-
-	si := buildStructuredInput(cmd)
-	log.Println("structured input", si)
-
 	// Send to packages
-	ret := ""
 	/*
 		for _, pkg := range pkgs {
 			path := path.Join("packages", pkg)
@@ -141,9 +153,205 @@ func handlerMain(c *echo.Context) error {
 			ret += string(out) + "\n\n"
 		}
 	*/
-	err := c.HTML(http.StatusOK, ret)
+
+Response:
+	err = c.HTML(http.StatusOK, ret)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
+	var err error
+
+	filename := path.Join("data", "common", "bayes.dat")
+	c, err = bayesian.NewClassifierFromFile(filename)
+	if err.Error() == "open data/common/bayes.dat: no such file or directory" {
+		c, err = buildClassifier(c)
+		if err != nil {
+			return c, err
+		}
+		log.Println("c2", c)
+	} else if err != nil {
+		log.Println("!!", err)
+		return c, err
+	}
+	return c, nil
+}
+
+func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
+	c = bayesian.NewClassifier(Command, Actor, Object, Time, None)
+	filename := path.Join("training", "imperative.txt")
+	fi, err := os.Open(filename)
+	if err != nil {
+		return c, err
+	}
+	defer fi.Close()
+	scanner := bufio.NewScanner(fi)
+	line := 1
+	for scanner.Scan() {
+		if err := trainClassifier(c, scanner.Text()); err != nil {
+			log.Fatalln("line", line, "::", err)
+		}
+		line++
+	}
+	if err = scanner.Err(); err != nil {
+		return c, err
+	}
+	if err = c.WriteClassesToFile(path.Join("data")); err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+func trainClassifier(c *bayesian.Classifier, s string) error {
+	if len(s) == 0 {
+		return nil
+	}
+	if s[0] == '/' {
+		return nil
+	}
+	ws, err := extractFields(s)
+	if err != nil {
+		return err
+	}
+	l := len(ws)
+	for i := 0; i < l; i++ {
+		var word2 string
+		var word3 string
+		word1, entity, err := extractEntity(ws[i])
+		if err != nil {
+			return err
+		}
+		if entity == "" {
+			continue
+		}
+		trigram := word1
+		if i+1 < l {
+			word2, _, err = extractEntity(ws[i+1])
+			if err != nil {
+				return err
+			}
+			trigram += " " + word2
+		}
+		if i+2 < l {
+			word3, _, err = extractEntity(ws[i+2])
+			if err != nil {
+				return err
+			}
+			trigram += " " + word3
+		}
+		c.Learn([]string{word1}, entity)
+		if word2 != "" {
+			c.Learn([]string{word1 + " " + word2}, entity)
+		}
+		if word3 != "" {
+			c.Learn([]string{trigram}, entity)
+		}
+	}
+	return nil
+}
+
+func extractFields(s string) ([]string, error) {
+	var ss []string
+
+	if len(s) == 0 {
+		return ss, errors.New("sentence too short to classify")
+	}
+	wordBuf := ""
+	ws := strings.Fields(s)
+	for _, w := range ws {
+		r, _ := utf8.DecodeRuneInString(w)
+		if r == '_' {
+			r, _ = utf8.DecodeRuneInString(w[3:])
+		}
+		if unicode.IsNumber(r) {
+			wordBuf += w + " "
+			continue
+		}
+		word, _, err := extractEntity(w)
+		if err != nil {
+			return ss, err
+		}
+		switch strings.ToLower(word) {
+		// Articles and prepositions
+		case "a", "an", "the", "before", "at", "after", "next":
+			wordBuf += w + " "
+		default:
+			ss = append(ss, wordBuf+w)
+			wordBuf = ""
+		}
+	}
+	return ss, nil
+}
+
+func classify(c *bayesian.Classifier, s string) (*StructuredInput, error) {
+	si := &StructuredInput{}
+	ws, err := extractFields(s)
+	if err != nil {
+		return si, err
+	}
+	var wc []wordclass
+	for i := range ws {
+		tmp, err := classifyTrigram(c, ws, i)
+		if err != nil {
+			return si, err
+		}
+		wc = append(wc, tmp)
+	}
+	if err = si.Add(wc); err != nil {
+		return si, err
+	}
+	return si, nil
+}
+
+func extractEntity(w string) (string, bayesian.Class, error) {
+	w = strings.TrimRight(w, ").,;")
+	if w[0] != '_' {
+		return w, "", nil
+	}
+	switch w[1] {
+	case 'C': // Command
+		return w[3:], Command, nil
+	case 'O': // Object
+		return w[3:], Object, nil
+	case 'A': // Actor
+		return w[3:], Actor, nil
+	case 'T': // Time
+		return w[3:], Time, nil
+	case 'N': // None
+		return w[3:], None, nil
+	}
+	return w, "", errors.New("syntax error in entity")
+}
+
+func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (wordclass,
+	error) {
+
+	var wc wordclass
+	l := len(ws)
+	word1, _, err := extractEntity(ws[i])
+	if err != nil {
+		return wc, err
+	}
+	trigram := word1
+	var word2 string
+	var word3 string
+	if i+1 < l {
+		word2, _, err = extractEntity(ws[i+1])
+		if err != nil {
+			return wc, err
+		}
+		trigram += " " + word2
+	}
+	if i+2 < l {
+		word3, _, err = extractEntity(ws[i+2])
+		if err != nil {
+			return wc, err
+		}
+		trigram += " " + word3
+	}
+	_, likely, _ := c.LogScores([]string{trigram})
+	return wordclass{word1, likely}, nil
 }

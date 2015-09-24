@@ -22,3 +22,9 @@ Supplemental to those parts are a number of tools, yet to be built.
 Packages provide all of Ava's functionality. Further, they may depend on one another.
 
 For instance, the meeting package (github.com/avabot/meeting) schedules meetings based on inputs. It requires the Ava gcal package to schedule meetings around your existing calendar. For email integration, additional Ava packages are also needed.
+
+## TODO
+
+1. HTTP endpoint for creating structured input, routing to packages
+2. Example package
+3. Package manager and storage server

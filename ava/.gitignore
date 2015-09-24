@@ -1,4 +1,7 @@
 ava
 *.sw*
-data/en
-data/common
+data/Actor
+data/Command
+data/Object
+data/Time
+data/None

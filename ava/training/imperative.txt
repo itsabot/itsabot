@@ -4,16 +4,29 @@
 
 // Basic commands
 _C(Order) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Call) _O(an Uber).
 _C(Ask) _O(a doctor).
 _C(Call) _O(her).
 _C(Order) _A(me) _O(an Uber).
-_C(Order) _O(an Uber) for _A(me).
+_C(Order) _O(an Uber) _N(for) _A(me).
+_C(Order) _O(an Uber) _N(for) _A(Sarah).
 _C(Buy) _A(him) _O(an iPhone).
+_C(Get) _A(Jim) _O(an Uber).
 _C(Get) _A(Jim) _O(2 shirts).
+_O(an Uber)
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _O(an Uber).
+_C(Get) _A(me) _T(at noon).
+_C(Get) _A(me) _T(before noon).
 
 // Complex commands
 
 // Oxford comma
-_C(Get) _A(Jim), _A(Paul) and _A(Sarah) _O(2 shirts).
-_C(Get) _A(Jim), _A(Paul), and _A(Sarah) _O(2 shirts).
-Before I leave, be sure to _C(take) _A(out) _O(the trash).
