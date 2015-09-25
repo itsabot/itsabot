@@ -11,6 +11,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/avabot/avabot/types"
 	"github.com/codegangsta/cli"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
@@ -22,11 +23,7 @@ import (
 var db *sqlx.DB
 var bayes *bayesian.Classifier
 
-var (
-	ErrInvalidClass        = errors.New("invalid class")
-	ErrInvalidCommand      = errors.New("invalid command")
-	ErrInvalidOddParameter = errors.New("parameter count must be even")
-)
+var ErrInvalidCommand = errors.New("invalid command")
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
@@ -123,7 +120,7 @@ func initRoutes(e *echo.Echo) {
 func handlerMain(c *echo.Context) error {
 	var ret string
 	var err error
-	si := &StructuredInput{}
+	si := &types.StructuredInput{}
 	cmd := c.Form("cmd")
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
@@ -286,13 +283,13 @@ func extractFields(s string) ([]string, error) {
 	return ss, nil
 }
 
-func classify(c *bayesian.Classifier, s string) (*StructuredInput, error) {
-	si := &StructuredInput{}
+func classify(c *bayesian.Classifier, s string) (*types.StructuredInput, error) {
+	si := &types.StructuredInput{}
 	ws, err := extractFields(s)
 	if err != nil {
 		return si, err
 	}
-	var wc []wordclass
+	var wc []types.WordClass
 	for i := range ws {
 		tmp, err := classifyTrigram(c, ws, i)
 		if err != nil {
@@ -326,10 +323,10 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 	return w, "", errors.New("syntax error in entity")
 }
 
-func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (wordclass,
+func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (types.WordClass,
 	error) {
 
-	var wc wordclass
+	var wc types.WordClass
 	l := len(ws)
 	word1, _, err := extractEntity(ws[i])
 	if err != nil {
@@ -353,5 +350,5 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (wordclass,
 		trigram += " " + word3
 	}
 	_, likely, _ := c.LogScores([]string{trigram})
-	return wordclass{word1, likely}, nil
+	return types.WordClass{word1, likely}, nil
 }

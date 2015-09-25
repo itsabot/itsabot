@@ -1,17 +1,13 @@
-package main
+package types
 
 import (
+	"errors"
 	"strings"
-
-	"github.com/jbrukh/bayesian"
 )
 
-const (
-	Command bayesian.Class = "Command"
-	Actor   bayesian.Class = "Actor"
-	Object  bayesian.Class = "Object"
-	Time    bayesian.Class = "Time"
-	None    bayesian.Class = "None"
+var (
+	ErrInvalidClass        = errors.New("invalid class")
+	ErrInvalidOddParameter = errors.New("parameter count must be even")
 )
 
 const (
@@ -30,23 +26,6 @@ type StructuredInput struct {
 	Times    []string
 }
 
-type wordclass struct {
-	Word  string
-	Class int
-}
-
-func buildStructuredInput(nl string) StructuredInput {
-	var si StructuredInput
-
-	/*
-		sentences := strings.Split(nl, ".")
-		for _, sent := range sentences {
-			si = si.add(parseSentence(sent))
-		}
-	*/
-	return si
-}
-
 func (si *StructuredInput) String() string {
 	s := "\n"
 	s += "Command: " + strings.Join(si.Command, ", ") + "\n"
@@ -56,9 +35,14 @@ func (si *StructuredInput) String() string {
 	return s
 }
 
+type WordClass struct {
+	Word  string
+	Class int
+}
+
 // Add pairs of words with their classes to a structured input. Params should
 // follow the ("Order", "Command"), ("noon", "Time") form.
-func (si *StructuredInput) Add(wc []wordclass) error {
+func (si *StructuredInput) Add(wc []WordClass) error {
 	if len(wc) == 0 {
 		return ErrInvalidOddParameter
 	}
