@@ -6,29 +6,18 @@ import (
 	"net/http"
 	"net/rpc"
 
-	"github.com/avabot/avabot/types"
+	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/pkg"
 )
 
 type Ava int
+
 type packageRegistration struct {
 	port int
-	sis  []types.StructuredInput
+	sis  []datatypes.StructuredInput
 }
 
 var packages map[string]packageRegistration
-
-// Listener includes the name of the package and the structured input to listen
-// for. StructuredInput is case insensitive.
-type Listener struct {
-	Name string
-	SI   *types.StructuredInput
-}
-
-// Registration
-type Registration struct {
-	Name string
-	Port string
-}
 
 func bootRPCServer() {
 	ava := new(Ava)
@@ -41,7 +30,7 @@ func bootRPCServer() {
 	go http.Serve(l, nil)
 }
 
-func (t *Ava) RegisterPackage(r Registration, reply *error) error {
+func (t *Ava) RegisterPackage(r pkg.Registration, reply *error) error {
 	// TODO
 	// Keep track of packages. Ensure no duplicates.
 	/*
@@ -53,7 +42,7 @@ func (t *Ava) RegisterPackage(r Registration, reply *error) error {
 	return nil
 }
 
-func (t *Ava) RespondTo(l Listener, reply *error) error {
+func (t *Ava) RespondTo(l pkg.Listener, reply *error) error {
 	// TODO
 	return nil
 }

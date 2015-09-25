@@ -7,11 +7,8 @@ import (
 	"net/http"
 	"net/rpc"
 
-	"github.com/avabot/avabot"
+	"github.com/avabot/ava/shared/datatypes"
 )
-
-var client *rpc.Client
-var pkgName string
 
 // Pkg holds config options for any Ava package. Name must be globally unique
 // Port takes the format of ":1234". Note that the colon is significant.
@@ -22,7 +19,24 @@ type Pkg struct {
 	ServerAddress string
 }
 
-const (
+// Listener includes the name of the package and the structured input to listen
+// for. StructuredInput is case insensitive.
+type Listener struct {
+	Name string
+	SI   *datatypes.StructuredInput
+}
+
+// Registration
+type Registration struct {
+	Name string
+	Port string
+}
+
+type Ava int
+
+var client *rpc.Client
+var pkgName string
+var (
 	ErrMissingPackageName = errors.New("missing package name")
 	ErrMissingPort        = errors.New("missing package port")
 )
@@ -34,7 +48,7 @@ func NewPackage(name, port, serverAddr string) (*Pkg, error) {
 	if len(port) == 0 {
 		return &Pkg{}, ErrMissingPort
 	}
-	return &Pkg{Name: name}
+	return &Pkg{Name: name}, nil
 }
 
 // Register with Ava to begin communicating over RPC.
@@ -45,31 +59,33 @@ func (p *Pkg) Register() error {
 	if err != nil {
 		return err
 	}
-	args := &Ava.Registration{Name: p.Name, Port: p.Port}
-	if err = client.Call("Ava:RegisterPackage", args, &reply); err != nil {
+	args := Registration{Name: p.Name, Port: p.Port}
+	err = client.Call("Ava:RegisterPackage", args, &replyErr)
+	if err != nil {
 		return err
 	}
 	if replyErr != nil {
-		return err
+		return replyErr
 	}
 	bootRPCServer(p.Port)
 	return nil
 }
 
 // RespondTo a specific StructuredInput, such as Command:Order && Object:Uber.
-func (p *Pkg) RespondTo(si *avabot.StructuredInput) error {
+func (p *Pkg) RespondTo(si *datatypes.StructuredInput) error {
 	var replyErr error
-	args := avabot.Listener{Name: pkgName, SI: si}
-	if err = client.Call("Ava:RespondTo", args, &replyErr); err != nil {
+	args := Listener{Name: pkgName, SI: si}
+	if err := client.Call("Ava:RespondTo", args, &replyErr); err != nil {
 		return err
 	}
 	if replyErr != nil {
 		return replyErr
 	}
+	return nil
 }
 
 func bootRPCServer(port string) {
-	ava := new(avabot.Ava)
+	ava := new(Ava)
 	rpc.Register(ava)
 	rpc.HandleHTTP()
 	l, e := net.Listen("tcp", port)
