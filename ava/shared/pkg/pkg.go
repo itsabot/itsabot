@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/rpc"
-	"reflect"
 
 	"github.com/avabot/ava/shared/datatypes"
 )
@@ -43,7 +42,7 @@ func NewPackage(name, port, serverAddr string,
 	if len(port) == 0 {
 		return &Pkg{}, ErrMissingPort
 	}
-	if reflect.DeepEqual(trigger, datatypes.StructuredInput{}) {
+	if trigger == nil {
 		return &Pkg{}, ErrMissingTrigger
 	}
 	c := PkgConfig{
