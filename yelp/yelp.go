@@ -8,8 +8,8 @@ import (
 	"log"
 	"net/url"
 
-	"github.com/avabot/avabot/types"
-	"github.com/avabot/pkg"
+	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/pkg"
 	"github.com/garyburd/go-oauth/oauth"
 )
 
@@ -31,7 +31,7 @@ type response struct {
 		Location     struct {
 			Address        string
 			City           string
-			DisplayAddress string `json:"display_address"`
+			DisplayAddress []string `json:"display_address"`
 		}
 	}
 }
@@ -44,15 +44,8 @@ var credPath = flag.String(
 var c client
 
 func main() {
-	p, err := pkg.NewPackage("yelp", ":4001", "")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	if err := p.Register(); err != nil {
-		log.Fatalln(err)
-	}
 	// TODO: Handle contractions (e.g. "where's") and plurals in Ava itself
-	si := types.StructuredInput{
+	trigger := &datatypes.StructuredInput{
 		Command: []string{"find", "where", "show"},
 		Objects: []string{
 			"food",
@@ -66,15 +59,34 @@ func main() {
 			"italian",
 			"ramen",
 			"eat",
-			// Perhaps extend and move to a separate txt file
+			// Perhaps extend and move to a separate txt file in Ava's language package.
+			// Language.Foods()
 		},
 	}
-	if err := p.RespondTo(*si); err != nil {
+	p, err := pkg.NewPackage("yelp", ":4001", "", trigger)
+	if err != nil {
 		log.Fatalln(err)
 	}
 	if err := readCredentials(&c); err != nil {
 		log.Fatalln(err)
 	}
+	if err := p.Register(); err != nil {
+		log.Fatalln(err)
+	}
+}
+
+func (t *Yelp) Run(si *datatypes.StructuredInput) string {
+	var query string
+	for _, o := range si.Objects {
+		query += o + " "
+	}
+	resp, err := t.search(query, 0)
+	if err != nil {
+		// TODO: Save log
+		return "I couldn't run that for you at this time. " +
+			err.Error()
+	}
+	return resp
 }
 
 // TODO: Add support for custom sorting, locations
@@ -92,15 +104,13 @@ func (t *Yelp) search(query string, offset int) (string, error) {
 	if len(data.Businesses) == 0 {
 		return "I couldn't find any places like that nearby.", err
 	}
-	for _, b := range data.Businesses {
-		addr := ""
-		if len(b.Location.DisplayAddress) > 0 {
-			addr = b.Location.DisplayAddress[0]
-		}
-		log.Println(b.Name, addr)
-		return fmt.Printf("How does this place look? %s", addr)
+	b := data.Businesses[0]
+	addr := ""
+	if len(b.Location.DisplayAddress) > 0 {
+		addr = b.Location.DisplayAddress[0]
 	}
-	return ""
+	log.Println(b.Name, addr)
+	return "How does this place look? " + addr, nil
 }
 
 func readCredentials(c *client) error {

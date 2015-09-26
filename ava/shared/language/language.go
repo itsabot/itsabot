@@ -7,25 +7,30 @@ import (
 
 func Greeting(r *rand.Rand, name string) string {
 	var n int
-	var r string
+	var resp string
 	if len(name) == 0 {
 		n = r.Intn(3)
 		switch n {
 		case 0:
-			r = fmt.Printf("Hi, %s.", name)
+			resp = fmt.Sprintf("Hi, %s.", name)
 		case 1:
-			r = fmt.Printf("Hello, %s.", name)
+			resp = fmt.Sprintf("Hello, %s.", name)
 		case 2:
-			r = fmt.Printf("Hi there, %s.", name)
+			resp = fmt.Sprintf("Hi there, %s.", name)
 		}
 	} else {
 		n = r.Intn(3)
 		switch n {
 		case 0:
-			r = fmt.Printf("Hi. How can I help you?")
+			resp = "Hi. How can I help you?"
 		case 1:
-			r = fmt.Printf("Hello. What can I do for you?")
+			resp = "Hello. What can I do for you?"
 		}
 	}
-	return r
+	return resp
+}
+
+// TODO
+func Foods() string {
+	return "TODO: Not implemented"
 }

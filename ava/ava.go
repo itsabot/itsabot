@@ -21,6 +21,7 @@ import (
 var db *sqlx.DB
 var bayes *bayesian.Classifier
 var ErrInvalidCommand = errors.New("invalid command")
+var ErrMissingPackage = errors.New("missing package")
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
@@ -42,7 +43,7 @@ func main() {
 		},
 		cli.BoolFlag{
 			Name:  "install, i",
-			Usage: "install packages in package.conf",
+			Usage: "install packages in package.json",
 		},
 	}
 	app.Action = func(c *cli.Context) {
@@ -63,27 +64,13 @@ func main() {
 }
 
 func startServer(port string) {
-	var err error
 	db = connectDB()
-	// Load packages
-	/*
-		bc, err := loadConfig("packages.conf")
-		if err != nil {
-			log.Fatalln("could not load package", err)
-		}
-	*/
+	// TODO Load packages
+	var err error
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
 		log.Fatalln("error loading classifier", err)
 	}
-	/*
-		si, err := classify(bayes, "train _C(Order) _O(an Uber).")
-		if err != nil {
-			log.Fatalln("error classifying sentence", err)
-		}
-		log.Println(si)
-	*/
-
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
