@@ -2,44 +2,45 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net"
-	"net/http"
 	"net/rpc"
+	"strconv"
+	"strings"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
 )
 
 type Ava int
 
-var regPkgs map[string]*pkg.Pkg
+var regPkgs map[string]*pkg.PkgWrapper = map[string]*pkg.PkgWrapper{}
 var client *rpc.Client
-
-func bootRPCServer() {
-	ava := new(Ava)
-	rpc.Register(ava)
-	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", ":4001")
-	if e != nil {
-		log.Fatal("listen error:", e)
-	}
-	go http.Serve(l, nil)
-}
 
 // RegisterPackage enables Ava to notify packages when specific StructuredInput
 // is encountered. Note that packages will only listen when ALL criteria are met
-func (t *Ava) RegisterPackage(r *pkg.Pkg, reply *error) error {
-	for _, c := range r.Trigger.Command {
-		for _, o := range r.Trigger.Objects {
-			for _, a := range r.Trigger.Actors {
-				s := c + o + a
-				if regPkgs[s] != nil {
-					return fmt.Errorf(
-						"duplicate package: %s",
-						r.Config.Name)
-				}
-				regPkgs[s] = r
+func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
+	plog := log.WithField("package", p.Config.Name)
+	plog.Debug("registering package")
+	for _, c := range p.Trigger.Command {
+		for _, o := range p.Trigger.Objects {
+			s := strings.ToLower(c + o)
+			if regPkgs[s] != nil {
+				return fmt.Errorf(
+					"duplicate package: %s",
+					p.Config.Name)
+			}
+			var err error
+			port := ":" + strconv.Itoa(p.Config.Port)
+			addr := p.Config.ServerAddress + port
+			client, err = rpc.Dial("tcp", addr)
+			if err != nil {
+				return err
+			}
+			logger := log.WithField("package", p.Config.Name)
+			regPkgs[s] = &pkg.PkgWrapper{
+				P:         p,
+				RPCClient: client,
+				Logger:    logger,
 			}
 		}
 	}
@@ -47,16 +48,14 @@ func (t *Ava) RegisterPackage(r *pkg.Pkg, reply *error) error {
 }
 
 // callPkg finds the intersection of triggers
-func callPkg(si *datatypes.StructuredInput) (string, error) {
-	var p *pkg.Pkg
+func callPkg(uid string, si *datatypes.StructuredInput) (string, error) {
+	var p *pkg.PkgWrapper
 Loop:
 	for _, c := range si.Command {
 		for _, o := range si.Objects {
-			for _, a := range si.Actors {
-				p = regPkgs[c+o+a]
-				if p != nil {
-					break Loop
-				}
+			p = regPkgs[strings.ToLower(c+o)]
+			if p != nil {
+				break Loop
 			}
 		}
 	}
@@ -71,18 +70,11 @@ Loop:
 	}
 }
 
-// TODO: Setup client when package is registered, not when it's found
-func foundPkg(p *pkg.Pkg, si *datatypes.StructuredInput) (string, error) {
-	var err error
-	client, err = rpc.DialHTTP("tcp", p.Config.ServerAddress+p.Config.Port)
-	if err != nil {
-		return "", err
-	}
-	log.Println("Sending to ", p.Config.Name)
+func foundPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput) (string, error) {
+	log.Debug("sending structured input to ", pw.P.Config.Name)
+	c := pw.P.Config.Name + ".Run"
 	var reply string
-	c := p.Config.Name + ":Run"
-	err = client.Call(c, si, &reply)
-	if err != nil {
+	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
 		return "", err
 	}
 	return reply, nil

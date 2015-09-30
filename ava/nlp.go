@@ -3,13 +3,13 @@ package main
 import (
 	"bufio"
 	"errors"
-	"log"
 	"os"
 	"path"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/jbrukh/bayesian"
 )
@@ -19,40 +19,42 @@ const (
 	Actor   bayesian.Class = "Actor"
 	Object  bayesian.Class = "Object"
 	Time    bayesian.Class = "Time"
+	Place   bayesian.Class = "Place"
 	None    bayesian.Class = "None"
 )
 
 func train(c *bayesian.Classifier, s string) error {
+	log.Info("training classifier")
 	if err := trainClassifier(c, s); err != nil {
 		return err
 	}
-	if err := c.WriteClassesToFile(path.Join("data")); err != nil {
+	if err := c.WriteToFile(path.Join("data", "bayes.dat")); err != nil {
 		return err
 	}
 	return nil
 }
 
 func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
+	log.Debug("loading classifier")
+	filename := path.Join("data", "bayes.dat")
 	var err error
-
-	filename := path.Join("data", "common", "bayes.dat")
 	c, err = bayesian.NewClassifierFromFile(filename)
-	if err.Error() == "open data/common/bayes.dat: no such file or directory" {
+	if err != nil && err.Error() == "open data/bayes.dat: no such file or directory" {
+		log.Warn("classifier file not found. building...")
 		c, err = buildClassifier(c)
 		if err != nil {
 			return c, err
 		}
-		log.Println("c2", c)
 	} else if err != nil {
-		log.Println("!!", err)
+		log.Info("error loading bayes.dat", err)
 		return c, err
 	}
 	return c, nil
 }
 
 func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
-	c = bayesian.NewClassifier(Command, Actor, Object, Time, None)
-	filename := path.Join("training", "imperative.txt")
+	c = bayesian.NewClassifier(Command, Actor, Object, Time, Place, None)
+	filename := path.Join("data", "training", "imperative.txt")
 	fi, err := os.Open(filename)
 	if err != nil {
 		return c, err
@@ -62,16 +64,17 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	line := 1
 	for scanner.Scan() {
 		if err := trainClassifier(c, scanner.Text()); err != nil {
-			log.Fatalln("line", line, "::", err)
+			log.Error("line", line, "::", err)
 		}
 		line++
 	}
 	if err = scanner.Err(); err != nil {
 		return c, err
 	}
-	if err = c.WriteClassesToFile(path.Join("data")); err != nil {
+	if err = c.WriteToFile(path.Join("data", "bayes.dat")); err != nil {
 		return c, err
 	}
+	log.Debug("new classifier trained")
 	return c, nil
 }
 
@@ -125,7 +128,6 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 
 func extractFields(s string) ([]string, error) {
 	var ss []string
-
 	if len(s) == 0 {
 		return ss, errors.New("sentence too short to classify")
 	}
@@ -146,7 +148,7 @@ func extractFields(s string) ([]string, error) {
 		}
 		switch strings.ToLower(word) {
 		// Articles and prepositions
-		case "a", "an", "the", "before", "at", "after", "next":
+		case "a", "an", "the", "before", "at", "after", "next", "to":
 			wordBuf += w + " "
 		default:
 			ss = append(ss, wordBuf+w)
@@ -173,6 +175,7 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 	if err = si.Add(wc); err != nil {
 		return si, err
 	}
+	log.Info(si.String())
 	return si, nil
 }
 
@@ -190,6 +193,8 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 		return w[3:], Actor, nil
 	case 'T': // Time
 		return w[3:], Time, nil
+	case 'P':
+		return w[3:], Place, nil
 	case 'N': // None
 		return w[3:], None, nil
 	}
@@ -205,6 +210,8 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (datatypes.Word
 	if err != nil {
 		return wc, err
 	}
+	log.Debug("word: ", word1)
+	bigram := word1
 	trigram := word1
 	var word2 string
 	var word3 string
@@ -213,6 +220,7 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (datatypes.Word
 		if err != nil {
 			return wc, err
 		}
+		bigram += " " + word2
 		trigram += " " + word2
 	}
 	if i+2 < l {
@@ -222,6 +230,35 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (datatypes.Word
 		}
 		trigram += " " + word3
 	}
-	_, likely, _ := c.LogScores([]string{trigram})
+	probs, likely, _, err := c.SafeProbScores([]string{trigram})
+	if err != nil {
+		return wc, err
+	}
+	if max(probs) <= 0.7 {
+		log.Debug("try 2")
+		probs, likely, _, err = c.SafeProbScores([]string{bigram})
+		if err != nil {
+			return wc, err
+		}
+	}
+	if max(probs) <= 0.7 {
+		log.Debug("try 3")
+		probs, likely, _, err = c.SafeProbScores([]string{word1})
+		if err != nil {
+			return wc, err
+		}
+	}
+	// TODO Design a process for automated training
+	log.Info(probs)
 	return datatypes.WordClass{word1, likely}, nil
+}
+
+func max(slice []float64) float64 {
+	m := slice[0]
+	for index := 1; index < len(slice); index++ {
+		if slice[index] > m {
+			m = slice[index]
+		}
+	}
+	return m
 }

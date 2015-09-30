@@ -2,13 +2,16 @@ package main
 
 import (
 	"errors"
-	"log"
 	"math/rand"
+	"net"
 	"net/http"
+	"net/rpc"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/codegangsta/cli"
 	"github.com/jbrukh/bayesian"
@@ -24,9 +27,12 @@ var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 
 func main() {
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	rand.Seed(time.Now().UnixNano())
-
+	if os.Getenv("AVA_ENV") == "production" {
+		log.SetLevel(log.WarnLevel)
+	} else {
+		log.SetLevel(log.DebugLevel)
+	}
 	app := cli.NewApp()
 	app.Name = "ava"
 	app.Usage = "general purpose ai platform"
@@ -49,10 +55,11 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		showHelp := true
 		if c.Bool("install") {
-			log.Println("TODO: Install packages")
+			log.Info("TODO: Install packages")
 			showHelp = false
 		}
 		if c.Bool("server") {
+			db = connectDB()
 			startServer(c.String("port"))
 			showHelp = false
 		}
@@ -64,41 +71,56 @@ func main() {
 }
 
 func startServer(port string) {
-	db = connectDB()
-	// TODO Load packages
 	var err error
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
-		log.Fatalln("error loading classifier", err)
+		log.Error("loading classifier: ", err)
 	}
+	go bootRPCServer(port)
+	bootDependencies()
+	log.Debug("booting local server")
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
 }
 
-// route will determine what kind of request it is based on text.
-// Content can belong to multiple classes. Route returns []string,
-// which is used by os.Exec to run the commands.
-func route(content string) []string {
-	var pkgs []string
-
-	return pkgs
+func bootRPCServer(port string) {
+	ava := new(Ava)
+	if err := rpc.Register(ava); err != nil {
+		log.Error("register ava in rpc", err)
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		log.Error("convert port to int", err)
+	}
+	l, err := net.Listen("tcp", ":"+strconv.Itoa(p+1))
+	if err != nil {
+		log.Error("rpc listen: ", err)
+	}
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Error("rpc accept: ", err)
+		}
+		go rpc.ServeConn(conn)
+	}
 }
 
 func connectDB() *sqlx.DB {
+	log.Debug("connecting to db")
 	db, err := sqlx.Connect("postgres",
 		"user=egtann dbname=ava sslmode=disable")
 	if err != nil {
-		log.Fatalln(err)
+		log.Error("could not connect to db ", err.Error())
 	}
 	return db
-	// Run schema while testing
 }
 
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger())
 	e.Use(mw.Gzip())
 	e.Use(mw.Recover())
+	e.SetDebug(true)
 	e.Post("/", handlerMain)
 }
 
@@ -118,24 +140,14 @@ func handlerMain(c *echo.Context) error {
 	}
 	si, err = classify(bayes, cmd)
 	if err != nil {
-		log.Fatalln("error classifying sentence", err)
+		log.Error("error classifying sentence", err)
 	}
-	ret = si.String()
+	ret, err = callPkg(c.Form("id"), si)
+	if err != nil {
+		return err
+	}
 	// Update state machine
 	// Save last command (save structured input)
-	// Send to packages
-	/*
-		for _, pkg := range pkgs {
-			path := path.Join("packages", pkg)
-			out, err := exec.Command(path, cmd).CombinedOutput()
-			if err != nil {
-				log.Println("unable to run package", err)
-				return err
-			}
-			ret += string(out) + "\n\n"
-		}
-	*/
-
 Response:
 	err = c.HTML(http.StatusOK, ret)
 	if err != nil {

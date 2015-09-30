@@ -15,8 +15,18 @@ const (
 	ActorI
 	ObjectI
 	TimeI
+	PlaceI
 	NoneI
 )
+
+var String map[int]string = map[int]string{
+	CommandI: "Command",
+	ActorI:   "Actor",
+	ObjectI:  "Object",
+	TimeI:    "Time",
+	PlaceI:   "Place",
+	NoneI:    "None",
+}
 
 type StructuredInput struct {
 	Sentence string
@@ -24,15 +34,27 @@ type StructuredInput struct {
 	Actors   []string
 	Objects  []string
 	Times    []string
+	Places   []string
 }
 
 func (si *StructuredInput) String() string {
 	s := "\n"
-	s += "Command: " + strings.Join(si.Command, ", ") + "\n"
-	s += "Actors: " + strings.Join(si.Actors, ", ") + "\n"
-	s += "Objects: " + strings.Join(si.Objects, ", ") + "\n"
-	s += "Times: " + strings.Join(si.Times, ", ") + "\n"
-	return s
+	if len(si.Command) > 0 {
+		s += "Command: " + strings.Join(si.Command, ", ") + "\n"
+	}
+	if len(si.Actors) > 0 {
+		s += "Actors: " + strings.Join(si.Actors, ", ") + "\n"
+	}
+	if len(si.Objects) > 0 {
+		s += "Objects: " + strings.Join(si.Objects, ", ") + "\n"
+	}
+	if len(si.Times) > 0 {
+		s += "Times: " + strings.Join(si.Times, ", ") + "\n"
+	}
+	if len(si.Places) > 0 {
+		s += "Places: " + strings.Join(si.Places, ", ") + "\n"
+	}
+	return s[:len(s)-1] + "\n"
 }
 
 type WordClass struct {
@@ -56,6 +78,8 @@ func (si *StructuredInput) Add(wc []WordClass) error {
 			si.Objects = append(si.Objects, w.Word)
 		case TimeI:
 			si.Times = append(si.Times, w.Word)
+		case PlaceI:
+			si.Places = append(si.Places, w.Word)
 		case NoneI:
 			// Do nothing
 		default:

@@ -30,7 +30,24 @@ func Greeting(r *rand.Rand, name string) string {
 	return resp
 }
 
+// TODO: Extend
+func Foods() []string {
+	return []string{
+		"food",
+		"restaurant",
+		"restaurants",
+		"pizza",
+		"chinese",
+		"japanese",
+		"korean",
+		"asian",
+		"italian",
+		"ramen",
+		"to eat",
+	}
+}
+
 // TODO
-func Foods() string {
+func USCities() string {
 	return "TODO: Not implemented"
 }
