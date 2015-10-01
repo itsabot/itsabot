@@ -80,7 +80,8 @@ func (p *Pkg) Register() error {
 	var notused error
 	plog.Debug("registering with ava")
 	err = client.Call("Ava.RegisterPackage", p, &notused)
-	if err != nil && err.Error() != "gob: type rpc.Client has no exported fields" {
+	if err != nil &&
+		err.Error() != "gob: type rpc.Client has no exported fields" {
 		plog.Error(err.Error())
 		return err
 	}

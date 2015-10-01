@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/rpc"
 	"net/url"
+	"os"
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
@@ -17,7 +18,7 @@ import (
 	"github.com/garyburd/go-oauth/oauth"
 )
 
-type Yelp int
+type Yelp string
 
 type client struct {
 	client oauth.Client
@@ -31,9 +32,8 @@ type response struct {
 		MobileUrl    string `json:"mobile_url"`
 		DisplayPhone string `json:"display_phone"`
 		Distance     int
-		Rating       int
+		Rating       float64
 		Location     struct {
-			Address        string
 			City           string
 			DisplayAddress []string `json:"display_address"`
 		}
@@ -50,6 +50,11 @@ var c client
 var plog *log.Entry
 
 func main() {
+	if os.Getenv("AVA_ENV") == "production" {
+		log.SetLevel(log.WarnLevel)
+	} else {
+		log.SetLevel(log.DebugLevel)
+	}
 	plog = log.WithField("package", "yelp")
 	if err := readCredentials(&c); err != nil {
 		plog.Fatalln(err)
@@ -70,15 +75,22 @@ func main() {
 	if err != nil {
 		plog.Fatal("creating package", p.Config.Name, err)
 	}
+	l := bootRPCServer(4002)
 	if err := p.Register(); err != nil &&
 		err.Error() != "gob: type rpc.Client has no exported fields" {
-		plog.Fatal("registering package", p.Config.Name, err)
+		plog.Fatal("registering package ", err)
 	}
-	bootRPCServer(4002)
-	plog.Debug("booted " + p.Config.Name)
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			plog.Fatal(err)
+		}
+		go rpc.ServeConn(conn)
+	}
 }
 
 func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
+	plog.Debug("package called")
 	var query, location string
 	for _, o := range si.Objects {
 		query += o + " "
@@ -86,13 +98,14 @@ func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
 	for _, p := range si.Places {
 		query += p + " "
 	}
+	// TODO: Get location if unknown
+	location = "Santa Monica"
 	r, err := t.search(query, location, 0)
 	if err != nil {
-		// TODO: Save log
+		plog.Error("search yelp: ", err)
 		r = "I couldn't run that for you at this time."
 	}
-	plog.Debug("yelp api response: " + r)
-	resp = &r
+	*resp = r
 	return nil
 }
 
@@ -121,7 +134,6 @@ func (t *Yelp) search(query, location string, offset int) (string, error) {
 }
 
 func readCredentials(c *client) error {
-	plog.Debug("credential path")
 	b, err := ioutil.ReadFile(*credPath)
 	if err != nil {
 		return err
@@ -149,12 +161,13 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		plog.Error(resp)
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func bootRPCServer(port int) {
+func bootRPCServer(port int) net.Listener {
 	yelp := new(Yelp)
 	if err := rpc.Register(yelp); err != nil {
 		plog.Fatalln(err)
@@ -163,11 +176,5 @@ func bootRPCServer(port int) {
 	if err != nil {
 		plog.Fatalln("rpc listen:", err)
 	}
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			plog.Fatalln("rpc accept:", err)
-		}
-		go rpc.ServeConn(conn)
-	}
+	return l
 }

@@ -13,6 +13,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/language"
 	"github.com/codegangsta/cli"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
@@ -76,9 +77,9 @@ func startServer(port string) {
 	if err != nil {
 		log.Error("loading classifier: ", err)
 	}
-	go bootRPCServer(port)
-	bootDependencies()
 	log.Debug("booting local server")
+	bootRPCServer(port)
+	bootDependencies()
 	e := echo.New()
 	initRoutes(e)
 	e.Run(":" + port)
@@ -93,17 +94,21 @@ func bootRPCServer(port string) {
 	if err != nil {
 		log.Error("convert port to int", err)
 	}
-	l, err := net.Listen("tcp", ":"+strconv.Itoa(p+1))
+	pt := strconv.Itoa(p + 1)
+	l, err := net.Listen("tcp", ":"+pt)
+	log.WithField("port", pt).Debug("booting rpc server")
 	if err != nil {
 		log.Error("rpc listen: ", err)
 	}
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Error("rpc accept: ", err)
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Error("rpc accept: ", err)
+			}
+			go rpc.ServeConn(conn)
 		}
-		go rpc.ServeConn(conn)
-	}
+	}()
 }
 
 func connectDB() *sqlx.DB {
@@ -133,18 +138,21 @@ func handlerMain(c *echo.Context) error {
 		return ErrInvalidCommand
 	}
 	if strings.ToLower(cmd)[0:5] == "train" {
-		if err := train(bayes, cmd[7:]); err != nil {
+		if err := train(bayes, cmd[6:]); err != nil {
 			return err
 		}
 		goto Response
 	}
 	si, err = classify(bayes, cmd)
 	if err != nil {
-		log.Error("error classifying sentence", err)
+		log.Error("error classifying sentence ", err)
 	}
 	ret, err = callPkg(c.Form("id"), si)
-	if err != nil {
+	if err != nil && err.Error() != "missing package" {
 		return err
+	}
+	if len(ret) == 0 {
+		ret = language.Confused()
 	}
 	// Update state machine
 	// Save last command (save structured input)

@@ -6,8 +6,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
@@ -89,6 +87,8 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 	if err != nil {
 		return err
 	}
+	log.Debug("fields: ", ws)
+	log.Debug("len: ", len(ws))
 	l := len(ws)
 	for i := 0; i < l; i++ {
 		var word2 string
@@ -127,35 +127,11 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 }
 
 func extractFields(s string) ([]string, error) {
-	var ss []string
 	if len(s) == 0 {
-		return ss, errors.New("sentence too short to classify")
+		return []string{}, errors.New("sentence too short to classify")
 	}
-	wordBuf := ""
 	ws := strings.Fields(s)
-	for _, w := range ws {
-		r, _ := utf8.DecodeRuneInString(w)
-		if r == '_' {
-			r, _ = utf8.DecodeRuneInString(w[3:])
-		}
-		if unicode.IsNumber(r) {
-			wordBuf += w + " "
-			continue
-		}
-		word, _, err := extractEntity(w)
-		if err != nil {
-			return ss, err
-		}
-		switch strings.ToLower(word) {
-		// Articles and prepositions
-		case "a", "an", "the", "before", "at", "after", "next", "to":
-			wordBuf += w + " "
-		default:
-			ss = append(ss, wordBuf+w)
-			wordBuf = ""
-		}
-	}
-	return ss, nil
+	return ws, nil
 }
 
 func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, error) {
@@ -180,7 +156,7 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 }
 
 func extractEntity(w string) (string, bayesian.Class, error) {
-	w = strings.TrimRight(w, ").,;")
+	w = strings.TrimRight(w, ").,;?")
 	if w[0] != '_' {
 		return w, "", nil
 	}
@@ -201,16 +177,21 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 	return w, "", errors.New("syntax error in entity")
 }
 
-func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (datatypes.WordClass,
-	error) {
+// classifyTrigram determines the best classification for a word in a sentence
+// given its surrounding context (i, i+1, i+2). Underflow on the returned
+// probabilities is possible, but ignored, since classifyTrigram prefers a >=70%
+// confidence level.
+func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
+	datatypes.WordClass, error) {
 
+	// TODO: Given the last 2 words of a sentence, construct the trigram
+	// including prior words.
 	var wc datatypes.WordClass
 	l := len(ws)
 	word1, _, err := extractEntity(ws[i])
 	if err != nil {
 		return wc, err
 	}
-	log.Debug("word: ", word1)
 	bigram := word1
 	trigram := word1
 	var word2 string
@@ -230,26 +211,17 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (datatypes.Word
 		}
 		trigram += " " + word3
 	}
-	probs, likely, _, err := c.SafeProbScores([]string{trigram})
-	if err != nil {
-		return wc, err
-	}
+	probs, likely, _ := c.ProbScores([]string{trigram})
 	if max(probs) <= 0.7 {
-		log.Debug("try 2")
-		probs, likely, _, err = c.SafeProbScores([]string{bigram})
-		if err != nil {
-			return wc, err
-		}
+		probs, likely, _ = c.ProbScores([]string{bigram})
 	}
-	if max(probs) <= 0.7 {
-		log.Debug("try 3")
-		probs, likely, _, err = c.SafeProbScores([]string{word1})
-		if err != nil {
-			return wc, err
-		}
+	m := max(probs)
+	if m <= 0.7 {
+		probs, likely, _ = c.ProbScores([]string{word1})
 	}
-	// TODO Design a process for automated training
-	log.Info(probs)
+	// TODO Design a process for automated training when confidence remains
+	// low.
+	log.Debug(word1, " || ", datatypes.String[likely], " || ", m)
 	return datatypes.WordClass{word1, likely}, nil
 }
 

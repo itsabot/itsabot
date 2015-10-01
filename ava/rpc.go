@@ -19,27 +19,26 @@ var client *rpc.Client
 // RegisterPackage enables Ava to notify packages when specific StructuredInput
 // is encountered. Note that packages will only listen when ALL criteria are met
 func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
-	plog := log.WithField("package", p.Config.Name)
-	plog.Debug("registering package")
+	pt := p.Config.Port + 1
+	log.WithField("port", pt).Debug("registering package with listen port")
+	port := ":" + strconv.Itoa(pt)
+	addr := p.Config.ServerAddress + port
+	cl, err := rpc.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
 	for _, c := range p.Trigger.Command {
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + o)
 			if regPkgs[s] != nil {
 				return fmt.Errorf(
-					"duplicate package: %s",
+					"duplicate package or trigger: %s",
 					p.Config.Name)
-			}
-			var err error
-			port := ":" + strconv.Itoa(p.Config.Port)
-			addr := p.Config.ServerAddress + port
-			client, err = rpc.Dial("tcp", addr)
-			if err != nil {
-				return err
 			}
 			logger := log.WithField("package", p.Config.Name)
 			regPkgs[s] = &pkg.PkgWrapper{
 				P:         p,
-				RPCClient: client,
+				RPCClient: cl,
 				Logger:    logger,
 			}
 		}
@@ -47,14 +46,15 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	return nil
 }
 
-// callPkg finds the intersection of triggers
 func callPkg(uid string, si *datatypes.StructuredInput) (string, error) {
 	var p *pkg.PkgWrapper
 Loop:
 	for _, c := range si.Command {
 		for _, o := range si.Objects {
 			p = regPkgs[strings.ToLower(c+o)]
+			log.Debug("searching for " + strings.ToLower(c+o))
 			if p != nil {
+				log.Debug("found pkg")
 				break Loop
 			}
 		}
@@ -72,10 +72,11 @@ Loop:
 
 func foundPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput) (string, error) {
 	log.Debug("sending structured input to ", pw.P.Config.Name)
-	c := pw.P.Config.Name + ".Run"
+	c := strings.Title(pw.P.Config.Name) + ".Run"
 	var reply string
 	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
 		return "", err
 	}
+	log.Debug("r: ", reply)
 	return reply, nil
 }
