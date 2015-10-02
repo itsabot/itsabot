@@ -17,6 +17,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	_ "github.com/lib/pq"
@@ -72,13 +73,16 @@ func main() {
 }
 
 func startServer(port string) {
-	var err error
+	if err := godotenv.Load(); err != nil {
+		log.Error("loading environment: ", err)
+	}
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
 		log.Error("loading classifier: ", err)
 	}
 	log.Debug("booting local server")
 	bootRPCServer(port)
+	bootTwilio()
 	bootDependencies()
 	e := echo.New()
 	initRoutes(e)
@@ -127,6 +131,11 @@ func initRoutes(e *echo.Echo) {
 	e.Use(mw.Recover())
 	e.SetDebug(true)
 	e.Post("/", handlerMain)
+	e.Post("/twilio", handlerTwilio)
+}
+
+// TODO
+func handlerTwilio(c *echo.Context) error {
 }
 
 func handlerMain(c *echo.Context) error {
@@ -137,7 +146,7 @@ func handlerMain(c *echo.Context) error {
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
-	if strings.ToLower(cmd)[0:5] == "train" {
+	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
 			return err
 		}

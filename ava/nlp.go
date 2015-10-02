@@ -155,6 +155,9 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 	return si, nil
 }
 
+// extractEntity from a word. If a Command, strip any contraction. For example,
+// "where's" -> where. Since Ava ignores linking verbs, there's no need to
+// add "is" back into the sentence.
 func extractEntity(w string) (string, bayesian.Class, error) {
 	w = strings.TrimRight(w, ").,;?")
 	if w[0] != '_' {
@@ -192,24 +195,26 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	if err != nil {
 		return wc, err
 	}
-	bigram := word1
-	trigram := word1
-	var word2 string
-	var word3 string
+	word1c := stripContraction(word1)
+	bigram := word1c
+	trigram := word1c
+	var word2, word2c, word3, word3c string
 	if i+1 < l {
 		word2, _, err = extractEntity(ws[i+1])
 		if err != nil {
 			return wc, err
 		}
-		bigram += " " + word2
-		trigram += " " + word2
+		word2c = stripContraction(word2)
+		bigram += " " + word2c
+		trigram += " " + word2c
 	}
 	if i+2 < l {
 		word3, _, err = extractEntity(ws[i+2])
 		if err != nil {
 			return wc, err
 		}
-		trigram += " " + word3
+		word3c = stripContraction(word3)
+		trigram += " " + word3c
 	}
 	probs, likely, _ := c.ProbScores([]string{trigram})
 	if max(probs) <= 0.7 {
@@ -221,7 +226,9 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	}
 	// TODO Design a process for automated training when confidence remains
 	// low.
-	log.Debug(word1, " || ", datatypes.String[likely], " || ", m)
+	if m <= 0.7 {
+		log.Debug(word1, " || ", datatypes.String[likely])
+	}
 	return datatypes.WordClass{word1, likely}, nil
 }
 
@@ -233,4 +240,19 @@ func max(slice []float64) float64 {
 		}
 	}
 	return m
+}
+
+func stripContraction(w string) string {
+	// TODO Check contractions.txt for reasonable things that should be
+	// added back.
+	if len(w) <= 2 {
+		return w
+	}
+	if w[len(w)-2] == '\'' {
+		return w[:len(w)-2]
+	}
+	if w[len(w)-3] == '\'' {
+		return w[:len(w)-3]
+	}
+	return w
 }

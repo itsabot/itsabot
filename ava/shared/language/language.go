@@ -60,6 +60,8 @@ func SuggestedPlace(s string) string {
 	case 3:
 		return "You could try this: " + s
 	}
+	log.Error("suggestedPlace failed to return a response")
+	return ""
 }
 
 // TODO: Extend
@@ -75,7 +77,8 @@ func Foods() []string {
 		"italian",
 		"ramen",
 		"pizza",
-		"to eat",
+		"burger",
+		"eat",
 	}
 }
 

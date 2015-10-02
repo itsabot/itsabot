@@ -1,3 +1,4 @@
 ava
 *.sw*
 bayes.dat
+.env

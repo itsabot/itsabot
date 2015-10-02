@@ -2,8 +2,8 @@ package pkg
 
 import (
 	"errors"
+	"net"
 	"net/rpc"
-	"os"
 	"strconv"
 
 	log "github.com/Sirupsen/logrus"
@@ -43,18 +43,21 @@ var (
 	ErrMissingTrigger     = errors.New("missing package trigger")
 )
 
-func NewPackage(name, serverAddr string, port int,
+func NewPackage(name string, trigger *datatypes.StructuredInput) (*Pkg, error) {
+	return NewPackageWithServer(name, "", trigger)
+}
+
+func NewPackageWithServer(name, serverAddr string,
 	trigger *datatypes.StructuredInput) (*Pkg, error) {
 
 	if len(name) == 0 {
 		return &Pkg{}, ErrMissingPackageName
 	}
-	if port == 0 {
-		return &Pkg{}, ErrMissingPort
-	}
 	if trigger == nil {
 		return &Pkg{}, ErrMissingTrigger
 	}
+	// TODO: Find open ports.
+	port := 4001
 	c := PkgConfig{
 		Name:          name,
 		Port:          port,
@@ -64,14 +67,15 @@ func NewPackage(name, serverAddr string, port int,
 }
 
 // Register with Ava to begin communicating over RPC.
-func (p *Pkg) Register() error {
-	if os.Getenv("AVA_ENV") == "production" {
-		log.SetLevel(log.WarnLevel)
-	} else {
-		log.SetLevel(log.DebugLevel)
-	}
+func (p *Pkg) Register(pkgT interface{}) error {
 	plog := log.WithField("package", p.Config.Name)
-	var err error
+	l, err := net.Listen("tcp", ":"+strconv.Itoa(p.Config.Port+1))
+	if err != nil {
+		plog.Fatalln("rpc listen:", err)
+	}
+	if err := rpc.Register(pkgT); err != nil {
+		plog.Fatal(err)
+	}
 	port := ":" + strconv.Itoa(p.Config.Port)
 	client, err = rpc.Dial("tcp", p.Config.ServerAddress+port)
 	if err != nil {
@@ -91,6 +95,13 @@ func (p *Pkg) Register() error {
 	}
 	plog.Debug("connected with database")
 	plog.Info("loaded")
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			plog.Fatal(err)
+		}
+		go rpc.ServeConn(conn)
+	}
 	return nil
 }
 

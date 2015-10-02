@@ -5,11 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net"
-	"net/rpc"
 	"net/url"
-	"os"
-	"strconv"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
@@ -50,16 +46,7 @@ var c client
 var plog *log.Entry
 
 func main() {
-	if os.Getenv("AVA_ENV") == "production" {
-		log.SetLevel(log.WarnLevel)
-	} else {
-		log.SetLevel(log.DebugLevel)
-	}
 	plog = log.WithField("package", "yelp")
-	if err := readCredentials(&c); err != nil {
-		plog.Fatalln(err)
-	}
-	// TODO: Handle contractions (e.g. "where's") and plurals in Ava itself
 	trigger := &datatypes.StructuredInput{
 		Command: []string{
 			"find",
@@ -71,21 +58,13 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err := pkg.NewPackage("yelp", "", 4001, trigger)
+	p, err := pkg.NewPackage("yelp", trigger)
 	if err != nil {
 		plog.Fatal("creating package", p.Config.Name, err)
 	}
-	l := bootRPCServer(4002)
-	if err := p.Register(); err != nil &&
-		err.Error() != "gob: type rpc.Client has no exported fields" {
+	yelp := new(Yelp)
+	if err := p.Register(yelp); err != nil {
 		plog.Fatal("registering package ", err)
-	}
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			plog.Fatal(err)
-		}
-		go rpc.ServeConn(conn)
 	}
 }
 
@@ -165,16 +144,4 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
-}
-
-func bootRPCServer(port int) net.Listener {
-	yelp := new(Yelp)
-	if err := rpc.Register(yelp); err != nil {
-		plog.Fatalln(err)
-	}
-	l, err := net.Listen("tcp", ":"+strconv.Itoa(port))
-	if err != nil {
-		plog.Fatalln("rpc listen:", err)
-	}
-	return l
 }

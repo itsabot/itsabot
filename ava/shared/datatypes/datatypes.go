@@ -29,6 +29,7 @@ var String map[int]string = map[int]string{
 }
 
 type StructuredInput struct {
+	Id       string
 	Sentence string
 	Command  []string
 	Actors   []string
