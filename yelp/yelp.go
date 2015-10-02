@@ -48,7 +48,7 @@ var plog *log.Entry
 func main() {
 	plog = log.WithField("package", "yelp")
 	trigger := &datatypes.StructuredInput{
-		Command: []string{
+		Commands: []string{
 			"find",
 			"where",
 			"show",

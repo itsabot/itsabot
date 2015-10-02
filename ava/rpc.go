@@ -27,7 +27,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	if err != nil {
 		return err
 	}
-	for _, c := range p.Trigger.Command {
+	for _, c := range p.Trigger.Commands {
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + o)
 			if regPkgs[s] != nil {
@@ -46,10 +46,10 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	return nil
 }
 
-func callPkg(uid string, si *datatypes.StructuredInput) (string, error) {
+func getPkg(si *datatypes.StructuredInput) (*pkg.PkgWrapper, error) {
 	var p *pkg.PkgWrapper
 Loop:
-	for _, c := range si.Command {
+	for _, c := range si.Commands {
 		for _, o := range si.Objects {
 			p = regPkgs[strings.ToLower(c+o)]
 			log.Debug("searching for " + strings.ToLower(c+o))
@@ -60,17 +60,14 @@ Loop:
 		}
 	}
 	if p == nil {
-		return "", ErrMissingPackage
+		return nil, ErrMissingPackage
 	} else {
-		resp, err := foundPkg(p, si)
-		if err != nil {
-			return "", err
-		}
-		return resp, nil
+		return p, nil
 	}
 }
 
-func foundPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput) (string, error) {
+func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput) (string,
+	error) {
 	log.Debug("sending structured input to ", pw.P.Config.Name)
 	c := strings.Title(pw.P.Config.Name) + ".Run"
 	var reply string

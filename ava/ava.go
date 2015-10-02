@@ -14,6 +14,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
+	"github.com/avabot/ava/shared/pkg"
 	"github.com/codegangsta/cli"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
@@ -73,7 +74,8 @@ func main() {
 }
 
 func startServer(port string) {
-	if err := godotenv.Load(); err != nil {
+	var err error
+	if err = godotenv.Load(); err != nil {
 		log.Error("loading environment: ", err)
 	}
 	bayes, err = loadClassifier(bayes)
@@ -136,16 +138,22 @@ func initRoutes(e *echo.Echo) {
 
 // TODO
 func handlerTwilio(c *echo.Context) error {
+	log.Error("twilio endpoint not implemented")
+	return errors.New("not implemented")
 }
 
 func handlerMain(c *echo.Context) error {
-	var ret string
-	var err error
-	si := &datatypes.StructuredInput{}
 	cmd := c.Form("cmd")
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
+	var ret string
+	var err error
+	var uid int
+	var fidT int
+	var pw *pkg.PkgWrapper
+	var pname string
+	si := &datatypes.StructuredInput{}
 	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
 			return err
@@ -154,17 +162,43 @@ func handlerMain(c *echo.Context) error {
 	}
 	si, err = classify(bayes, cmd)
 	if err != nil {
-		log.Error("error classifying sentence ", err)
+		log.Error("classifying sentence ", err)
 	}
-	ret, err = callPkg(c.Form("id"), si)
+	uid, err = strconv.Atoi(c.Form("uid"))
+	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		uid = 0
+	} else if err != nil {
+		return err
+	}
+	fidT, err = strconv.Atoi(c.Form("flexidtype"))
+	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		fidT = 0
+	} else if err != nil {
+		return err
+	}
+	si, err = addContext(si, uid, c.Form("flexid"), fidT)
+	if err != nil {
+		log.Error("adding context ", err)
+	}
+	pw, err = getPkg(si)
 	if err != nil && err.Error() != "missing package" {
 		return err
+	}
+	if pw != nil {
+		ret, err = callPkg(pw, si)
+		if err != nil && err.Error() != "missing package" {
+			return err
+		}
 	}
 	if len(ret) == 0 {
 		ret = language.Confused()
 	}
-	// Update state machine
-	// Save last command (save structured input)
+	if pw != nil {
+		pname = pw.P.Config.Name
+	}
+	if err := saveStructuredInput(si, ret, pname); err != nil {
+		return err
+	}
 Response:
 	err = c.HTML(http.StatusOK, ret)
 	if err != nil {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"database/sql"
 	"errors"
 	"os"
 	"path"
@@ -20,6 +21,8 @@ const (
 	Place   bayesian.Class = "Place"
 	None    bayesian.Class = "None"
 )
+
+var ErrMissingFlexIdType = errors.New("missing flexidtype")
 
 func train(c *bayesian.Classifier, s string) error {
 	log.Info("training classifier")
@@ -151,7 +154,83 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 	if err = si.Add(wc); err != nil {
 		return si, err
 	}
-	log.Info(si.String())
+	return si, nil
+}
+
+// addContext to a StructuredInput, adding a user identifier and replacing
+// pronouns with the nouns to which they refer.
+func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
+	*datatypes.StructuredInput, error) {
+	si.UserId = uid
+	si.FlexId = fid
+	si.FlexIdType = fidT
+	if len(si.FlexId) > 0 && si.FlexIdType == 0 {
+		return si, ErrMissingFlexIdType
+	}
+	if si.UserId == 0 {
+		if len(si.FlexId) > 0 {
+			q := `SELECT id FROM users WHERE `
+			if si.FlexIdType == datatypes.FlexIdTypeEmail {
+				q += `email=$1`
+			} else if si.FlexIdType == datatypes.FlexIdTypePhone {
+				q += `phone=$1`
+			}
+			if err := db.Get(&si.UserId, q, si.FlexId); err != nil {
+				log.Error("query userid: ", err)
+			}
+		}
+		if si.UserId == 0 {
+			log.Debug("no userid found")
+		}
+	}
+	for i, w := range si.Pronouns() {
+		var q string
+		var dest *[]string
+		var orig []string
+		var s datatypes.StructuredInput
+		switch datatypes.Pronouns[w] {
+		case datatypes.ObjectI:
+			// NOTE trailing space is significant
+			q = `SELECT objects FROM inputs `
+			dest = &s.Objects
+			orig = si.Objects
+		case datatypes.ActorI:
+			q = `SELECT actors FROM inputs `
+			dest = &s.Actors
+			orig = si.Actors
+		case datatypes.TimeI:
+			q = `SELECT times FROM inputs `
+			dest = &s.Times
+			orig = si.Times
+		case datatypes.PlaceI:
+			q = `SELECT places FROM inputs `
+			dest = &s.Places
+			orig = si.Places
+		default:
+			return si, errors.New("unknown type found for pronoun")
+		}
+		if si.UserId > 0 {
+			q += `WHERE userid=$1 ORDER BY createdat DESC`
+			if err := db.Get(dest, q, si.UserId); err != nil {
+				log.Error("query last input: ", err)
+			}
+		} else {
+			// NOTE there is a minor security vulnerability here,
+			// since FlexIds are not guaranteed to identify the
+			// user. That is, FlexIds can be spoofed, and by asking
+			// something with a pronoun, a hostile user could get
+			// information about a user's previous request.
+			q += `WHERE flexid=$1 ORDER BY createdat DESC`
+			err := db.Get(dest, q, si.FlexId)
+			if err != nil && err != sql.ErrNoRows {
+				log.Error("query last input: ", err)
+			}
+		}
+		if len(*dest) > 0 {
+			d := *dest
+			orig[i] = d[len(d)-1]
+		}
+	}
 	return si, nil
 }
 
@@ -186,7 +265,6 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 // confidence level.
 func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	datatypes.WordClass, error) {
-
 	// TODO: Given the last 2 words of a sentence, construct the trigram
 	// including prior words.
 	var wc datatypes.WordClass
@@ -227,9 +305,9 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	// TODO Design a process for automated training when confidence remains
 	// low.
 	if m <= 0.7 {
-		log.Debug(word1, " || ", datatypes.String[likely])
+		log.Debug(word1, " || ", datatypes.String[likely+1])
 	}
-	return datatypes.WordClass{word1, likely}, nil
+	return datatypes.WordClass{word1, likely + 1}, nil
 }
 
 func max(slice []float64) float64 {
