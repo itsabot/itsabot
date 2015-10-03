@@ -22,7 +22,10 @@ const (
 	None    bayesian.Class = "None"
 )
 
-var ErrMissingFlexIdType = errors.New("missing flexidtype")
+var (
+	ErrMissingFlexIdType = errors.New("missing flexidtype")
+	ErrSentenceTooShort  = errors.New("sentence too short to classify")
+)
 
 func train(c *bayesian.Classifier, s string) error {
 	log.Info("training classifier")
@@ -81,17 +84,12 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 
 func trainClassifier(c *bayesian.Classifier, s string) error {
 	if len(s) == 0 {
-		return nil
+		return ErrSentenceTooShort
 	}
 	if s[0] == '/' {
 		return nil
 	}
-	ws, err := extractFields(s)
-	if err != nil {
-		return err
-	}
-	log.Debug("fields: ", ws)
-	log.Debug("len: ", len(ws))
+	ws := strings.Fields(s)
 	l := len(ws)
 	for i := 0; i < l; i++ {
 		var word2 string
@@ -129,20 +127,12 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 	return nil
 }
 
-func extractFields(s string) ([]string, error) {
-	if len(s) == 0 {
-		return []string{}, errors.New("sentence too short to classify")
-	}
-	ws := strings.Fields(s)
-	return ws, nil
-}
-
 func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, error) {
 	si := &datatypes.StructuredInput{}
-	ws, err := extractFields(s)
-	if err != nil {
-		return si, err
+	if len(s) == 0 {
+		return si, ErrSentenceTooShort
 	}
+	ws := strings.Fields(s)
 	var wc []datatypes.WordClass
 	for i := range ws {
 		tmp, err := classifyTrigram(c, ws, i)
@@ -151,7 +141,7 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 		}
 		wc = append(wc, tmp)
 	}
-	if err = si.Add(wc); err != nil {
+	if err := si.Add(wc); err != nil {
 		return si, err
 	}
 	return si, nil
@@ -160,78 +150,69 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 // addContext to a StructuredInput, adding a user identifier and replacing
 // pronouns with the nouns to which they refer.
 func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
-	*datatypes.StructuredInput, error) {
-	si.UserId = uid
-	si.FlexId = fid
-	si.FlexIdType = fidT
-	if len(si.FlexId) > 0 && si.FlexIdType == 0 {
-		return si, ErrMissingFlexIdType
+	*datatypes.StructuredInput, bool, error) {
+	u, err := getUser(si)
+	if err != nil && err != sql.ErrNoRows {
+		return si, false, err
 	}
-	if si.UserId == 0 {
-		if len(si.FlexId) > 0 {
-			q := `SELECT id FROM users WHERE `
-			if si.FlexIdType == datatypes.FlexIdTypeEmail {
-				q += `email=$1`
-			} else if si.FlexIdType == datatypes.FlexIdTypePhone {
-				q += `phone=$1`
-			}
-			if err := db.Get(&si.UserId, q, si.FlexId); err != nil {
-				log.Error("query userid: ", err)
-			}
-		}
-		if si.UserId == 0 {
-			log.Debug("no userid found")
-		}
-	}
-	for i, w := range si.Pronouns() {
-		var q string
-		var dest *[]string
-		var orig []string
-		var s datatypes.StructuredInput
+	ctxAdded := false
+	for _, w := range si.Pronouns() {
+		var ctx string
 		switch datatypes.Pronouns[w] {
 		case datatypes.ObjectI:
-			// NOTE trailing space is significant
-			q = `SELECT objects FROM inputs `
-			dest = &s.Objects
-			orig = si.Objects
+			ctx, err = getContextObject(u, si, "objects")
+			if err != nil {
+				return si, false, err
+			}
+			for i, o := range si.Objects {
+				if o != w {
+					continue
+				}
+				si.Objects[i] = ctx
+				ctxAdded = true
+			}
 		case datatypes.ActorI:
-			q = `SELECT actors FROM inputs `
-			dest = &s.Actors
-			orig = si.Actors
+			ctx, err = getContextObject(u, si, "actors")
+			if err != nil {
+				return si, false, err
+			}
+			for i, o := range si.Actors {
+				if o != w {
+					continue
+				}
+				si.Actors[i] = ctx
+				ctxAdded = true
+			}
 		case datatypes.TimeI:
-			q = `SELECT times FROM inputs `
-			dest = &s.Times
-			orig = si.Times
+			ctx, err = getContextObject(u, si, "times")
+			if err != nil {
+				return si, false, err
+			}
+			for i, o := range si.Times {
+				if o != w {
+					continue
+				}
+				si.Times[i] = ctx
+				ctxAdded = true
+			}
 		case datatypes.PlaceI:
-			q = `SELECT places FROM inputs `
-			dest = &s.Places
-			orig = si.Places
+			ctx, err = getContextObject(u, si, "places")
+			if err != nil {
+				return si, false, err
+			}
+			for i, o := range si.Places {
+				if o != w {
+					continue
+				}
+				si.Places[i] = ctx
+				ctxAdded = true
+			}
 		default:
-			return si, errors.New("unknown type found for pronoun")
+			return si, false, errors.New("unknown type found for pronoun")
 		}
-		if si.UserId > 0 {
-			q += `WHERE userid=$1 ORDER BY createdat DESC`
-			if err := db.Get(dest, q, si.UserId); err != nil {
-				log.Error("query last input: ", err)
-			}
-		} else {
-			// NOTE there is a minor security vulnerability here,
-			// since FlexIds are not guaranteed to identify the
-			// user. That is, FlexIds can be spoofed, and by asking
-			// something with a pronoun, a hostile user could get
-			// information about a user's previous request.
-			q += `WHERE flexid=$1 ORDER BY createdat DESC`
-			err := db.Get(dest, q, si.FlexId)
-			if err != nil && err != sql.ErrNoRows {
-				log.Error("query last input: ", err)
-			}
-		}
-		if len(*dest) > 0 {
-			d := *dest
-			orig[i] = d[len(d)-1]
-		}
+		log.Debug("ctx: ", ctx)
 	}
-	return si, nil
+	return si, ctxAdded, nil
 }
 
 // extractEntity from a word. If a Command, strip any contraction. For example,
@@ -243,17 +224,17 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 		return w, "", nil
 	}
 	switch w[1] {
-	case 'C': // Command
+	case 'C':
 		return w[3:], Command, nil
-	case 'O': // Object
+	case 'O':
 		return w[3:], Object, nil
-	case 'A': // Actor
+	case 'A':
 		return w[3:], Actor, nil
-	case 'T': // Time
+	case 'T':
 		return w[3:], Time, nil
 	case 'P':
 		return w[3:], Place, nil
-	case 'N': // None
+	case 'N':
 		return w[3:], None, nil
 	}
 	return w, "", errors.New("syntax error in entity")
@@ -302,7 +283,7 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	if m <= 0.7 {
 		probs, likely, _ = c.ProbScores([]string{word1})
 	}
-	// TODO Design a process for automated training when confidence remains
+	// TODO design a process for automated training when confidence remains
 	// low.
 	if m <= 0.7 {
 		log.Debug(word1, " || ", datatypes.String[likely+1])

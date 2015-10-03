@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net/url"
+	"os"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
@@ -46,7 +46,16 @@ var c client
 var plog *log.Entry
 
 func main() {
+	if os.Getenv("AVA_ENV") == "production" {
+		log.SetLevel(log.WarnLevel)
+	} else {
+		log.SetLevel(log.DebugLevel)
+	}
 	plog = log.WithField("package", "yelp")
+	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
+	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
+	c.token.Token = os.Getenv("YELP_TOKEN")
+	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
 	trigger := &datatypes.StructuredInput{
 		Commands: []string{
 			"find",
@@ -78,13 +87,22 @@ func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
 		query += p + " "
 	}
 	// TODO: Get location if unknown
-	location = "Santa Monica"
+	if len(si.Places) == 0 {
+		location = "Santa Monica"
+	}
 	r, err := t.search(query, location, 0)
 	if err != nil {
 		plog.Error("search yelp: ", err)
 		r = "I couldn't run that for you at this time."
 	}
 	*resp = r
+	return nil
+}
+
+func (t *Yelp) FollowUp(si *datatypes.StructuredInput, resp *string) error {
+	plog.Debug("package called as follow up")
+	plog.Debug(si.String())
+	*resp = "OK!"
 	return nil
 }
 
@@ -110,27 +128,6 @@ func (t *Yelp) search(query, location string, offset int) (string, error) {
 	}
 	plog.Println(b.Name, addr)
 	return "How does this place look? " + b.Name + " at " + addr, nil
-}
-
-func readCredentials(c *client) error {
-	b, err := ioutil.ReadFile(*credPath)
-	if err != nil {
-		return err
-	}
-	var creds struct {
-		ConsumerKey    string
-		ConsumerSecret string
-		Token          string
-		TokenSecret    string
-	}
-	if err := json.Unmarshal(b, &creds); err != nil {
-		return err
-	}
-	c.client.Credentials.Token = creds.ConsumerKey
-	c.client.Credentials.Secret = creds.ConsumerSecret
-	c.token.Token = creds.Token
-	c.token.Secret = creds.TokenSecret
-	return nil
 }
 
 func (c *client) get(urlStr string, params url.Values, v interface{}) error {

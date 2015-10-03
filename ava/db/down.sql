@@ -1,2 +1,3 @@
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS inputs;
+DROP TABLE IF EXISTS usersflexids;

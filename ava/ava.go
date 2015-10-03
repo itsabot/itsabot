@@ -58,7 +58,7 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		showHelp := true
 		if c.Bool("install") {
-			log.Info("TODO: Install packages")
+			log.Info("TODO: install packages")
 			showHelp = false
 		}
 		if c.Bool("server") {
@@ -88,6 +88,7 @@ func startServer(port string) {
 	bootDependencies()
 	e := echo.New()
 	initRoutes(e)
+	log.Info("booted ava")
 	e.Run(":" + port)
 }
 
@@ -147,12 +148,11 @@ func handlerMain(c *echo.Context) error {
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
-	var ret string
+	var ret, pname, route string
 	var err error
-	var uid int
-	var fidT int
+	var uid, fidT int
+	var ctxAdded bool
 	var pw *pkg.PkgWrapper
-	var pname string
 	si := &datatypes.StructuredInput{}
 	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
@@ -171,21 +171,21 @@ func handlerMain(c *echo.Context) error {
 		return err
 	}
 	fidT, err = strconv.Atoi(c.Form("flexidtype"))
-	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+	if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 		fidT = 0
 	} else if err != nil {
 		return err
 	}
-	si, err = addContext(si, uid, c.Form("flexid"), fidT)
+	si, ctxAdded, err = addContext(si, uid, c.Form("flexid"), fidT)
 	if err != nil {
 		log.Error("adding context ", err)
 	}
-	pw, err = getPkg(si)
+	pw, route, err = getPkg(si)
 	if err != nil && err.Error() != "missing package" {
 		return err
 	}
 	if pw != nil {
-		ret, err = callPkg(pw, si)
+		ret, err = callPkg(pw, si, ctxAdded)
 		if err != nil && err.Error() != "missing package" {
 			return err
 		}
@@ -196,7 +196,7 @@ func handlerMain(c *echo.Context) error {
 	if pw != nil {
 		pname = pw.P.Config.Name
 	}
-	if err := saveStructuredInput(si, ret, pname); err != nil {
+	if err := saveStructuredInput(si, ret, pname, route); err != nil {
 		return err
 	}
 Response:

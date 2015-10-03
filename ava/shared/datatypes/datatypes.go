@@ -1,11 +1,19 @@
 package datatypes
 
 import (
+	"database/sql/driver"
+	"encoding/csv"
 	"errors"
+	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 )
+
+type StringSlice []string
 
 var (
 	ErrInvalidClass        = errors.New("invalid class")
@@ -55,14 +63,19 @@ type StructuredInput struct {
 	UserId     int
 	FlexId     string
 	FlexIdType int
-	// TODO: Check if authenticated. If not, packages may require
-	// authentication
-	Sentence string
-	Commands []string
-	Actors   []string
-	Objects  []string
-	Times    []string
-	Places   []string
+	Sentence   string
+	Commands   StringSlice
+	Actors     StringSlice
+	Objects    StringSlice
+	Times      StringSlice
+	Places     StringSlice
+}
+
+type User struct {
+	Id                int
+	Email             string
+	Phone             string
+	LastAuthenticated *time.Time
 }
 
 func (si *StructuredInput) String() string {
@@ -143,4 +156,69 @@ func (si *StructuredInput) Pronouns() []string {
 		}
 	}
 	return p
+}
+
+// for replacing escaped quotes except if it is preceded by a literal backslash
+//  eg "\\" should translate to a quoted element whose value is \
+
+var quoteEscapeRegex = regexp.MustCompile(`([^\\]([\\]{2})*)\\"`)
+
+// Scan convert to a slice of strings
+// http://www.postgresql.org/docs/9.1/static/arrays.html#ARRAYS-IO
+func (s *StringSlice) Scan(src interface{}) error {
+	asBytes, ok := src.([]byte)
+	if !ok {
+		return error(errors.New("scan source was not []bytes"))
+	}
+	str := string(asBytes)
+	str = quoteEscapeRegex.ReplaceAllString(str, `$1""`)
+	str = strings.Replace(str, `\\`, `\`, -1)
+	str = str[1 : len(str)-1]
+	csvReader := csv.NewReader(strings.NewReader(str))
+	slice, err := csvReader.Read()
+	if err != nil {
+		return err
+	}
+	(*s) = StringSlice(slice)
+	return nil
+}
+
+func (s StringSlice) Value() (driver.Value, error) {
+	// string escapes.
+	// \ => \\\
+	// " => \"
+	for i, elem := range s {
+		s[i] = `"` + strings.Replace(strings.Replace(elem, `\`, `\\\`, -1), `"`, `\"`, -1) + `"`
+	}
+	return "{" + strings.Join(s, ",") + "}", nil
+}
+
+func (s StringSlice) Last() string {
+	return s[len(s)-1]
+}
+
+func (u *User) isAuthenticated() (bool, error) {
+	var oldTime time.Time
+	tmp := os.Getenv("REQUIRE_AUTH_IN_HOURS")
+	var t int
+	if len(tmp) > 0 {
+		var err error
+		t, err = strconv.Atoi(tmp)
+		if err != nil {
+			return false, err
+		}
+		if t < 0 {
+			return false, errors.New("negative REQUIRE_AUTH_IN_HOURS")
+		}
+	} else {
+		log.Warn("REQUIRE_AUTH_IN_HOURS environment variable is not set.",
+			" Using 168 hours (one week) as the default.")
+		t = 168
+	}
+	oldTime = time.Now().Add(time.Duration(-1*t) * time.Hour)
+	authenticated := false
+	if u.LastAuthenticated.After(oldTime) {
+		authenticated = true
+	}
+	return authenticated, nil
 }

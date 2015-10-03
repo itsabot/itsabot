@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/rpc"
 	"strconv"
@@ -46,12 +47,14 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	return nil
 }
 
-func getPkg(si *datatypes.StructuredInput) (*pkg.PkgWrapper, error) {
+func getPkg(si *datatypes.StructuredInput) (*pkg.PkgWrapper, string, error) {
 	var p *pkg.PkgWrapper
+	var route string
 Loop:
 	for _, c := range si.Commands {
 		for _, o := range si.Objects {
-			p = regPkgs[strings.ToLower(c+o)]
+			route = strings.ToLower(c + o)
+			p = regPkgs[route]
 			log.Debug("searching for " + strings.ToLower(c+o))
 			if p != nil {
 				log.Debug("found pkg")
@@ -60,16 +63,51 @@ Loop:
 		}
 	}
 	if p == nil {
-		return nil, ErrMissingPackage
+		return nil, "", ErrMissingPackage
 	} else {
-		return p, nil
+		return p, route, nil
 	}
 }
 
-func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput) (string,
-	error) {
+func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput, ctxAdded bool) (
+	string, error) {
 	log.Debug("sending structured input to ", pw.P.Config.Name)
-	c := strings.Title(pw.P.Config.Name) + ".Run"
+	c := strings.Title(pw.P.Config.Name)
+	if ctxAdded {
+		c += ".FollowUp"
+	} else {
+		c += ".Run"
+	}
+	var reply string
+	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
+		return "", err
+	}
+	log.Debug("r: ", reply)
+	return reply, nil
+}
+
+func callLastPkg(si *datatypes.StructuredInput) (string,
+	error) {
+	log.Debug("sending structured input to last package")
+	var route string
+	q := `SELECT route FROM inputs WHERE `
+	if si.UserId > 0 {
+		q += `userid=$1 ORDER BY createdat DESC`
+		if err := db.Get(&route, q, si.UserId); err != nil && err != sql.ErrNoRows {
+			return "", err
+		}
+	} else {
+		q += `flexid=$1 ORDER BY createdat DESC`
+		if err := db.Get(&route, q, si.FlexId); err != nil && err != sql.ErrNoRows {
+			return "", err
+		}
+	}
+	log.Debug("retrieved package route: ", route)
+	pw := regPkgs[route]
+	if pw == nil {
+		return "", ErrMissingPackage
+	}
+	c := strings.Title(pw.P.Config.Name) + ".FollowUp"
 	var reply string
 	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
 		return "", err
