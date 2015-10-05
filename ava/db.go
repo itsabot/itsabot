@@ -1,6 +1,11 @@
 package main
 
-import "github.com/avabot/ava/shared/datatypes"
+import (
+	"database/sql"
+
+	log "github.com/Sirupsen/logrus"
+	"github.com/avabot/ava/shared/datatypes"
+)
 
 func saveStructuredInput(si *datatypes.StructuredInput, rsp, pkg, route string) error {
 	q := `
@@ -83,6 +88,7 @@ func getLastInputFromUser(u *datatypes.User) (*datatypes.StructuredInput,
 
 func getContextObject(u *datatypes.User, si *datatypes.StructuredInput,
 	datatype string) (string, error) {
+	log.Debug("db: getting object context")
 	var tmp *datatypes.StringSlice
 	if u != nil {
 		q := `
@@ -100,7 +106,8 @@ func getContextObject(u *datatypes.User, si *datatypes.StructuredInput,
 				flexid=$1 AND
 				flexidtype=$2 AND
 				array_length(objects, 1) > 0)`
-		if err := db.Get(&tmp, q, si.FlexId, si.FlexIdType); err != nil {
+		err := db.Get(&tmp, q, si.FlexId, si.FlexIdType)
+		if err != nil && err != sql.ErrNoRows {
 			return "", err
 		}
 	}

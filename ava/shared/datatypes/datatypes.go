@@ -176,10 +176,10 @@ func (s *StringSlice) Scan(src interface{}) error {
 	str = str[1 : len(str)-1]
 	csvReader := csv.NewReader(strings.NewReader(str))
 	slice, err := csvReader.Read()
-	if err != nil {
+	if err != nil && err.Error() != "EOF" {
 		return err
 	}
-	(*s) = StringSlice(slice)
+	*s = StringSlice(slice)
 	return nil
 }
 
@@ -194,6 +194,9 @@ func (s StringSlice) Value() (driver.Value, error) {
 }
 
 func (s StringSlice) Last() string {
+	if len(s) == 0 {
+		return ""
+	}
 	return s[len(s)-1]
 }
 

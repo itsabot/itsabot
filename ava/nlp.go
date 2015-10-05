@@ -164,6 +164,9 @@ func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
 			if err != nil {
 				return si, false, err
 			}
+			if ctx == "" {
+				return si, false, nil
+			}
 			for i, o := range si.Objects {
 				if o != w {
 					continue
@@ -175,6 +178,9 @@ func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
 			ctx, err = getContextObject(u, si, "actors")
 			if err != nil {
 				return si, false, err
+			}
+			if ctx == "" {
+				return si, false, nil
 			}
 			for i, o := range si.Actors {
 				if o != w {
@@ -188,6 +194,9 @@ func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
 			if err != nil {
 				return si, false, err
 			}
+			if ctx == "" {
+				return si, false, nil
+			}
 			for i, o := range si.Times {
 				if o != w {
 					continue
@@ -199,6 +208,9 @@ func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
 			ctx, err = getContextObject(u, si, "places")
 			if err != nil {
 				return si, false, err
+			}
+			if ctx == "" {
+				return si, false, nil
 			}
 			for i, o := range si.Places {
 				if o != w {
