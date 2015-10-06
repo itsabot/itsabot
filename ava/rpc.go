@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"net/rpc"
 	"strconv"
@@ -78,36 +77,6 @@ func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput, ctxAdded bool) (
 	} else {
 		c += ".Run"
 	}
-	var reply string
-	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
-		return "", err
-	}
-	log.Debug("r: ", reply)
-	return reply, nil
-}
-
-func callLastPkg(si *datatypes.StructuredInput) (string,
-	error) {
-	log.Debug("sending structured input to last package")
-	var route string
-	q := `SELECT route FROM inputs WHERE `
-	if si.UserId > 0 {
-		q += `userid=$1 ORDER BY createdat DESC`
-		if err := db.Get(&route, q, si.UserId); err != nil && err != sql.ErrNoRows {
-			return "", err
-		}
-	} else {
-		q += `flexid=$1 ORDER BY createdat DESC`
-		if err := db.Get(&route, q, si.FlexId); err != nil && err != sql.ErrNoRows {
-			return "", err
-		}
-	}
-	log.Debug("retrieved package route: ", route)
-	pw := regPkgs[route]
-	if pw == nil {
-		return "", ErrMissingPackage
-	}
-	c := strings.Title(pw.P.Config.Name) + ".FollowUp"
 	var reply string
 	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
 		return "", err
