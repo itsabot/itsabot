@@ -9,6 +9,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
 	"github.com/garyburd/go-oauth/oauth"
@@ -77,6 +78,8 @@ func main() {
 	}
 }
 
+// TODO change function signature to use new struct, wrapping si and a user
+// object together.
 func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
 	plog.Debug("package called")
 	var query, location string
@@ -88,6 +91,7 @@ func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
 	}
 	// TODO: Get location if unknown
 	if len(si.Places) == 0 {
+		knowledge.LastLocation(si)
 		location = "Santa Monica"
 	}
 	r, err := t.search(query, location, 0)
