@@ -13,6 +13,7 @@ type User struct {
 	Id                int
 	Email             string
 	Phone             string
+	LocationId        int
 	LastAuthenticated *time.Time
 }
 

@@ -6,13 +6,14 @@ import (
 	"errors"
 
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/jmoiron/sqlx"
 )
 
 var ErrNoLocation = errors.New("no previous location")
 
 // LastLocation returns the last known location of a user. If the location is
 // unknown, LastLocation returns an error.
-func LastLocation(u *datatypes.User) (*datatypes.Location, error) {
+func LastLocation(db *sqlx.DB, u *datatypes.User) (*datatypes.Location, error) {
 	var loc *datatypes.Location
 	if u.LocationId == 0 {
 		return loc, ErrNoLocation

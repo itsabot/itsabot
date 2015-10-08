@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
 	"github.com/garyburd/go-oauth/oauth"
+	"github.com/jmoiron/sqlx"
 )
 
 type Yelp string
@@ -37,14 +39,12 @@ type response struct {
 	}
 }
 
-var credPath = flag.String(
-	"config",
-	"ava_modules/yelp/config.json",
-	"Path to configuration file containing the application's credentials.")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
+var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
 var plog *log.Entry
+var db *sqlx.DB
 
 func main() {
 	if os.Getenv("AVA_ENV") == "production" {
@@ -53,10 +53,12 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 	plog = log.WithField("package", "yelp")
+	flag.Parse()
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
+	db = connectDB()
 	trigger := &datatypes.StructuredInput{
 		Commands: []string{
 			"find",
@@ -68,7 +70,7 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err := pkg.NewPackage("yelp", trigger)
+	p, err := pkg.NewPackage("yelp", *port, trigger)
 	if err != nil {
 		plog.Fatal("creating package", p.Config.Name, err)
 	}
@@ -78,21 +80,23 @@ func main() {
 	}
 }
 
-// TODO change function signature to use new struct, wrapping si and a user
-// object together.
-func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
+func (t *Yelp) Run(m *datatypes.Message, resp *string) error {
 	plog.Debug("package called")
 	var query, location string
+	si := m.Input.StructuredInput
 	for _, o := range si.Objects {
 		query += o + " "
 	}
 	for _, p := range si.Places {
 		query += p + " "
 	}
-	// TODO: Get location if unknown
 	if len(si.Places) == 0 {
-		knowledge.LastLocation(si)
-		location = "Santa Monica"
+		loc, err := knowledge.LastLocation(db, m.User)
+		if err != nil {
+			log.Error("getting last location")
+			return err
+		}
+		location = loc.Name
 	}
 	r, err := t.search(query, location, 0)
 	if err != nil {
@@ -103,11 +107,36 @@ func (t *Yelp) Run(si *datatypes.StructuredInput, resp *string) error {
 	return nil
 }
 
-func (t *Yelp) FollowUp(si *datatypes.StructuredInput, resp *string) error {
-	plog.Debug("package called as follow up")
-	plog.Debug(si.String())
-	*resp = "OK!"
+func (t *Yelp) FollowUp(m *datatypes.Message, resp *string) error {
+	for _, o := range m.Input.StructuredInput.Objects {
+		switch o {
+		case "rating", "review", "recommend":
+			rating, err := getRating(m)
+			if err != nil {
+				return err
+			}
+			*resp = "It has a " + rating + " review on Yelp."
+			return nil
+		case "number", "phone", "call":
+		case "information":
+		}
+	}
 	return nil
+}
+
+func getRating(m *datatypes.Message) (string, error) {
+	r := datatypes.Response{}
+	if err := m.LastResponse(db, &r); err != nil {
+		return "", err
+	}
+	log.Debug("STATE: ", r.State)
+	return "5", nil
+	/*
+		if len(r.State.Businesses) == 0 {
+			return "", ErrNoBusinesses
+		}
+		return fmt.Sprintf("%.1f", r.State.Businesses[0].Rating), nil
+	*/
 }
 
 // TODO: Add support for custom sorting, locations
@@ -145,4 +174,14 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
+}
+
+func connectDB() *sqlx.DB {
+	log.Debug("connecting to db")
+	db, err := sqlx.Connect("postgres",
+		"user=egtann dbname=ava sslmode=disable")
+	if err != nil {
+		log.Error("could not connect to db ", err.Error())
+	}
+	return db
 }

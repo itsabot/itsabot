@@ -2,13 +2,23 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
-func saveStructuredInput(si *datatypes.StructuredInput, rsp, pkg, route string) error {
+var ErrMissingUser = errors.New("missing user")
+
+func saveStructuredInput(in *datatypes.Input, rsp, pkg,
+	route string) error {
+	// TODO
 	q := `
+		INSERT INTO responses (userid, inputid, response, state)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id`
+	// TODO Change 0 to $10 below with responseid
+	q = `
 		INSERT INTO inputs (
 			userid,
 			flexid,
@@ -19,66 +29,57 @@ func saveStructuredInput(si *datatypes.StructuredInput, rsp, pkg, route string) 
 			actors,
 			times,
 			places,
-			response,
+			responseid,
 			package,
 			route
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11)`
+	si := in.StructuredInput
 	_, err := db.Exec(
-		q, si.UserId, si.FlexId, si.FlexIdType, si.Sentence,
-		si.Commands, si.Objects, si.Actors, si.Times, si.Places, rsp,
+		q, in.UserId, in.FlexId, in.FlexIdType, in.Sentence,
+		si.Commands, si.Objects, si.Actors, si.Times, si.Places,
 		pkg, route)
 	return err
 }
 
-func getUser(si *datatypes.StructuredInput) (*datatypes.User, error) {
-	if len(si.FlexId) > 0 && si.FlexIdType == 0 {
+func getUser(in *datatypes.Input) (*datatypes.User, error) {
+	if len(in.FlexId) > 0 && in.FlexIdType == 0 {
 		return nil, ErrMissingFlexIdType
 	}
+	if in.UserId == 0 {
+		q := `SELECT userid
+		      FROM userflexids
+		      WHERE flexid=$1 AND flexidtype=$2
+		      ORDER BY createdat DESC`
+		err := db.Get(&in.UserId, q, in.FlexId, in.FlexIdType)
+		if err == sql.ErrNoRows {
+			return nil, ErrMissingUser
+		} else if err != nil {
+			return nil, err
+		}
+	}
+	q := `SELECT id, name, email, lastauthenticated
+	      FROM users
+	      WHERE id=$1`
 	var u *datatypes.User
-	userQuery := `
-			SELECT id, email, phone, lastauthenticated
-			FROM users
-			WHERE id=$1`
-	if si.UserId > 0 {
-		if err := db.Get(u, userQuery, si.UserId); err != nil {
-			return nil, err
-		}
-	} else {
-		q := `
-			SELECT userid
-			FROM usersflexids
-			WHERE flexid=$1 AND flexidtype=$2
-			ORDER BY createdat DESC`
-		var userid int
-		err := db.Get(&userid, q, si.FlexId, si.FlexIdType)
-		if err != nil {
-			return nil, err
-		}
-		if err := db.Get(u, userQuery, userid); err != nil {
-			return nil, err
-		}
+	if err := db.Get(u, q, in.UserId); err != nil {
+		return nil, err
 	}
 	return u, nil
 }
 
-func getLastInput(si *datatypes.StructuredInput) (*datatypes.StructuredInput,
-	error) {
-	var s *datatypes.StructuredInput
+func getLastInput(in *datatypes.Input) (*datatypes.Input, error) {
+	var input *datatypes.Input
 	q := `SELECT (
 		userid, flexid, flexidtype, commands, objects, actors,
-		times, places, sentence, response, package, route) `
-	if si.UserId > 0 {
+		times, places, sentence, responseid, package, route) `
+	if in.UserId > 0 {
 		q += `WHERE userid=$1`
-		if err := db.Get(s, q, si.UserId); err != nil {
-			return s, err
-		}
-	} else {
-		q += `WHERE flexid=$1 AND flexidtype=$2`
-		if err := db.Get(s, q, si.FlexId, si.FlexIdType); err != nil {
-			return s, err
+		if err := db.Get(input, q, in.UserId); err != nil {
+			log.Error("getLastInput: ", err)
+			return input, err
 		}
 	}
-	return s, nil
+	return input, nil
 }
 
 func getLastInputFromUser(u *datatypes.User) (*datatypes.StructuredInput,
@@ -90,24 +91,15 @@ func getContextObject(u *datatypes.User, si *datatypes.StructuredInput,
 	datatype string) (string, error) {
 	log.Debug("db: getting object context")
 	var tmp *datatypes.StringSlice
+	if u == nil {
+		return "", ErrMissingUser
+	}
 	if u != nil {
 		q := `
 			SELECT ` + datatype + `
 			FROM inputs
 			WHERE userid=$1 AND array_length(objects, 1) > 0`
 		if err := db.Get(&tmp, q, u.Id); err != nil {
-			return "", err
-		}
-	} else {
-		q := `
-			SELECT ` + datatype + `
-			FROM inputs
-			WHERE (
-				flexid=$1 AND
-				flexidtype=$2 AND
-				array_length(objects, 1) > 0)`
-		err := db.Get(&tmp, q, si.FlexId, si.FlexIdType)
-		if err != nil && err != sql.ErrNoRows {
 			return "", err
 		}
 	}

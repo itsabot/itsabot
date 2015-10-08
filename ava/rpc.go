@@ -46,9 +46,19 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	return nil
 }
 
-func getPkg(si *datatypes.StructuredInput) (*pkg.PkgWrapper, string, error) {
+func getPkg(m *datatypes.Message) (*pkg.PkgWrapper, string, error) {
 	var p *pkg.PkgWrapper
+	if m.User == nil {
+		p = regPkgs["ONBOARD"]
+		if p != nil {
+			return p, "ONBOARD", nil
+		} else {
+			log.Error("missing required onboard package")
+			return nil, "ONBOARD", ErrMissingPackage
+		}
+	}
 	var route string
+	si := m.Input.StructuredInput
 Loop:
 	for _, c := range si.Commands {
 		for _, o := range si.Objects {
@@ -68,8 +78,12 @@ Loop:
 	}
 }
 
-func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput, ctxAdded bool) (
-	string, error) {
+func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, error) {
+	pw, route, err := getPkg(m)
+	if err != nil {
+		log.Error("getPkg: ", err)
+		return "", route, err
+	}
 	log.Debug("sending structured input to ", pw.P.Config.Name)
 	c := strings.Title(pw.P.Config.Name)
 	if ctxAdded {
@@ -78,9 +92,9 @@ func callPkg(pw *pkg.PkgWrapper, si *datatypes.StructuredInput, ctxAdded bool) (
 		c += ".Run"
 	}
 	var reply string
-	if err := pw.RPCClient.Call(c, si, &reply); err != nil {
-		return "", err
+	if err := pw.RPCClient.Call(c, m, &reply); err != nil {
+		return "", route, err
 	}
 	log.Debug("r: ", reply)
-	return reply, nil
+	return reply, route, nil
 }

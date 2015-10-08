@@ -135,6 +135,8 @@ func initRoutes(e *echo.Echo) {
 	e.SetDebug(true)
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
+	e.Get("/login", handlerLogin)
+	e.Post("/login", handlerLoginSubmit)
 }
 
 // TODO
@@ -148,11 +150,14 @@ func handlerMain(c *echo.Context) error {
 	if len(cmd) == 0 {
 		return ErrInvalidCommand
 	}
-	var ret, pname, route string
+	var ret, pname, route, fid string
 	var err error
 	var uid, fidT int
 	var ctxAdded bool
 	var pw *pkg.PkgWrapper
+	var m *datatypes.Message
+	var u *datatypes.User
+	in := &datatypes.Input{}
 	si := &datatypes.StructuredInput{}
 	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
@@ -164,31 +169,28 @@ func handlerMain(c *echo.Context) error {
 	if err != nil {
 		log.Error("classifying sentence ", err)
 	}
-	uid, err = strconv.Atoi(c.Form("uid"))
-	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
-		uid = 0
-	} else if err != nil {
-		return err
-	}
-	fidT, err = strconv.Atoi(c.Form("flexidtype"))
-	if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
-		fidT = 0
-	} else if err != nil {
-		return err
-	}
-	si, ctxAdded, err = addContext(si, uid, c.Form("flexid"), fidT)
+	uid, fid, fidT, err = validateParams(c)
 	if err != nil {
-		log.Error("adding context ", err)
-	}
-	pw, route, err = getPkg(si)
-	if err != nil && err.Error() != "missing package" {
 		return err
 	}
-	if pw != nil {
-		ret, err = callPkg(pw, si, ctxAdded)
-		if err != nil && err.Error() != "missing package" {
-			return err
-		}
+	in = &datatypes.Input{
+		StructuredInput: si,
+		UserId:          uid,
+		FlexId:          fid,
+		FlexIdType:      fidT,
+	}
+	m = &datatypes.Message{User: u, Input: in}
+	u, err = getUser(in)
+	if err != nil && err != ErrMissingUser {
+		log.Error("getUser: ", err)
+	}
+	m, ctxAdded, err = addContext(m)
+	if err != nil {
+		log.Error("addContext: ", err)
+	}
+	ret, route, err = callPkg(m, ctxAdded)
+	if err != nil && err != ErrMissingPackage {
+		return err
 	}
 	if len(ret) == 0 {
 		ret = language.Confused()
@@ -196,7 +198,8 @@ func handlerMain(c *echo.Context) error {
 	if pw != nil {
 		pname = pw.P.Config.Name
 	}
-	if err := saveStructuredInput(si, ret, pname, route); err != nil {
+	in.StructuredInput = si
+	if err := saveStructuredInput(in, ret, pname, route); err != nil {
 		return err
 	}
 Response:
@@ -205,4 +208,33 @@ Response:
 		return err
 	}
 	return nil
+}
+
+// TODO
+func handlerLogin(c *echo.Context) error {
+	return errors.New("not implemented")
+}
+
+// TODO
+func handlerLoginSubmit(c *echo.Context) error {
+	return errors.New("not implemented")
+}
+
+func validateParams(c *echo.Context) (int, string, int, error) {
+	var uid, fidT int
+	var fid string
+	var err error
+	uid, err = strconv.Atoi(c.Form("uid"))
+	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		uid = 0
+	} else if err != nil {
+		return uid, fid, fidT, err
+	}
+	fidT, err = strconv.Atoi(c.Form("flexidtype"))
+	if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		fidT = 0
+	} else if err != nil {
+		return uid, fid, fidT, err
+	}
+	return uid, fid, fidT, nil
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"database/sql"
 	"errors"
 	"os"
 	"path"
@@ -147,84 +146,86 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 	return si, nil
 }
 
-// addContext to a StructuredInput, adding a user identifier and replacing
-// pronouns with the nouns to which they refer.
-func addContext(si *datatypes.StructuredInput, uid int, fid string, fidT int) (
-	*datatypes.StructuredInput, bool, error) {
-	u, err := getUser(si)
-	if err != nil && err != sql.ErrNoRows {
-		return si, false, err
-	}
+// addContext to a StructuredInput, replacing pronouns with the nouns to which
+// they refer. TODO refactor
+func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 	ctxAdded := false
-	for _, w := range si.Pronouns() {
+	for _, w := range m.Input.StructuredInput.Pronouns() {
 		var ctx string
+		var err error
 		switch datatypes.Pronouns[w] {
 		case datatypes.ObjectI:
-			ctx, err = getContextObject(u, si, "objects")
+			ctx, err = getContextObject(m.User,
+				m.Input.StructuredInput,
+				"objects")
 			if err != nil {
-				return si, false, err
+				return m, false, err
 			}
 			if ctx == "" {
-				return si, false, nil
+				return m, false, nil
 			}
-			for i, o := range si.Objects {
+			for i, o := range m.Input.StructuredInput.Objects {
 				if o != w {
 					continue
 				}
-				si.Objects[i] = ctx
+				m.Input.StructuredInput.Objects[i] = ctx
 				ctxAdded = true
 			}
 		case datatypes.ActorI:
-			ctx, err = getContextObject(u, si, "actors")
+			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
+				"actors")
 			if err != nil {
-				return si, false, err
+				return m, false, err
 			}
 			if ctx == "" {
-				return si, false, nil
+				return m, false, nil
 			}
-			for i, o := range si.Actors {
+			for i, o := range m.Input.StructuredInput.Actors {
 				if o != w {
 					continue
 				}
-				si.Actors[i] = ctx
+				m.Input.StructuredInput.Actors[i] = ctx
 				ctxAdded = true
 			}
 		case datatypes.TimeI:
-			ctx, err = getContextObject(u, si, "times")
+			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
+				"times")
 			if err != nil {
-				return si, false, err
+				return m, false, err
 			}
 			if ctx == "" {
-				return si, false, nil
+				return m, false, nil
 			}
-			for i, o := range si.Times {
+			for i, o := range m.Input.StructuredInput.Times {
 				if o != w {
 					continue
 				}
-				si.Times[i] = ctx
+				m.Input.StructuredInput.Times[i] = ctx
 				ctxAdded = true
 			}
 		case datatypes.PlaceI:
-			ctx, err = getContextObject(u, si, "places")
+			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
+				"places")
 			if err != nil {
-				return si, false, err
+				return m, false, err
 			}
 			if ctx == "" {
-				return si, false, nil
+				return m, false, nil
 			}
-			for i, o := range si.Places {
+			for i, o := range m.Input.StructuredInput.Places {
 				if o != w {
 					continue
 				}
-				si.Places[i] = ctx
+				m.Input.StructuredInput.Places[i] = ctx
 				ctxAdded = true
 			}
 		default:
-			return si, false, errors.New("unknown type found for pronoun")
+			return m, false,
+				errors.New("unknown type found for pronoun")
 		}
 		log.Debug("ctx: ", ctx)
 	}
-	return si, ctxAdded, nil
+	return m, ctxAdded, nil
 }
 
 // extractEntity from a word. If a Command, strip any contraction. For example,
@@ -297,8 +298,9 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	}
 	// TODO design a process for automated training when confidence remains
 	// low.
+	m = max(probs)
 	if m <= 0.7 {
-		log.Debug(word1, " || ", datatypes.String[likely+1])
+		log.Debug(word1, " || ", datatypes.String[likely+1], " || ", m)
 	}
 	return datatypes.WordClass{word1, likely + 1}, nil
 }

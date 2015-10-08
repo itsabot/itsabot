@@ -47,6 +47,6 @@ func bootDependencies() {
 		if err = cmd.Start(); err != nil {
 			plog.Fatal("running package process: ", err)
 		}
-		i++
+		i += 2
 	}
 }

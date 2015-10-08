@@ -56,3 +56,14 @@ func (s StringSlice) Last() string {
 	}
 	return s[len(s)-1]
 }
+
+func (s StringSlice) String() string {
+	if len(s) == 0 {
+		return ""
+	}
+	var ss string
+	for _, w := range s {
+		ss += " " + w
+	}
+	return ss[1:]
+}

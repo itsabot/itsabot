@@ -43,21 +43,19 @@ var (
 	ErrMissingTrigger     = errors.New("missing package trigger")
 )
 
-func NewPackage(name string, trigger *datatypes.StructuredInput) (*Pkg, error) {
-	return NewPackageWithServer(name, "", trigger)
+func NewPackage(name string, port int, trigger *datatypes.StructuredInput) (
+	*Pkg, error) {
+	return NewPackageWithServer(name, "", port, trigger)
 }
 
-func NewPackageWithServer(name, serverAddr string,
+func NewPackageWithServer(name, serverAddr string, port int,
 	trigger *datatypes.StructuredInput) (*Pkg, error) {
-
 	if len(name) == 0 {
 		return &Pkg{}, ErrMissingPackageName
 	}
 	if trigger == nil {
 		return &Pkg{}, ErrMissingTrigger
 	}
-	// TODO: Find open ports.
-	port := 4001
 	c := PkgConfig{
 		Name:          name,
 		Port:          port,
@@ -76,13 +74,12 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	if err := rpc.Register(pkgT); err != nil {
 		plog.Fatal(err)
 	}
-	port := ":" + strconv.Itoa(p.Config.Port)
+	port := ":" + strconv.Itoa(p.Config.Port+1)
 	client, err = rpc.Dial("tcp", p.Config.ServerAddress+port)
 	if err != nil {
 		return err
 	}
 	var notused error
-	plog.Debug("registering with ava")
 	err = client.Call("Ava.RegisterPackage", p, &notused)
 	if err != nil &&
 		err.Error() != "gob: type rpc.Client has no exported fields" {

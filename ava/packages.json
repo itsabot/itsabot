@@ -2,6 +2,7 @@
 	"name": "ava",
 	"version": "0.0.1",
 	"dependencies": {
-		"yelp": "*"
+		"yelp": "*",
+		"onboard": "*"
 	}
 }

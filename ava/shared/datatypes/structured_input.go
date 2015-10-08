@@ -10,15 +10,16 @@ import (
 // guaranteed to be unique. The FlexId is used for UserId lookups to maintain
 // context, such as a phone number or email address.
 type StructuredInput struct {
-	UserId     int
-	FlexId     string
-	FlexIdType int
-	Sentence   string
-	Commands   StringSlice
-	Actors     StringSlice
-	Objects    StringSlice
-	Times      StringSlice
-	Places     StringSlice
+	Commands StringSlice
+	Actors   StringSlice
+	Objects  StringSlice
+	Times    StringSlice
+	Places   StringSlice
+}
+
+type WordClass struct {
+	Word  string
+	Class int
 }
 
 func (si *StructuredInput) String() string {
@@ -39,11 +40,6 @@ func (si *StructuredInput) String() string {
 		s += "Places: " + strings.Join(si.Places, ", ") + "\n"
 	}
 	return s[:len(s)-1] + "\n"
-}
-
-type WordClass struct {
-	Word  string
-	Class int
 }
 
 // Add pairs of words with their classes to a structured input. Params should

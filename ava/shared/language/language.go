@@ -32,6 +32,37 @@ func Greeting(r *rand.Rand, name string) string {
 	return ""
 }
 
+func FirstMeeting() string {
+	n := rand.Intn(3)
+	switch n {
+	case 0:
+		return "Hi, I'm Ava. What's your name?"
+	case 1:
+		return "Hi, this is Ava. Who is this?"
+	case 2:
+		return "Hi, my name's Ava. What's your name?"
+	}
+	log.Error("firstmeeting failed to return a response")
+	return ""
+}
+
+func NiceMeetingYou() string {
+	n := rand.Intn(3)
+	switch n {
+	case 0:
+		return "It's nice to meet you. If we're going to work " +
+			"together, can you sign up for me here? "
+	case 1:
+		return "Nice meeting you. Before we take this further, can " +
+			"you sign up for me here? "
+	case 2:
+		return "Great to meet you! Can you sign up for me here to " +
+			"get started? "
+	}
+	log.Error("nicemeetingyou failed to return a response")
+	return ""
+}
+
 func Confused() string {
 	n := rand.Intn(4)
 	switch n {
