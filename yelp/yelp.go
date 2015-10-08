@@ -5,10 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
@@ -43,16 +43,9 @@ var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
-var plog *log.Entry
 var db *sqlx.DB
 
 func main() {
-	if os.Getenv("AVA_ENV") == "production" {
-		log.SetLevel(log.WarnLevel)
-	} else {
-		log.SetLevel(log.DebugLevel)
-	}
-	plog = log.WithField("package", "yelp")
 	flag.Parse()
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
@@ -72,16 +65,16 @@ func main() {
 	}
 	p, err := pkg.NewPackage("yelp", *port, trigger)
 	if err != nil {
-		plog.Fatal("creating package", p.Config.Name, err)
+		log.Fatalln("creating package", p.Config.Name, err)
 	}
 	yelp := new(Yelp)
 	if err := p.Register(yelp); err != nil {
-		plog.Fatal("registering package ", err)
+		log.Fatalln("registering package ", err)
 	}
 }
 
 func (t *Yelp) Run(m *datatypes.Message, resp *string) error {
-	plog.Debug("package called")
+	log.Println("package called")
 	var query, location string
 	si := m.Input.StructuredInput
 	for _, o := range si.Objects {
@@ -93,14 +86,14 @@ func (t *Yelp) Run(m *datatypes.Message, resp *string) error {
 	if len(si.Places) == 0 {
 		loc, err := knowledge.LastLocation(db, m.User)
 		if err != nil {
-			log.Error("getting last location")
+			log.Println("err: getting last location")
 			return err
 		}
 		location = loc.Name
 	}
 	r, err := t.search(query, location, 0)
 	if err != nil {
-		plog.Error("search yelp: ", err)
+		log.Println("err: search yelp: ", err)
 		r = "I couldn't run that for you at this time."
 	}
 	*resp = r
@@ -129,7 +122,7 @@ func getRating(m *datatypes.Message) (string, error) {
 	if err := m.LastResponse(db, &r); err != nil {
 		return "", err
 	}
-	log.Debug("STATE: ", r.State)
+	log.Println("STATE: ", r.State)
 	return "5", nil
 	/*
 		if len(r.State.Businesses) == 0 {
@@ -159,7 +152,7 @@ func (t *Yelp) search(query, location string, offset int) (string, error) {
 	if len(b.Location.DisplayAddress) > 0 {
 		addr = b.Location.DisplayAddress[0]
 	}
-	plog.Println(b.Name, addr)
+	log.Println(b.Name, addr)
 	return "How does this place look? " + b.Name + " at " + addr, nil
 }
 
@@ -170,18 +163,18 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		plog.Error(resp)
+		log.Println("err:", resp)
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
 func connectDB() *sqlx.DB {
-	log.Debug("connecting to db")
+	log.Println("connecting to db")
 	db, err := sqlx.Connect("postgres",
 		"user=egtann dbname=ava sslmode=disable")
 	if err != nil {
-		log.Error("could not connect to db ", err.Error())
+		log.Println("err: could not connect to db", err)
 	}
 	return db
 }

@@ -3,8 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"log"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
@@ -75,7 +75,7 @@ func getLastInput(in *datatypes.Input) (*datatypes.Input, error) {
 	if in.UserId > 0 {
 		q += `WHERE userid=$1`
 		if err := db.Get(input, q, in.UserId); err != nil {
-			log.Error("getLastInput: ", err)
+			log.Println("err: ", err)
 			return input, err
 		}
 	}
@@ -89,7 +89,7 @@ func getLastInputFromUser(u *datatypes.User) (*datatypes.StructuredInput,
 
 func getContextObject(u *datatypes.User, si *datatypes.StructuredInput,
 	datatype string) (string, error) {
-	log.Debug("db: getting object context")
+	log.Println("db: getting object context")
 	var tmp *datatypes.StringSlice
 	if u == nil {
 		return "", ErrMissingUser

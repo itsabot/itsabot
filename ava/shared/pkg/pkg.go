@@ -2,11 +2,10 @@ package pkg
 
 import (
 	"errors"
+	"log"
 	"net"
 	"net/rpc"
 	"strconv"
-
-	log "github.com/Sirupsen/logrus"
 
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/jmoiron/sqlx"
@@ -16,7 +15,6 @@ import (
 type PkgWrapper struct {
 	P         *Pkg
 	RPCClient *rpc.Client
-	Logger    *log.Entry
 }
 
 // Pkg holds config options for any Ava package. Name must be globally unique
@@ -66,36 +64,33 @@ func NewPackageWithServer(name, serverAddr string, port int,
 
 // Register with Ava to begin communicating over RPC.
 func (p *Pkg) Register(pkgT interface{}) error {
-	plog := log.WithField("package", p.Config.Name)
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(p.Config.Port+1))
 	if err != nil {
-		plog.Fatalln("rpc listen:", err)
+		log.Fatalln("rpc listen:", err, p.Config.Name)
 	}
 	if err := rpc.Register(pkgT); err != nil {
-		plog.Fatal(err)
+		log.Fatalln(err, p.Config.Name)
 	}
-	port := ":" + strconv.Itoa(p.Config.Port+1)
-	client, err = rpc.Dial("tcp", p.Config.ServerAddress+port)
+	client, err = rpc.Dial("tcp", ":4001")
 	if err != nil {
 		return err
 	}
 	var notused error
+	log.Println("calling register", p.Config.Name)
 	err = client.Call("Ava.RegisterPackage", p, &notused)
-	if err != nil &&
-		err.Error() != "gob: type rpc.Client has no exported fields" {
-		plog.Error(err.Error())
+	if err != nil {
+		log.Println("err: registering package", p.Config.Name, err)
 		return err
 	}
-	plog.Debug("connected with ava")
+	log.Println("connected with ava", p.Config.Name)
 	if err = connectDB(); err != nil {
 		return err
 	}
-	plog.Debug("connected with database")
-	plog.Info("loaded")
+	log.Println("connected with database", p.Config.Name)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			plog.Fatal(err)
+			log.Fatalln(err)
 		}
 		go rpc.ServeConn(conn)
 	}

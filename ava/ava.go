@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -9,9 +11,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
@@ -31,11 +33,6 @@ var ErrMissingPackage = errors.New("missing package")
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	if os.Getenv("AVA_ENV") == "production" {
-		log.SetLevel(log.WarnLevel)
-	} else {
-		log.SetLevel(log.DebugLevel)
-	}
 	app := cli.NewApp()
 	app.Name = "ava"
 	app.Usage = "general purpose ai platform"
@@ -58,7 +55,7 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		showHelp := true
 		if c.Bool("install") {
-			log.Info("TODO: install packages")
+			log.Println("TODO: install packages")
 			showHelp = false
 		}
 		if c.Bool("server") {
@@ -76,42 +73,45 @@ func main() {
 func startServer(port string) {
 	var err error
 	if err = godotenv.Load(); err != nil {
-		log.Error("loading environment: ", err)
+		log.Println("err: loading environment:", err)
+	}
+	if err = checkRequiredEnvVars(); err != nil {
+		log.Println("err:", err)
 	}
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
-		log.Error("loading classifier: ", err)
+		log.Println("err: loading classifier:", err)
 	}
-	log.Debug("booting local server")
+	log.Println("booting local server")
 	bootRPCServer(port)
 	bootTwilio()
 	bootDependencies()
 	e := echo.New()
 	initRoutes(e)
-	log.Info("booted ava")
+	log.Println("booted ava")
 	e.Run(":" + port)
 }
 
 func bootRPCServer(port string) {
 	ava := new(Ava)
 	if err := rpc.Register(ava); err != nil {
-		log.Error("register ava in rpc", err)
+		log.Println("register ava in rpc", err)
 	}
 	p, err := strconv.Atoi(port)
 	if err != nil {
-		log.Error("convert port to int", err)
+		log.Println("convert port to int", err)
 	}
 	pt := strconv.Itoa(p + 1)
 	l, err := net.Listen("tcp", ":"+pt)
-	log.WithField("port", pt).Debug("booting rpc server")
+	log.Println("booting rpc server", pt)
 	if err != nil {
-		log.Error("rpc listen: ", err)
+		log.Println("err: rpc listen: ", err)
 	}
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				log.Error("rpc accept: ", err)
+				log.Println("err: rpc accept: ", err)
 			}
 			go rpc.ServeConn(conn)
 		}
@@ -119,11 +119,11 @@ func bootRPCServer(port string) {
 }
 
 func connectDB() *sqlx.DB {
-	log.Debug("connecting to db")
+	log.Println("connecting to db")
 	db, err := sqlx.Connect("postgres",
 		"user=egtann dbname=ava sslmode=disable")
 	if err != nil {
-		log.Error("could not connect to db ", err.Error())
+		log.Println("could not connect to db ", err.Error())
 	}
 	return db
 }
@@ -133,15 +133,35 @@ func initRoutes(e *echo.Echo) {
 	e.Use(mw.Gzip())
 	e.Use(mw.Recover())
 	e.SetDebug(true)
+	e.Static("/public/css", "assets/css")
+	e.Static("/public/images", "assets/images")
+	e.Get("/", handlerIndex)
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/login", handlerLogin)
 	e.Post("/login", handlerLoginSubmit)
 }
 
+func handlerIndex(c *echo.Context) error {
+	tmplIndex, err := template.ParseFiles("assets/html/index.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var s []byte
+	b := bytes.NewBuffer(s)
+	if err := tmplIndex.Execute(b, struct{}{}); err != nil {
+		log.Fatalln(err)
+	}
+	err = c.HTML(http.StatusOK, "%s", b)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // TODO
 func handlerTwilio(c *echo.Context) error {
-	log.Error("twilio endpoint not implemented")
+	log.Println("twilio endpoint not implemented")
 	return errors.New("not implemented")
 }
 
@@ -167,7 +187,7 @@ func handlerMain(c *echo.Context) error {
 	}
 	si, err = classify(bayes, cmd)
 	if err != nil {
-		log.Error("classifying sentence ", err)
+		log.Println("classifying sentence ", err)
 	}
 	uid, fid, fidT, err = validateParams(c)
 	if err != nil {
@@ -182,11 +202,11 @@ func handlerMain(c *echo.Context) error {
 	m = &datatypes.Message{User: u, Input: in}
 	u, err = getUser(in)
 	if err != nil && err != ErrMissingUser {
-		log.Error("getUser: ", err)
+		log.Println("getUser: ", err)
 	}
 	m, ctxAdded, err = addContext(m)
 	if err != nil {
-		log.Error("addContext: ", err)
+		log.Println("addContext: ", err)
 	}
 	ret, route, err = callPkg(m, ctxAdded)
 	if err != nil && err != ErrMissingPackage {
@@ -237,4 +257,19 @@ func validateParams(c *echo.Context) (int, string, int, error) {
 		return uid, fid, fidT, err
 	}
 	return uid, fid, fidT, nil
+}
+
+func checkRequiredEnvVars() error {
+	base := os.Getenv("BASE_URL")
+	l := len(base)
+	if l == 0 {
+		return errors.New("BASE_URL environment variable not set")
+	}
+	if l < 4 || base[0:4] != "http" {
+		return errors.New("BASE_URL invalid. Must include http/https")
+	}
+	if base[l-1] != '/' {
+		return errors.New("BASE_URL must end in '/'")
+	}
+	return nil
 }

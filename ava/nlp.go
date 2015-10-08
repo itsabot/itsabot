@@ -3,11 +3,11 @@ package main
 import (
 	"bufio"
 	"errors"
+	"log"
 	"os"
 	"path"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/jbrukh/bayesian"
 )
@@ -27,7 +27,7 @@ var (
 )
 
 func train(c *bayesian.Classifier, s string) error {
-	log.Info("training classifier")
+	log.Println("training classifier")
 	if err := trainClassifier(c, s); err != nil {
 		return err
 	}
@@ -38,18 +38,18 @@ func train(c *bayesian.Classifier, s string) error {
 }
 
 func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
-	log.Debug("loading classifier")
+	log.Println("loading classifier")
 	filename := path.Join("data", "bayes.dat")
 	var err error
 	c, err = bayesian.NewClassifierFromFile(filename)
 	if err != nil && err.Error() == "open data/bayes.dat: no such file or directory" {
-		log.Warn("classifier file not found. building...")
+		log.Println("warn: classifier file not found. building...")
 		c, err = buildClassifier(c)
 		if err != nil {
 			return c, err
 		}
 	} else if err != nil {
-		log.Info("error loading bayes.dat", err)
+		log.Println("error loading bayes.dat", err)
 		return c, err
 	}
 	return c, nil
@@ -67,7 +67,7 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	line := 1
 	for scanner.Scan() {
 		if err := trainClassifier(c, scanner.Text()); err != nil {
-			log.Error("line", line, "::", err)
+			log.Println("err: line", line, "::", err)
 		}
 		line++
 	}
@@ -77,7 +77,7 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	if err = c.WriteToFile(path.Join("data", "bayes.dat")); err != nil {
 		return c, err
 	}
-	log.Debug("new classifier trained")
+	log.Println("new classifier trained")
 	return c, nil
 }
 
@@ -223,7 +223,7 @@ func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 			return m, false,
 				errors.New("unknown type found for pronoun")
 		}
-		log.Debug("ctx: ", ctx)
+		log.Println("ctx: ", ctx)
 	}
 	return m, ctxAdded, nil
 }
@@ -300,7 +300,7 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	// low.
 	m = max(probs)
 	if m <= 0.7 {
-		log.Debug(word1, " || ", datatypes.String[likely+1], " || ", m)
+		log.Println(word1, " || ", datatypes.String[likely+1], " || ", m)
 	}
 	return datatypes.WordClass{word1, likely + 1}, nil
 }

@@ -3,12 +3,11 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 type packagesConf struct {
@@ -23,29 +22,25 @@ func bootDependencies() {
 	// TODO Inspect for errors
 	content, err := ioutil.ReadFile("packages.json")
 	if err != nil {
-		log.Error("reading packages.json", err)
-		log.Fatal("could not start")
+		log.Println("err: reading packages.json", err)
+		log.Fatalln("could not start")
 	}
 	var conf packagesConf
 	err = json.Unmarshal(content, &conf)
 	if err != nil {
-		log.Error("unmarshaling packages", err)
-		log.Fatal("could not start")
+		log.Println("err: unmarshaling packages", err)
+		log.Fatalln("could not start")
 	}
-	i := 1
+	i := 2
 	for name := range conf.Dependencies {
 		p := strconv.Itoa(4000 + i)
-		plog := log.WithFields(log.Fields{
-			"port":    p,
-			"package": name,
-		})
-		plog.Debug("booting package")
+		log.Println("booting package", name, p)
 		pth := path.Join("ava_modules", name, name)
 		cmd := exec.Command(pth, "-port", p)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err = cmd.Start(); err != nil {
-			plog.Fatal("running package process: ", err)
+			log.Fatalln("running package process: ", err)
 		}
 		i += 2
 	}

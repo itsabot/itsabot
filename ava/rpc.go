@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/rpc"
 	"strconv"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
 )
@@ -20,7 +20,7 @@ var client *rpc.Client
 // is encountered. Note that packages will only listen when ALL criteria are met
 func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 	pt := p.Config.Port + 1
-	log.WithField("port", pt).Debug("registering package with listen port")
+	log.Println("registering package with listen port", pt)
 	port := ":" + strconv.Itoa(pt)
 	addr := p.Config.ServerAddress + port
 	cl, err := rpc.Dial("tcp", addr)
@@ -28,6 +28,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 		return err
 	}
 	for _, c := range p.Trigger.Commands {
+		c = strings.ToLower(c)
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + o)
 			if regPkgs[s] != nil {
@@ -35,13 +36,9 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 					"duplicate package or trigger: %s",
 					p.Config.Name)
 			}
-			logger := log.WithField("package", p.Config.Name)
-			regPkgs[s] = &pkg.PkgWrapper{
-				P:         p,
-				RPCClient: cl,
-				Logger:    logger,
-			}
+			regPkgs[s] = &pkg.PkgWrapper{P: p, RPCClient: cl}
 		}
+		regPkgs[c] = &pkg.PkgWrapper{P: p, RPCClient: cl}
 	}
 	return nil
 }
@@ -49,12 +46,12 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *error) error {
 func getPkg(m *datatypes.Message) (*pkg.PkgWrapper, string, error) {
 	var p *pkg.PkgWrapper
 	if m.User == nil {
-		p = regPkgs["ONBOARD"]
+		p = regPkgs["onboard"]
 		if p != nil {
-			return p, "ONBOARD", nil
+			return p, "onboard", nil
 		} else {
-			log.Error("missing required onboard package")
-			return nil, "ONBOARD", ErrMissingPackage
+			log.Println("err: missing required onboard package")
+			return nil, "onboard", ErrMissingPackage
 		}
 	}
 	var route string
@@ -64,9 +61,9 @@ Loop:
 		for _, o := range si.Objects {
 			route = strings.ToLower(c + o)
 			p = regPkgs[route]
-			log.Debug("searching for " + strings.ToLower(c+o))
+			log.Println("searching for " + strings.ToLower(c+o))
 			if p != nil {
-				log.Debug("found pkg")
+				log.Println("found pkg")
 				break Loop
 			}
 		}
@@ -81,12 +78,13 @@ Loop:
 func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, error) {
 	pw, route, err := getPkg(m)
 	if err != nil {
-		log.Error("getPkg: ", err)
+		log.Println("err: getPkg: ", err)
 		return "", route, err
 	}
-	log.Debug("sending structured input to ", pw.P.Config.Name)
+	log.Println("sending structured input to", pw.P.Config.Name)
 	c := strings.Title(pw.P.Config.Name)
-	if ctxAdded {
+	if ctxAdded || len(m.Input.StructuredInput.Commands) == 0 {
+		log.Println("FollowUp")
 		c += ".FollowUp"
 	} else {
 		c += ".Run"
@@ -95,6 +93,6 @@ func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, error) {
 	if err := pw.RPCClient.Call(c, m, &reply); err != nil {
 		return "", route, err
 	}
-	log.Debug("r: ", reply)
+	log.Println("r:", reply)
 	return reply, route, nil
 }
