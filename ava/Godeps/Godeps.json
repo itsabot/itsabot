@@ -35,11 +35,6 @@
 			"Rev": "69738bd209812c5a381786011aff17944a384554"
 		},
 		{
-			"ImportPath": "github.com/joho/godotenv",
-			"Comment": "v1-2-gead2e75",
-			"Rev": "ead2e75027bf1a3f6457e28d9eb3c2fa05109d2b"
-		},
-		{
 			"ImportPath": "github.com/labstack/echo",
 			"Comment": "v1.0.0-20-g35d018c",
 			"Rev": "35d018c671c30559348332400c63344394488976"

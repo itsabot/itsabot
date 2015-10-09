@@ -18,7 +18,6 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/joho/godotenv"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
 	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
@@ -75,9 +74,6 @@ func main() {
 
 func startServer(port string) {
 	var err error
-	if err = godotenv.Load(); err != nil {
-		log.Println("err: loading environment:", err)
-	}
 	if err = checkRequiredEnvVars(); err != nil {
 		log.Println("err:", err)
 	}
@@ -178,7 +174,7 @@ func handlerIndex(c *echo.Context) error {
 
 // TODO
 func handlerTwilio(c *echo.Context) error {
-	log.Println("twilio endpoint not implemented")
+	log.Println(c.Form)
 	return errors.New("not implemented")
 }
 
@@ -240,7 +236,6 @@ func handlerMain(c *echo.Context) error {
 		return err
 	}
 	if err := routeResponse(in, ret); err != nil {
-		log.Println("Twilio err:", err)
 		return err
 	}
 Response:
