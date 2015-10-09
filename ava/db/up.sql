@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS responses (
 	inputid INTEGER NOT NULL,
 	response VARCHAR(255) NOT NULL,
 	state JSONB,
+	responsetype INTEGER NOT NULL, -- 1 (Twilio). More to be added
+	responseid VARCHAR(255) NOT NULL, -- ID in Twilio
 	createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	PRIMARY KEY (id)
 );

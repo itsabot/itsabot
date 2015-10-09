@@ -25,6 +25,7 @@ import (
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	_ "github.com/lib/pq"
+	"github.com/subosito/twilio"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -238,8 +239,25 @@ func handlerMain(c *echo.Context) error {
 	if err := saveStructuredInput(in, ret, pname, route); err != nil {
 		return err
 	}
+	if err := routeResponse(in, ret); err != nil {
+		log.Println("Twilio err:", err)
+		return err
+	}
 Response:
 	err = c.HTML(http.StatusOK, ret)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func routeResponse(in *datatypes.Input, ret string) error {
+	if in.FlexIdType != datatypes.FlexIdTypePhone {
+		return errors.New("route type not implemented")
+	}
+	params := twilio.MessageParams{Body: ret}
+	_, resp, err := tc.Messages.Send("+14242971568", in.FlexId, params)
+	log.Println(resp)
 	if err != nil {
 		return err
 	}
@@ -399,6 +417,7 @@ func validateParams(c *echo.Context) (int, string, int, error) {
 	var uid, fidT int
 	var fid string
 	var err error
+	fid = c.Form("flexid")
 	uid, err = strconv.Atoi(c.Form("uid"))
 	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 		uid = 0
