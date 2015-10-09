@@ -19,14 +19,14 @@ const (
 	// MethodCVV will require the CVV (3-4 digit security code) for a credit
 	// card on file. If the user has no credit cards on file, the user will
 	// be asked for one.
-	MethodCVV Method
+	MethodCVV
 
 	// MethodZip requires the zip code associated with a credit card on
 	// file. Just like MethodCVV, the user will be asked for a credit card
 	// if not on file. This method is considered slightly more secure than
 	// CVV, since having the credit card (and therefore the CVV) is not
 	// enough.
-	MethodZip Method
+	MethodZip
 
 	// TODO MethodWeb: require a traditional username and password
 )
@@ -41,5 +41,5 @@ const (
 // previously authenticated. TODO implement
 func Authenticate(m Method) (Method, error) {
 	log.Error("Authenticate not implemented")
-	return Method{}, errors.New("not implemented")
+	return Method(0), errors.New("not implemented")
 }
