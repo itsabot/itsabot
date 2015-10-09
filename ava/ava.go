@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"log"
 	"math/rand"
@@ -24,6 +25,7 @@ import (
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var db *sqlx.DB
@@ -135,14 +137,24 @@ func initRoutes(e *echo.Echo) {
 	e.SetDebug(true)
 	e.Static("/public/css", "assets/css")
 	e.Static("/public/images", "assets/images")
+
 	e.Get("/", handlerIndex)
-	e.Post("/", handlerMain)
-	e.Post("/twilio", handlerTwilio)
+	e.Get("/signup", handlerSignup)
+	e.Post("/signup", handlerSignupSubmit)
 	e.Get("/login", handlerLogin)
 	e.Post("/login", handlerLoginSubmit)
+	e.Get("/success", handlerLoginSuccess)
+
+	e.Post("/", handlerMain)
+	e.Post("/twilio", handlerTwilio)
+
 }
 
 func handlerIndex(c *echo.Context) error {
+	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
 	tmplIndex, err := template.ParseFiles("assets/html/index.html")
 	if err != nil {
 		log.Fatalln(err)
@@ -152,7 +164,11 @@ func handlerIndex(c *echo.Context) error {
 	if err := tmplIndex.Execute(b, struct{}{}); err != nil {
 		log.Fatalln(err)
 	}
-	err = c.HTML(http.StatusOK, "%s", b)
+	b2 := bytes.NewBuffer(s)
+	if err := tmplLayout.Execute(b2, b); err != nil {
+		log.Fatalln(err)
+	}
+	err = c.HTML(http.StatusOK, "%s", b2)
 	if err != nil {
 		return err
 	}
@@ -230,14 +246,153 @@ Response:
 	return nil
 }
 
-// TODO
 func handlerLogin(c *echo.Context) error {
-	return errors.New("not implemented")
+	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	tmplLogin, err := template.ParseFiles("assets/html/login.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var s []byte
+	b := bytes.NewBuffer(s)
+	var data struct{ Error string }
+	if c.Get("err") != nil {
+		data.Error = c.Get("err").(error).Error()
+		c.Set("err", nil)
+	}
+	if err := tmplLogin.Execute(b, data); err != nil {
+		log.Fatalln(err)
+	}
+	b2 := bytes.NewBuffer(s)
+	if err := tmplLayout.Execute(b2, b); err != nil {
+		log.Fatalln(err)
+	}
+	err = c.HTML(http.StatusOK, "%s", b2)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
-// TODO
+func handlerSignup(c *echo.Context) error {
+	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	tmplSignup, err := template.ParseFiles("assets/html/signup.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var s []byte
+	b := bytes.NewBuffer(s)
+	data := struct{ Error string }{}
+	if c.Get("err") != nil {
+		data.Error = c.Get("err").(error).Error()
+		c.Set("err", nil)
+	}
+	if err := tmplSignup.Execute(b, data); err != nil {
+		log.Fatalln(err)
+	}
+	b2 := bytes.NewBuffer(s)
+	if err := tmplLayout.Execute(b2, b); err != nil {
+		log.Fatalln(err)
+	}
+	err = c.HTML(http.StatusOK, "%s", b2)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func handlerLoginSubmit(c *echo.Context) error {
-	return errors.New("not implemented")
+	var u struct {
+		Id       int
+		Password []byte
+	}
+	var err error
+	q := `SELECT id, password FROM users WHERE email=$1`
+	err = db.Get(&u, q, c.Form("email"))
+	if err == sql.ErrNoRows {
+		err = errors.New("Invalid username/password combination")
+		goto Response
+	} else if err != nil {
+		goto Response
+	}
+	err = bcrypt.CompareHashAndPassword(u.Password, []byte(c.Form("pw")))
+	if err != nil {
+		goto Response
+	}
+Response:
+	if err != nil {
+		c.Set("err", err)
+		return handlerLogin(c)
+	}
+	return handlerLoginSuccess(c)
+}
+
+func handlerLoginSuccess(c *echo.Context) error {
+	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	tmplSignup, err := template.ParseFiles("assets/html/loginsuccess.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var s []byte
+	b := bytes.NewBuffer(s)
+	if err := tmplSignup.Execute(b, struct{}{}); err != nil {
+		log.Fatalln(err)
+	}
+	b2 := bytes.NewBuffer(s)
+	if err := tmplLayout.Execute(b2, b); err != nil {
+		log.Fatalln(err)
+	}
+	err = c.HTML(http.StatusOK, "%s", b2)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func handlerSignupSubmit(c *echo.Context) error {
+	name := c.Form("name")
+	email := c.Form("email")
+	pw := c.Form("pw")
+	var err error
+	var hpw []byte
+	var q string
+	if len(name) == 0 {
+		err = errors.New("You must enter a name.")
+		goto Response
+	}
+	if len(email) == 0 || !strings.ContainsAny(email, "@") {
+		err = errors.New("You must enter an email.")
+		goto Response
+	}
+	if len(pw) < 8 {
+		err = errors.New("Your password must be at least 8 characters.")
+		goto Response
+	}
+	hpw, err = bcrypt.GenerateFromPassword([]byte(pw), 10)
+	if err != nil {
+		goto Response
+	}
+	q = `INSERT INTO users (name, email, password, locationid)
+	      VALUES ($1, $2, $3, 0)`
+	_, err = db.Exec(q, name, email, hpw)
+	if err != nil && err.Error() ==
+		`pq: duplicate key value violates unique constraint "users_email_key"` {
+		err = errors.New("Sorry, that email is taken.")
+	}
+Response:
+	if err != nil {
+		c.Set("err", err)
+		return handlerSignup(c)
+	}
+	return handlerLoginSuccess(c)
 }
 
 func validateParams(c *echo.Context) (int, string, int, error) {

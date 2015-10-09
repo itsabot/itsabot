@@ -1,0 +1,31 @@
+<div class="row margin-tb-sm text-center">
+	<a href="/"><img class="icon-md" src="/public/images/face_laugh.png" /></a>
+</div>
+<div class="row">
+	<div class="col-sm-6 col-sm-push-3">
+		<h2 class="text-center">Sign up for Ava</h2>
+		{{if .Error}}
+			<div class="alert alert-danger margin-top-sm" role="alert">{{.Error}}</div>
+		{{end}}
+		<form action="/signup" method="post">
+			<div class="form-group">
+				<label for="inputName">Name</label>
+				<input type="text" name="name" class="form-control" id="inputName" placeholder="Your Name">
+			</div>
+			<div class="form-group">
+				<label for="inputEmail">Email</label>
+				<input type="email" name="email" class="form-control" id="inputEmail" placeholder="Email">
+			</div>
+			<div class="form-group">
+				<label for="inputPassword">Password</label>
+				<input type="password" name="pw" class="form-control" id="inputPassword" placeholder="Password">
+			</div>
+			<div class="text-center">
+				<button type="submit" class="btn btn-default btn-lg">Sign up</button>
+				<div class="help-block margin-top-sm">
+					Already have an account? <a href="/login">Log in here.</a>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>

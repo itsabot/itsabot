@@ -100,6 +100,7 @@ func (t *Yelp) Run(m *datatypes.Message, resp *string) error {
 	return nil
 }
 
+// TODO: Build a way to set up an expected state or response
 func (t *Yelp) FollowUp(m *datatypes.Message, resp *string) error {
 	for _, o := range m.Input.StructuredInput.Objects {
 		switch o {
