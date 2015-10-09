@@ -7,9 +7,9 @@ import (
 	"net/rpc"
 	"strconv"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
 )
 
 type PkgWrapper struct {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 func Greeting(r *rand.Rand, name string) string {
