@@ -119,8 +119,12 @@ func bootRPCServer(port string) {
 
 func connectDB() *sqlx.DB {
 	log.Println("connecting to db")
-	db, err := sqlx.Connect("postgres",
-		"user=egtann dbname=ava sslmode=disable")
+	if os.Getenv("AVA_ENV") == "production" {
+		db, err := sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+	} else {
+		db, err := sqlx.Connect("postgres",
+			"user=egtann dbname=ava sslmode=disable")
+	}
 	if err != nil {
 		log.Println("could not connect to db ", err.Error())
 	}
@@ -144,7 +148,6 @@ func initRoutes(e *echo.Echo) {
 
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
-
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -429,16 +432,18 @@ func validateParams(c *echo.Context) (int, string, int, error) {
 }
 
 func checkRequiredEnvVars() error {
+	port := os.Getenv("PORT")
+	_, err := strconv.Atoi(port)
+	if err != nil {
+		return errors.New("PORT is not set to an integer")
+	}
 	base := os.Getenv("BASE_URL")
 	l := len(base)
 	if l == 0 {
-		return errors.New("BASE_URL environment variable not set")
+		return errors.New("BASE_URL not set")
 	}
 	if l < 4 || base[0:4] != "http" {
 		return errors.New("BASE_URL invalid. Must include http/https")
-	}
-	if base[l-1] != '/' {
-		return errors.New("BASE_URL must end in '/'")
 	}
 	return nil
 }
