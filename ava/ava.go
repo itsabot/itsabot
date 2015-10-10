@@ -62,7 +62,7 @@ func main() {
 		}
 		if c.Bool("server") {
 			db = connectDB()
-			startServer(c.String("port"))
+			startServer(os.Getenv("PORT"))
 			showHelp = false
 		}
 		if showHelp {
