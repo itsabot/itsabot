@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/codegangsta/cli"
-	_ "github.com/lib/pq"
+	"github.com/avabot/Godeps/_workspace/src/github.com/codegangsta/cli"
+	_ "github.com/avabot/Godeps/_workspace/src/github.com/lib/pq"
 )
 
 func main() {

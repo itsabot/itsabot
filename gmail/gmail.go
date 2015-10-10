@@ -11,10 +11,10 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/gmail/v1"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/net/context"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/oauth2"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/oauth2/google"
+	"github.com/avabot/Godeps/_workspace/src/google.golang.org/api/gmail/v1"
 )
 
 // then generate a Client. It returns the generated Client.

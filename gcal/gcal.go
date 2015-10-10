@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"golang.org/x/net/context"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/calendar/v3"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/net/context"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/oauth2"
+	"github.com/avabot/Godeps/_workspace/src/golang.org/x/oauth2/google"
+	"github.com/avabot/Godeps/_workspace/src/google.golang.org/api/calendar/v3"
 )
 
 // getClient uses a Context and Config to retrieve a Token

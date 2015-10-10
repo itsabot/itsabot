@@ -5,7 +5,7 @@ package knowledge
 import (
 	"errors"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/avabot/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 )
 

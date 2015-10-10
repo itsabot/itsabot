@@ -3,7 +3,7 @@ package auth
 import (
 	"errors"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/avabot/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 type Method int

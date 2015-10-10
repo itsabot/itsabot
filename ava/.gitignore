@@ -1,4 +1,2 @@
 ava
 *.sw*
-.env
-data/bayes.dat
