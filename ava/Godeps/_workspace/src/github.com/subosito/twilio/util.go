@@ -2,7 +2,7 @@ package twilio
 
 import (
 	"encoding/json"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/figo"
+	"github.com/subosito/figo"
 	"io/ioutil"
 	"net/http"
 	"net/url"

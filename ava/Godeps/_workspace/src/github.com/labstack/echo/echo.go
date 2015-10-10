@@ -14,9 +14,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/bradfitz/http2"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattn/go-colorable"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+	"github.com/bradfitz/http2"
+	"github.com/mattn/go-colorable"
+	"golang.org/x/net/websocket"
 )
 
 type (
