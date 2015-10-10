@@ -65,6 +65,7 @@ func NewPackageWithServer(name, serverAddr string, port int,
 
 // Register with Ava to begin communicating over RPC.
 func (p *Pkg) Register(pkgT interface{}) error {
+	log.Println("connecting to port", p.Config.Port+1, "for", p.Config.Name)
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(p.Config.Port+1))
 	if err != nil {
 		log.Fatalln("rpc listen:", err, p.Config.Name)
