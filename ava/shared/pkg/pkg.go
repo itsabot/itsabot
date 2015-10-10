@@ -72,7 +72,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	if err := rpc.Register(pkgT); err != nil {
 		log.Fatalln(err, p.Config.Name)
 	}
-	port, err := strconv.Atoi(os.Getenv("port"))
+	port, err := strconv.Atoi(os.Getenv("PORT"))
 	if err != nil {
 		return err
 	}
