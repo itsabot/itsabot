@@ -119,16 +119,18 @@ func bootRPCServer(port string) {
 
 func connectDB() *sqlx.DB {
 	log.Println("connecting to db")
+	var d *sqlx.DB
+	var err error
 	if os.Getenv("AVA_ENV") == "production" {
-		db, err := sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+		d, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
-		db, err := sqlx.Connect("postgres",
+		d, err = sqlx.Connect("postgres",
 			"user=egtann dbname=ava sslmode=disable")
 	}
 	if err != nil {
 		log.Println("could not connect to db ", err.Error())
 	}
-	return db
+	return d
 }
 
 func initRoutes(e *echo.Echo) {
