@@ -172,8 +172,14 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 
 func connectDB() *sqlx.DB {
 	log.Println("connecting to db")
-	db, err := sqlx.Connect("postgres",
-		"user=egtann dbname=ava sslmode=disable")
+	var db *sqlx.DB
+	var err error
+	if os.Getenv("AVA_ENV") == "production" {
+		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+	} else {
+		db, err = sqlx.Connect("postgres",
+			"user=egtann dbname=ava sslmode=disable")
+	}
 	if err != nil {
 		log.Println("err: could not connect to db", err)
 	}

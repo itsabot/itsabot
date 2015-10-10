@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/rpc"
+	"os"
 	"strconv"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -99,8 +100,12 @@ func (p *Pkg) Register(pkgT interface{}) error {
 
 func connectDB() error {
 	var err error
-	db, err = sqlx.Connect("postgres",
-		"user=egtann dbname=ava sslmode=disable")
+	if os.Getenv("AVA_ENV") == "production" {
+		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+	} else {
+		db, err = sqlx.Connect("postgres",
+			"user=egtann dbname=ava sslmode=disable")
+	}
 	if err != nil {
 		return err
 	}
