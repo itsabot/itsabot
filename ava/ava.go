@@ -121,6 +121,7 @@ func connectDB() *sqlx.DB {
 	log.Println("connecting to db")
 	var d *sqlx.DB
 	var err error
+	log.Println("AVA_ENV =", os.Getenv("AVA_ENV"))
 	if os.Getenv("AVA_ENV") == "production" {
 		d, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
