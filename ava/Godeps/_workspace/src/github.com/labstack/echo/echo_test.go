@@ -12,8 +12,8 @@ import (
 
 	"errors"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/net/websocket"
 )
 
 type (
