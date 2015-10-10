@@ -177,9 +177,16 @@ func handlerIndex(c *echo.Context) error {
 	return nil
 }
 
-// TODO
 func handlerTwilio(c *echo.Context) error {
-	log.Println(c.Form)
+	log.Println("from", c.Form("From"))
+	log.Println("body", c.Form("Body"))
+	c.Set("cmd", c.Form("Body"))
+	c.Set("flexid", c.Form("From"))
+	c.Set("flexidtype", 2)
+	if err := handlerMain(c); err != nil {
+		log.Println("main err:", err)
+		return err
+	}
 	return errors.New("not implemented")
 }
 
@@ -447,5 +454,6 @@ func checkRequiredEnvVars() error {
 	if l < 4 || base[0:4] != "http" {
 		return errors.New("BASE_URL invalid. Must include http/https")
 	}
+	// TODO Check for DATABASE_URL if AVA_ENV==production
 	return nil
 }
