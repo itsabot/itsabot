@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
-	"golang.org/x/net/websocket"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
 )
 
 func main() {
