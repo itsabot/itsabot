@@ -33,7 +33,11 @@ func bootDependencies() {
 	}
 	i := 2
 	for name := range conf.Dependencies {
-		p := strconv.Itoa(4000 + i)
+		port, err := strconv.Atoi(os.Getenv("PORT"))
+		if err != nil {
+			log.Fatalln("PORT must be an integer")
+		}
+		p := strconv.Itoa(port + i)
 		log.Println("booting package", name, p)
 		pth := path.Join("ava_modules", name, name)
 		cmd := exec.Command(pth, "-port", p)

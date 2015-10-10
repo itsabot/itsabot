@@ -72,7 +72,11 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	if err := rpc.Register(pkgT); err != nil {
 		log.Fatalln(err, p.Config.Name)
 	}
-	client, err = rpc.Dial("tcp", ":4001")
+	port, err := strconv.Atoi(os.Getenv("port"))
+	if err != nil {
+		return err
+	}
+	client, err = rpc.Dial("tcp", ":"+strconv.Itoa(port+1))
 	if err != nil {
 		return err
 	}
