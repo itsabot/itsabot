@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/stvp/go-udp-testing"
 )
 
 func TestWritingToUDP(t *testing.T) {

@@ -1,0 +1,9 @@
+# Website
+website/public
+
+# Node.js
+node_modules
+
+# IntelliJ
+.idea
+*.iml

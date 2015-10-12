@@ -15,10 +15,11 @@
 package oauth_test
 
 import (
-	"github.com/garyburd/go-oauth/oauth"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/garyburd/go-oauth/oauth"
 )
 
 // This example shows how to sign a request when the URL Opaque field is used.

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	log "github.com/Sirupsen/logrus"
+	"github.com/jmoiron/sqlx"
 )
 
 type jsonState json.RawMessage

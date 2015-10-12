@@ -75,11 +75,11 @@ Loop:
 	}
 }
 
-func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, error) {
+func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, string, error) {
 	pw, route, err := getPkg(m)
 	if err != nil {
 		log.Println("err: getPkg: ", err)
-		return "", route, err
+		return "", pw.P.Config.Name, route, err
 	}
 	log.Println("sending structured input to", pw.P.Config.Name)
 	c := strings.Title(pw.P.Config.Name)
@@ -91,8 +91,8 @@ func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, error) {
 	}
 	var reply string
 	if err := pw.RPCClient.Call(c, m, &reply); err != nil {
-		return "", route, err
+		return "", pw.P.Config.Name, route, err
 	}
 	log.Println("r:", reply)
-	return reply, route, nil
+	return reply, pw.P.Config.Name, route, nil
 }

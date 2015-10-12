@@ -3,9 +3,10 @@ package logstash
 import (
 	"bytes"
 	"encoding/json"
+	"testing"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestLogstashFormatter(t *testing.T) {

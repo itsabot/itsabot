@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/garyburd/go-oauth/oauth"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
+	"github.com/garyburd/go-oauth/oauth"
+	"github.com/jmoiron/sqlx"
 )
 
 type Yelp string

@@ -10,8 +10,7 @@ import (
 
 var ErrMissingUser = errors.New("missing user")
 
-func saveStructuredInput(in *datatypes.Input, rsp, pkg,
-	route string) error {
+func saveStructuredInput(in *datatypes.Input, rsp, pkg, route string) error {
 	// TODO
 	q := `
 		INSERT INTO responses (userid, inputid, response, state)

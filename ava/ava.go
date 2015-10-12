@@ -15,17 +15,16 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
-	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
-	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/pkg"
+	"github.com/codegangsta/cli"
+	"github.com/jbrukh/bayesian"
+	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo"
+	mw "github.com/labstack/echo/middleware"
+	_ "github.com/lib/pq"
+	"github.com/subosito/twilio"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var db *sqlx.DB
@@ -178,84 +177,85 @@ func handlerIndex(c *echo.Context) error {
 }
 
 func handlerTwilio(c *echo.Context) error {
-	log.Println("from", c.Form("From"))
-	log.Println("body", c.Form("Body"))
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
-	if err := handlerMain(c); err != nil {
-		log.Println("main err:", err)
+	ret, err := processText(c)
+	if err != nil {
 		return err
 	}
-	return errors.New("not implemented")
+	ret, err = stringToTwiml(ret)
+	if err != nil {
+		return err
+	}
+	err = c.XML(http.StatusOK, twilioResp{Message: ret})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func handlerMain(c *echo.Context) error {
-	cmd := c.Form("cmd")
-	if len(cmd) == 0 {
-		return ErrInvalidCommand
-	}
-	var ret, pname, route, fid string
-	var err error
-	var uid, fidT int
-	var ctxAdded bool
-	var pw *pkg.PkgWrapper
-	var m *datatypes.Message
-	var u *datatypes.User
-	in := &datatypes.Input{}
-	si := &datatypes.StructuredInput{}
-	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
-		if err := train(bayes, cmd[6:]); err != nil {
-			return err
-		}
-		goto Response
-	}
-	si, err = classify(bayes, cmd)
-	if err != nil {
-		log.Println("classifying sentence ", err)
-	}
-	uid, fid, fidT, err = validateParams(c)
+	ret, err := processText(c)
 	if err != nil {
 		return err
 	}
-	in = &datatypes.Input{
-		StructuredInput: si,
-		UserId:          uid,
-		FlexId:          fid,
-		FlexIdType:      fidT,
-	}
-	m = &datatypes.Message{User: u, Input: in}
-	u, err = getUser(in)
-	if err != nil && err != ErrMissingUser {
-		log.Println("getUser: ", err)
-	}
-	m, ctxAdded, err = addContext(m)
-	if err != nil {
-		log.Println("addContext: ", err)
-	}
-	ret, route, err = callPkg(m, ctxAdded)
-	if err != nil && err != ErrMissingPackage {
-		return err
-	}
-	if len(ret) == 0 {
-		ret = language.Confused()
-	}
-	if pw != nil {
-		pname = pw.P.Config.Name
-	}
-	in.StructuredInput = si
-	if err := saveStructuredInput(in, ret, pname, route); err != nil {
-		return err
-	}
-	if err := routeResponse(in, ret); err != nil {
-		return err
-	}
-Response:
 	err = c.HTML(http.StatusOK, ret)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func processText(c *echo.Context) (string, error) {
+	cmd := c.Form("cmd")
+	if len(cmd) == 0 {
+		return "", ErrInvalidCommand
+	}
+	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
+		if err := train(bayes, cmd[6:]); err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	si, err := classify(bayes, cmd)
+	if err != nil {
+		log.Println("classifying sentence ", err)
+	}
+	uid, fid, fidT, err := validateParams(c)
+	if err != nil {
+		return "", err
+	}
+	in := &datatypes.Input{
+		StructuredInput: si,
+		UserId:          uid,
+		FlexId:          fid,
+		FlexIdType:      fidT,
+	}
+	u, err := getUser(in)
+	if err != nil && err != ErrMissingUser {
+		log.Println("getUser: ", err)
+	}
+	m := &datatypes.Message{User: u, Input: in}
+	m, ctxAdded, err := addContext(m)
+	if err != nil {
+		log.Println("addContext: ", err)
+	}
+	ret, pname, route, err := callPkg(m, ctxAdded)
+	if err != nil && err != ErrMissingPackage {
+		return ret, err
+	}
+	if len(ret) == 0 {
+		ret = language.Confused()
+	}
+	in.StructuredInput = si
+	if err := saveStructuredInput(in, ret, pname, route); err != nil {
+		return ret, err
+	}
+	if err := routeResponse(in, ret); err != nil {
+		return ret, err
+	}
+	return ret, nil
 }
 
 func routeResponse(in *datatypes.Input, ret string) error {

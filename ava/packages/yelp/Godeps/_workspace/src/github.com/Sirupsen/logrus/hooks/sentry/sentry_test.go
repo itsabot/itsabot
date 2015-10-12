@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/getsentry/raven-go"
 )
 
 const (
