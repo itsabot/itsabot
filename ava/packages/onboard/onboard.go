@@ -31,7 +31,7 @@ func main() {
 }
 
 func (t *Onboard) Run(m *datatypes.Message, resp *string) error {
-	url := os.Getenv("BASE_URL") + "login"
+	url := os.Getenv("BASE_URL") + "signup"
 	*resp = "To get started, sign up here: " + url
 	return nil
 }
