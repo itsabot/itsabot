@@ -418,9 +418,20 @@ Response:
 
 // TODO defer panic
 func validateParams(c *echo.Context) (int, string, int) {
-	uid := c.Get("uid").(int)
-	fid := c.Get("flexid").(string)
-	fidT := c.Get("flexidtype").(int)
+	var uid, fidT int
+	var fid string
+	tmp := c.Get("uid")
+	if tmp != nil {
+		uid = tmp.(int)
+	}
+	tmp = c.Get("flexid")
+	if tmp != nil {
+		fid = tmp.(string)
+	}
+	tmp = c.Get("flexidtype")
+	if tmp != nil {
+		fidT = tmp.(int)
+	}
 	return uid, fid, fidT
 }
 
