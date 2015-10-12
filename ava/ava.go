@@ -248,9 +248,6 @@ func processText(c *echo.Context) (string, error) {
 	if err := saveStructuredInput(in, ret, pname, route); err != nil {
 		return ret, err
 	}
-	if err := routeResponse(in, ret); err != nil {
-		return ret, err
-	}
 	return ret, nil
 }
 
