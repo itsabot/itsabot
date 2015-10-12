@@ -178,7 +178,7 @@ func handlerIndex(c *echo.Context) error {
 
 func handlerTwilio(c *echo.Context) error {
 	log.Println("TWILIO")
-	log.Printf("%+v\n", c.Request)
+	log.Printf("%+v\n", *c.Request())
 	c.Set("cmd", c.Param("Body"))
 	c.Set("flexid", c.Param("From"))
 	c.Set("flexidtype", 2)
