@@ -45,7 +45,6 @@ func main() {
 		},
 		cli.StringFlag{
 			Name:  "port, p",
-			Value: "4000",
 			Usage: "set port for server",
 		},
 		cli.BoolFlag{
