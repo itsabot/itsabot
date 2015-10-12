@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -177,7 +178,7 @@ func handlerIndex(c *echo.Context) error {
 
 func handlerTwilio(c *echo.Context) error {
 	log.Println("TWILIO")
-	log.Printf("%+v\n", c.Request)
+	return fmt.Errorf("%+v\n", c.Request)
 	c.Set("cmd", c.Param("Body"))
 	c.Set("flexid", c.Param("From"))
 	c.Set("flexidtype", 2)
@@ -185,12 +186,7 @@ func handlerTwilio(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	ret, err = stringToTwiml(ret)
-	if err != nil {
-		return err
-	}
-	err = c.XML(http.StatusOK, twilioResp{Message: ret})
-	if err != nil {
+	if err = c.XML(http.StatusOK, twilioResp{Message: ret}); err != nil {
 		return err
 	}
 	return nil
