@@ -133,13 +133,13 @@ func connectDB() *sqlx.DB {
 }
 
 func initRoutes(e *echo.Echo) {
-	e.Use(mw.Logger())
-	e.Use(mw.Gzip())
-	e.Use(mw.Recover())
+	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
 	e.SetDebug(true)
+
 	e.Static("/public/css", "assets/css")
 	e.Static("/public/images", "assets/images")
 
+	// Web routes
 	e.Get("/", handlerIndex)
 	e.Get("/signup", handlerSignup)
 	e.Post("/signup", handlerSignupSubmit)
@@ -147,6 +147,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/login", handlerLoginSubmit)
 	e.Get("/success", handlerLoginSuccess)
 
+	// API routes
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
 }
