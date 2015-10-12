@@ -198,6 +198,10 @@ func handlerTwilio(c *echo.Context) error {
 }
 
 func handlerMain(c *echo.Context) error {
+	c.Set("cmd", c.Form("cmd"))
+	c.Set("flexid", c.Form("flexid"))
+	c.Set("flexidtype", c.Form("flexidtype"))
+	c.Set("uid", c.Form("uid"))
 	ret, err := processText(c)
 	if err != nil {
 		return err
@@ -210,7 +214,7 @@ func handlerMain(c *echo.Context) error {
 }
 
 func processText(c *echo.Context) (string, error) {
-	cmd := c.Form("cmd")
+	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
 		return "", ErrInvalidCommand
 	}
@@ -426,14 +430,14 @@ func validateParams(c *echo.Context) (int, string, int, error) {
 	var uid, fidT int
 	var fid string
 	var err error
-	fid = c.Form("flexid")
-	uid, err = strconv.Atoi(c.Form("uid"))
+	fid = c.Get("flexid").(string)
+	uid, err = strconv.Atoi(c.Get("uid").(string))
 	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 		uid = 0
 	} else if err != nil {
 		return uid, fid, fidT, err
 	}
-	fidT, err = strconv.Atoi(c.Form("flexidtype"))
+	fidT, err = strconv.Atoi(c.Get("flexidtype").(string))
 	if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 		fidT = 0
 	} else if err != nil {
