@@ -177,8 +177,6 @@ func handlerIndex(c *echo.Context) error {
 }
 
 func handlerTwilio(c *echo.Context) error {
-	log.Println("TWILIO")
-	log.Printf("%+v\n", *c.Request())
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
@@ -223,10 +221,7 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		log.Println("classifying sentence ", err)
 	}
-	uid, fid, fidT, err := validateParams(c)
-	if err != nil {
-		return "", err
-	}
+	uid, fid, fidT := validateParams(c)
 	in := &datatypes.Input{
 		StructuredInput: si,
 		UserId:          uid,
@@ -421,24 +416,12 @@ Response:
 	return handlerLoginSuccess(c)
 }
 
-func validateParams(c *echo.Context) (int, string, int, error) {
-	var uid, fidT int
-	var fid string
-	var err error
-	fid = c.Get("flexid").(string)
-	uid, err = strconv.Atoi(c.Get("uid").(string))
-	if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
-		uid = 0
-	} else if err != nil {
-		return uid, fid, fidT, err
-	}
-	fidT, err = strconv.Atoi(c.Get("flexidtype").(string))
-	if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
-		fidT = 0
-	} else if err != nil {
-		return uid, fid, fidT, err
-	}
-	return uid, fid, fidT, nil
+// TODO defer panic
+func validateParams(c *echo.Context) (int, string, int) {
+	uid := c.Get("uid").(int)
+	fid := c.Get("flexid").(string)
+	fidT := c.Get("flexidtype").(int)
+	return uid, fid, fidT
 }
 
 func checkRequiredEnvVars() error {
