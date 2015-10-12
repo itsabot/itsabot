@@ -8,8 +8,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/jbrukh/bayesian"
 )
 
 const (

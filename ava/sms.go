@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"os"
 
-	"github.com/subosito/twilio"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 )
 
 var tc *twilio.Client

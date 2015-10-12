@@ -15,16 +15,16 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
+	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
+	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/codegangsta/cli"
-	"github.com/jbrukh/bayesian"
-	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo"
-	mw "github.com/labstack/echo/middleware"
-	_ "github.com/lib/pq"
-	"github.com/subosito/twilio"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var db *sqlx.DB
