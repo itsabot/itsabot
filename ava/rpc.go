@@ -77,6 +77,9 @@ Loop:
 
 func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, string, error) {
 	pw, route, err := getPkg(m)
+	if pw == nil {
+		return "", "", route, nil
+	}
 	if err != nil {
 		log.Println("err: getPkg: ", err)
 		return "", pw.P.Config.Name, route, err
