@@ -50,7 +50,6 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		} else if err != nil {
-			log.Println("ERROR IS HERE")
 			return nil, err
 		}
 	} else if len(in.FlexId) > 0 && in.FlexIdType == 0 {
@@ -59,12 +58,11 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 	q := `SELECT id, name, email, lastauthenticated
 	      FROM users
 	      WHERE id=$1`
-	var u *datatypes.User
-	if err := db.Get(u, q, in.UserId); err != nil {
-		log.Println("ERROR IS HAPPENING HERE")
+	u := datatypes.User{}
+	if err := db.Get(&u, q, in.UserId); err != nil {
 		return nil, err
 	}
-	return u, nil
+	return &u, nil
 }
 
 func getLastInput(in *datatypes.Input) (*datatypes.Input, error) {
