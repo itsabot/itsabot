@@ -45,7 +45,7 @@ func (t *Onboard) FollowUp(m *datatypes.Message, resp *string) error {
 	if err != nil {
 		return err
 	}
-	*resp = "Please sign up to get started: " + u
+	*resp = "Hi, I'm Ava. To get started, you can sign up here: " + u
 	return nil
 }
 
@@ -56,7 +56,7 @@ func getURL(m *datatypes.Message) (string, error) {
 		"flexid":     {fid},
 		"flexidtype": {strconv.Itoa(fidT)},
 	}
-	u := os.Getenv("BASE_URL") + "login?" + v.Encode()
+	u := os.Getenv("BASE_URL") + "signup?" + v.Encode()
 	u, err := goisgd.Shorten(u)
 	if err != nil {
 		return "", err
