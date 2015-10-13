@@ -13,8 +13,8 @@ type User struct {
 	Id                int
 	Name              string
 	Email             string
-	LocationId        int
-	LastAuthenticated *time.Time
+	LocationID        int        `db:"locationid"`
+	LastAuthenticated *time.Time `db:"lastauthenticated"`
 }
 
 func (u *User) isAuthenticated() (bool, error) {

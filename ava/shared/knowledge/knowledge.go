@@ -15,7 +15,7 @@ var ErrNoLocation = errors.New("no previous location")
 // unknown, LastLocation returns an error.
 func LastLocation(db *sqlx.DB, u *datatypes.User) (*datatypes.Location, error) {
 	var loc *datatypes.Location
-	if u.LocationId == 0 {
+	if u.LocationID == 0 {
 		return loc, ErrNoLocation
 	}
 	q := `

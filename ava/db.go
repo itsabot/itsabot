@@ -41,9 +41,6 @@ func saveStructuredInput(in *datatypes.Input, rsp, pkg, route string) error {
 }
 
 func getUser(in *datatypes.Input) (*datatypes.User, error) {
-	if len(in.FlexId) > 0 && in.FlexIdType == 0 {
-		return nil, ErrMissingFlexIdType
-	}
 	if in.UserId == 0 {
 		q := `SELECT userid
 		      FROM userflexids
@@ -53,14 +50,18 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		} else if err != nil {
+			log.Println("ERROR IS HERE")
 			return nil, err
 		}
+	} else if len(in.FlexId) > 0 && in.FlexIdType == 0 {
+		return nil, ErrMissingFlexIdType
 	}
 	q := `SELECT id, name, email, lastauthenticated
 	      FROM users
 	      WHERE id=$1`
 	var u *datatypes.User
 	if err := db.Get(u, q, in.UserId); err != nil {
+		log.Println("ERROR IS HAPPENING HERE")
 		return nil, err
 	}
 	return u, nil
