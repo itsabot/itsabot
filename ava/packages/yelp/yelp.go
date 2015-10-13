@@ -94,7 +94,7 @@ func (t *Yelp) Run(m *datatypes.Message, resp *string) error {
 	r, err := t.search(query, location, 0)
 	if err != nil {
 		log.Println("err: search yelp: ", err)
-		r = "I couldn't run that for you at this time."
+		r = "I can't find that for you now. Let's try again later."
 	}
 	*resp = r
 	return nil

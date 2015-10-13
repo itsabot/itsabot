@@ -58,7 +58,9 @@ func getPkg(m *datatypes.Message) (*pkg.PkgWrapper, string, error) {
 	si := m.Input.StructuredInput
 Loop:
 	for _, c := range si.Commands {
+		c = strings.Split(c, "'")[0]
 		for _, o := range si.Objects {
+			o = strings.Split(o, "'")[0]
 			route = strings.ToLower(c + o)
 			p = regPkgs[route]
 			log.Println("searching for " + strings.ToLower(c+o))
