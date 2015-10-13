@@ -16,7 +16,7 @@ type packagesConf struct {
 	Dependencies map[string]string
 }
 
-// TODO Fetches packages via package manager, puts them in a dir. ava_modules
+// TODO Fetches packages via package manager, puts them in the packages dir
 
 func bootDependencies() {
 	// TODO Inspect for errors
@@ -39,7 +39,7 @@ func bootDependencies() {
 	for name := range conf.Dependencies {
 		p := strconv.Itoa(port + i)
 		log.Println("booting package", name, p)
-		pth := path.Join("ava_modules", name, name)
+		pth := path.Join("packages", name, name)
 		cmd := exec.Command(pth, "-port", p)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
