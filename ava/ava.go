@@ -216,7 +216,6 @@ func processText(c *echo.Context) (string, error) {
 	if len(cmd) == 0 {
 		return "", ErrInvalidCommand
 	}
-	log.Println("TMP:", strings.ToLower(cmd)[0:5])
 	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
 			return "", err

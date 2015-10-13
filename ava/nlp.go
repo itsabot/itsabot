@@ -267,26 +267,23 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	if err != nil {
 		return wc, err
 	}
-	word1c := stripContraction(word1)
-	bigram := word1c
-	trigram := word1c
-	var word2, word2c, word3, word3c string
+	bigram := word1
+	trigram := word1
+	var word2, word3 string
 	if i+1 < l {
 		word2, _, err = extractEntity(ws[i+1])
 		if err != nil {
 			return wc, err
 		}
-		word2c = stripContraction(word2)
-		bigram += " " + word2c
-		trigram += " " + word2c
+		bigram += " " + word2
+		trigram += " " + word2
 	}
 	if i+2 < l {
 		word3, _, err = extractEntity(ws[i+2])
 		if err != nil {
 			return wc, err
 		}
-		word3c = stripContraction(word3)
-		trigram += " " + word3c
+		trigram += " " + word3
 	}
 	probs, likely, _ := c.ProbScores([]string{trigram})
 	if max(probs) <= 0.7 {
@@ -313,19 +310,4 @@ func max(slice []float64) float64 {
 		}
 	}
 	return m
-}
-
-func stripContraction(w string) string {
-	// TODO Check contractions.txt for reasonable things that should be
-	// added back.
-	if len(w) <= 2 {
-		return w
-	}
-	if w[len(w)-2] == '\'' {
-		return w[:len(w)-2]
-	}
-	if w[len(w)-3] == '\'' {
-		return w[:len(w)-3]
-	}
-	return w
 }
