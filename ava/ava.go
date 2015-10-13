@@ -249,12 +249,9 @@ func processText(c *echo.Context) (string, error) {
 	return ret, nil
 }
 
-func sendMessage(u *datatype.User, s string) error {
-	if in.FlexIdType != datatypes.FlexIdTypePhone {
-		return errors.New("route type not implemented")
-	}
-	params := twilio.MessageParams{Body: ret}
-	_, resp, err := tc.Messages.Send("+14242971568", in.FlexId, params)
+func sendMessage(to, msg string) error {
+	params := twilio.MessageParams{Body: msg}
+	_, resp, err := tc.Messages.Send("+14242971568", to, params)
 	log.Println(resp)
 	if err != nil {
 		return err
@@ -364,8 +361,8 @@ func handlerLoginSuccess(c *echo.Context) error {
 	if err = tmplLayout.Execute(b2, b); err != nil {
 		return err
 	}
-	// TODO craft welcome email with examples for use, send here
-	err = sendMessage(u, "Thanks for signing in! How can I help you?")
+	to := c.Form("flexid")
+	err = sendMessage(to, "Thanks for signing in! How can I help you?")
 	if err != nil {
 		return err
 	}
