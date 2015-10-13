@@ -56,6 +56,7 @@ func getURL(m *datatypes.Message) (string, error) {
 		"flexid":     {fid},
 		"flexidtype": {strconv.Itoa(fidT)},
 	}
+	v.Set("encodedpath", v.Encode())
 	u := os.Getenv("BASE_URL") + "signup?" + v.Encode()
 	u, err := goisgd.Shorten(u)
 	if err != nil {
