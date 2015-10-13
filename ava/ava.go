@@ -184,7 +184,13 @@ func handlerTwilio(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = c.XML(http.StatusOK, twilioResp{Message: ret}); err != nil {
+	var resp twilioResp
+	if len(ret) == 0 {
+		resp = twilioResp{}
+	} else {
+		resp = twilioResp{Message: ret}
+	}
+	if err = c.XML(http.StatusOK, resp); err != nil {
 		return err
 	}
 	return nil
