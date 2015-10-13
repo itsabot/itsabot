@@ -136,6 +136,7 @@ func initRoutes(e *echo.Echo) {
 	e.SetDebug(true)
 
 	e.Static("/public/css", "assets/css")
+	e.Static("/public/js", "assets/js")
 	e.Static("/public/images", "assets/images")
 
 	// Web routes
