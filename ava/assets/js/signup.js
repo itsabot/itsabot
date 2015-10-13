@@ -39,9 +39,9 @@ window.onload = function() {
 		document.querySelector("#flexid").value = params.flexid;
 		document.querySelector("#flexidtype").value = params.flexidtype;
 		var link = document.querySelector("#login");
-		link.setAttribute("href", link.attributes.href+window.location.search);
+		link.setAttribute("href", link.href+window.location.search);
 	} else if (document.querySelector("#login") !== null) {
 		var link = document.querySelector("#signup");
-		link.setAttribute("href", link.attributes.href+window.location.search);
+		link.setAttribute("href", link.href+window.location.search);
 	}
 };
