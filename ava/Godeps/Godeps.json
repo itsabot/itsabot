@@ -11,6 +11,10 @@
 			"Rev": "8961c3750a47b8c0b3e118d52513b97adf85a7e8"
 		},
 		{
+			"ImportPath": "github.com/NickPresta/GoURLShortener",
+			"Rev": "eaed3e167e4ca10342e1446e8fc81b092dd76a17"
+		},
+		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.8.7",
 			"Rev": "418b41d23a1bf978c06faea5313ba194650ac088"
