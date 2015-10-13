@@ -3,8 +3,11 @@ package main
 import (
 	"flag"
 	"log"
+	"net/url"
 	"os"
+	"strconv"
 
+	"github.com/NickPresta/GoURLShortener"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
 )
@@ -15,8 +18,6 @@ type Onboard string
 
 func main() {
 	flag.Parse()
-	// NOTE onboard is a special trigger that's called when a user cannot be
-	// found for a particular flexid. Normally triggers must be lowercase.
 	trigger := &datatypes.StructuredInput{
 		Commands: []string{"onboard"},
 	}
@@ -31,13 +32,34 @@ func main() {
 }
 
 func (t *Onboard) Run(m *datatypes.Message, resp *string) error {
-	url := os.Getenv("BASE_URL") + "signup"
-	*resp = "To get started, sign up here: " + url
+	u, err := getURL(m)
+	if err != nil {
+		return err
+	}
+	*resp = "Hi, I'm Ava. To get started, you can sign up here: " + u
 	return nil
 }
 
 func (t *Onboard) FollowUp(m *datatypes.Message, resp *string) error {
-	url := os.Getenv("BASE_URL") + "login"
-	*resp = "Please signup to get started: " + url
+	u, err := getURL(m)
+	if err != nil {
+		return err
+	}
+	*resp = "Please sign up to get started: " + u
 	return nil
+}
+
+func getURL(m *datatypes.Message) (string, error) {
+	fid := m.Input.FlexId
+	fidT := m.Input.FlexIdType
+	v := url.Values{
+		"flexid":     {fid},
+		"flexidtype": {strconv.Itoa(fidT)},
+	}
+	u := os.Getenv("BASE_URL") + "login?" + v.Encode()
+	u, err := goisgd.Shorten(u)
+	if err != nil {
+		return "", err
+	}
+	return u, nil
 }

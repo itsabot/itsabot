@@ -169,8 +169,7 @@ func handlerIndex(c *echo.Context) error {
 	if err := tmplLayout.Execute(b2, b); err != nil {
 		log.Fatalln(err)
 	}
-	err = c.HTML(http.StatusOK, "%s", b2)
-	if err != nil {
+	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
 		return err
 	}
 	return nil
@@ -199,8 +198,7 @@ func handlerMain(c *echo.Context) error {
 	if err != nil {
 		return err
 	}
-	err = c.HTML(http.StatusOK, ret)
-	if err != nil {
+	if err = c.HTML(http.StatusOK, ret); err != nil {
 		return err
 	}
 	return nil
@@ -251,7 +249,7 @@ func processText(c *echo.Context) (string, error) {
 	return ret, nil
 }
 
-func routeResponse(in *datatypes.Input, ret string) error {
+func sendMessage(u *datatype.User, s string) error {
 	if in.FlexIdType != datatypes.FlexIdTypePhone {
 		return errors.New("route type not implemented")
 	}
@@ -287,8 +285,7 @@ func handlerLogin(c *echo.Context) error {
 	if err := tmplLayout.Execute(b2, b); err != nil {
 		log.Fatalln(err)
 	}
-	err = c.HTML(http.StatusOK, "%s", b2)
-	if err != nil {
+	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
 		return err
 	}
 	return nil
@@ -297,11 +294,11 @@ func handlerLogin(c *echo.Context) error {
 func handlerSignup(c *echo.Context) error {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	tmplSignup, err := template.ParseFiles("assets/html/signup.html")
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	var s []byte
 	b := bytes.NewBuffer(s)
@@ -311,14 +308,13 @@ func handlerSignup(c *echo.Context) error {
 		c.Set("err", nil)
 	}
 	if err := tmplSignup.Execute(b, data); err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	b2 := bytes.NewBuffer(s)
 	if err := tmplLayout.Execute(b2, b); err != nil {
-		log.Fatalln(err)
+		return err
 	}
-	err = c.HTML(http.StatusOK, "%s", b2)
-	if err != nil {
+	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
 		return err
 	}
 	return nil
@@ -353,23 +349,27 @@ Response:
 func handlerLoginSuccess(c *echo.Context) error {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	tmplSignup, err := template.ParseFiles("assets/html/loginsuccess.html")
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	var s []byte
 	b := bytes.NewBuffer(s)
-	if err := tmplSignup.Execute(b, struct{}{}); err != nil {
-		log.Fatalln(err)
+	if err = tmplSignup.Execute(b, struct{}{}); err != nil {
+		return err
 	}
 	b2 := bytes.NewBuffer(s)
-	if err := tmplLayout.Execute(b2, b); err != nil {
-		log.Fatalln(err)
+	if err = tmplLayout.Execute(b2, b); err != nil {
+		return err
 	}
-	err = c.HTML(http.StatusOK, "%s", b2)
+	// TODO craft welcome email with examples for use, send here
+	err = sendMessage(u, "Thanks for signing in! How can I help you?")
 	if err != nil {
+		return err
+	}
+	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
 		return err
 	}
 	return nil
@@ -379,9 +379,13 @@ func handlerSignupSubmit(c *echo.Context) error {
 	name := c.Form("name")
 	email := c.Form("email")
 	pw := c.Form("pw")
+	fid := c.Form("flexid")
+	fidT := c.Form("flexidtype")
 	var err error
 	var hpw []byte
 	var q string
+	var uid int
+	var tx *sqlx.Tx
 	if len(name) == 0 {
 		err = errors.New("You must enter a name.")
 		goto Response
@@ -398,12 +402,26 @@ func handlerSignupSubmit(c *echo.Context) error {
 	if err != nil {
 		goto Response
 	}
+	tx, err = db.Beginx()
+	if err != nil {
+		goto Response
+	}
 	q = `INSERT INTO users (name, email, password, locationid)
-	      VALUES ($1, $2, $3, 0)`
-	_, err = db.Exec(q, name, email, hpw)
+	     VALUES ($1, $2, $3, 0)
+	     RETURNING id`
+	err = tx.QueryRowx(q, name, email, hpw).Scan(&uid)
 	if err != nil && err.Error() ==
 		`pq: duplicate key value violates unique constraint "users_email_key"` {
 		err = errors.New("Sorry, that email is taken.")
+	}
+	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
+	     VALUES ($1, $2, $3)`
+	_, err = tx.Exec(q, uid, fid, fidT)
+	if err != nil {
+		goto Response
+	}
+	if err = tx.Commit(); err != nil {
+		goto Response
 	}
 Response:
 	if err != nil {
@@ -413,8 +431,12 @@ Response:
 	return handlerLoginSuccess(c)
 }
 
-// TODO defer panic
 func validateParams(c *echo.Context) (int, string, int) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("validateParams recovered from panic", r)
+		}
+	}()
 	var uid, fidT int
 	var fid string
 	tmp := c.Get("uid")
