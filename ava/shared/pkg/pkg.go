@@ -111,8 +111,5 @@ func connectDB() error {
 		db, err = sqlx.Connect("postgres",
 			"user=egtann dbname=ava sslmode=disable")
 	}
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

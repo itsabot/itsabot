@@ -13,25 +13,27 @@ import (
 type jsonState json.RawMessage
 
 type Message struct {
-	User  *User
-	Input *Input
+	User         *User
+	Input        *Input
+	LastResponse *Response
 }
 
 type Response struct {
-	Id        int
-	UserId    int
-	InputId   int
-	Response  string
-	State     jsonState
+	ID        int
+	UserID    int
+	InputID   int
+	Sentence  string
+	State     map[string]interface{} //jsonState
 	CreatedAt time.Time
 }
 
 type Input struct {
-	UserId          int
-	FlexId          string
-	FlexIdType      int
+	ID              int
+	UserID          int
+	FlexID          string
+	FlexIDType      int
 	Sentence        string
-	ResponseId      int
+	ResponseID      int
 	StructuredInput *StructuredInput
 }
 
@@ -50,14 +52,14 @@ func (j *jsonState) Value() (driver.Value, error) {
 func NewInput(si *StructuredInput, uid int, fid string, fidT int) *Input {
 	in := Input{
 		StructuredInput: si,
-		UserId:          uid,
-		FlexId:          fid,
-		FlexIdType:      fidT,
+		UserID:          uid,
+		FlexID:          fid,
+		FlexIDType:      fidT,
 	}
 	return &in
 }
 
-func (m *Message) LastResponse(db *sqlx.DB, r *Response) error {
+func (m *Message) GetLastResponse(db *sqlx.DB) error {
 	q := `
 		SELECT state
 		FROM responses
@@ -67,10 +69,25 @@ func (m *Message) LastResponse(db *sqlx.DB, r *Response) error {
 		// TODO move to shared errors
 		return errors.New("missing user")
 	}
-	row := db.QueryRowx(q, m.User.Id)
-	if err := row.StructScan(r); err != nil {
+	row := db.QueryRowx(q, m.User.ID)
+	if err := row.StructScan(m.LastResponse); err != nil {
 		log.Error("ERROR DB: ", err)
 		return err
 	}
 	return nil
+}
+
+func (r *Response) QuestionLanguage() bool {
+	if r.Sentence == "Where are you now?" ||
+		r.Sentence[0:17] == "Are you still in " {
+		return true
+	}
+	return false
+}
+
+func NewResponse(m *Message) *Response {
+	return &Response{
+		UserID:  m.User.ID,
+		InputID: m.Input.ID,
+	}
 }

@@ -50,8 +50,8 @@ func (t *Onboard) FollowUp(m *datatypes.Message, resp *string) error {
 }
 
 func getURL(m *datatypes.Message) (string, error) {
-	fid := m.Input.FlexId
-	fidT := m.Input.FlexIdType
+	fid := m.Input.FlexID
+	fidT := m.Input.FlexIDType
 	v := url.Values{
 		"flexid":     {fid},
 		"flexidtype": {strconv.Itoa(fidT)},

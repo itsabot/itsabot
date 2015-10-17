@@ -113,7 +113,9 @@ func Foods() []string {
 	}
 }
 
-// TODO
-func USCities() string {
-	return "TODO: Not implemented"
+func QuestionLocation(loc string) string {
+	if len(loc) == 0 {
+		return "Where are you now?"
+	}
+	return fmt.Sprintf("Are you still near %s?", loc)
 }

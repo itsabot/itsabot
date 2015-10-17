@@ -232,7 +232,7 @@ func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 // "where's" -> where. Since Ava ignores linking verbs, there's no need to
 // add "is" back into the sentence.
 func extractEntity(w string) (string, bayesian.Class, error) {
-	w = strings.TrimRight(w, ").,;?")
+	w = strings.TrimRight(w, ").,;?!:")
 	if w[0] != '_' {
 		return w, "", nil
 	}

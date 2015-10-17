@@ -229,13 +229,16 @@ func processText(c *echo.Context) (string, error) {
 	uid, fid, fidT := validateParams(c)
 	in := &datatypes.Input{
 		StructuredInput: si,
-		UserId:          uid,
-		FlexId:          fid,
-		FlexIdType:      fidT,
+		UserID:          uid,
+		FlexID:          fid,
+		FlexIDType:      fidT,
 	}
 	u, err := getUser(in)
-	if err != nil && err != ErrMissingUser {
+	if err == ErrMissingUser {
+		log.Println(err)
+	} else if err != nil {
 		log.Println("getUser: ", err)
+		return "", err
 	}
 	m := &datatypes.Message{User: u, Input: in}
 	m, ctxAdded, err := addContext(m)
@@ -408,6 +411,7 @@ func handlerSignupSubmit(c *echo.Context) error {
 	}
 	tx, err = db.Beginx()
 	if err != nil {
+		err = errors.New("Something went wrong. Try again.")
 		goto Response
 	}
 	q = `INSERT INTO users (name, email, password, locationid)
@@ -422,9 +426,13 @@ func handlerSignupSubmit(c *echo.Context) error {
 	     VALUES ($1, $2, $3)`
 	_, err = tx.Exec(q, uid, fid, fidT)
 	if err != nil {
+		log.Println("uid", uid, "fid", fid, "fidT", fidT)
+		err = errors.New(
+			"Couldn't register you. Did you use the link sent to you?")
 		goto Response
 	}
 	if err = tx.Commit(); err != nil {
+		err = errors.New("Something went wrong. Please try again.")
 		goto Response
 	}
 Response:
@@ -443,17 +451,30 @@ func validateParams(c *echo.Context) (int, string, int) {
 	}()
 	var uid, fidT int
 	var fid string
+	var err error
 	tmp := c.Get("uid")
 	if tmp != nil {
-		uid = tmp.(int)
+		uid, err = strconv.Atoi(tmp.(string))
+		if err != nil {
+			panic(err)
+		}
 	}
 	tmp = c.Get("flexid")
 	if tmp != nil {
 		fid = tmp.(string)
+		if len(fid) == 0 {
+			panic(errors.New("flexid is blank"))
+		}
 	}
 	tmp = c.Get("flexidtype")
 	if tmp != nil {
-		fidT = tmp.(int)
+		fidT, err = strconv.Atoi(tmp.(string))
+		if fidT == 0 {
+			panic(errors.New("flexidtype cannot be 0"))
+		}
+		if err != nil {
+			panic(err)
+		}
 	}
 	return uid, fid, fidT
 }

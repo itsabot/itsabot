@@ -10,7 +10,7 @@ import (
 )
 
 type User struct {
-	Id                int
+	ID                int
 	Name              string
 	Email             string
 	LocationID        int        `db:"locationid"`

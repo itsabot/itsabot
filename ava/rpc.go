@@ -94,10 +94,9 @@ func callPkg(m *datatypes.Message, ctxAdded bool) (string, string, string, error
 	} else {
 		c += ".Run"
 	}
-	var reply string
+	var reply datatypes.Response
 	if err := pw.RPCClient.Call(c, m, &reply); err != nil {
 		return "", pw.P.Config.Name, route, err
 	}
-	log.Println("r:", reply)
-	return reply, pw.P.Config.Name, route, nil
+	return reply.Sentence, pw.P.Config.Name, route, nil
 }
