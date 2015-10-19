@@ -124,8 +124,10 @@ func SaveResponse(respMsg *datatypes.ResponseMsg, r *datatypes.Response) error {
 	err = db.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, state).
 		Scan(&rid)
 	if err != nil {
+		log.Println("ERR SAVING", err)
 		return err
 	}
+	log.Println("saved route", r.Route)
 	respMsg.ResponseID = rid
 	respMsg.Sentence = r.Sentence
 	return nil

@@ -78,6 +78,38 @@ func Confused() string {
 	return ""
 }
 
+func Positive() string {
+	n := rand.Intn(3)
+	switch n {
+	case 0:
+		return "Great!"
+	case 1:
+		return "I'm glad to hear that!"
+	case 2:
+		return "Great to hear!"
+	}
+	log.Println("positive failed to return a response")
+	return ""
+}
+
+func Welcome() string {
+	n := rand.Intn(5)
+	switch n {
+	case 0:
+		return "You're welcome!"
+	case 1:
+		return "Sure thing!"
+	case 2:
+		return "I'm happy to help!"
+	case 3:
+		return "My pleasure."
+	case 4:
+		return "Sure."
+	}
+	log.Println("welcome failed to return a response")
+	return ""
+}
+
 func SuggestedPlace(s string) string {
 	n := rand.Intn(4)
 	switch n {

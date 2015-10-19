@@ -229,6 +229,7 @@ func processText(c *echo.Context) (string, error) {
 	}
 	uid, fid, fidT := validateParams(c)
 	in := &datatypes.Input{
+		Sentence:        cmd,
 		StructuredInput: si,
 		UserID:          uid,
 		FlexID:          fid,

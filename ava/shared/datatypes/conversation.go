@@ -69,7 +69,7 @@ func NewInput(si *StructuredInput, uid int, fid string, fidT int) *Input {
 
 func (m *Message) GetLastResponse(db *sqlx.DB) error {
 	q := `
-		SELECT state, route, sentence
+		SELECT state, route, sentence, userid
 		FROM responses
 		WHERE userid=$1
 		ORDER BY createdat DESC`
@@ -82,13 +82,17 @@ func (m *Message) GetLastResponse(db *sqlx.DB) error {
 		State    []byte
 		Route    string
 		Sentence string
+		UserID   int
 	}
 	if err := row.StructScan(&tmp); err != nil {
 		log.Println("structscan row ", err)
 		return err
 	}
-	m.LastResponse = &Response{Route: tmp.Route, Sentence: tmp.Sentence}
-	log.Println("last response", m.LastResponse)
+	m.LastResponse = &Response{
+		Route:    tmp.Route,
+		Sentence: tmp.Sentence,
+		UserID:   tmp.UserID,
+	}
 	if err := json.Unmarshal(tmp.State, &m.LastResponse.State); err != nil {
 		log.Println("unmarshaling state", err)
 		return err
@@ -97,23 +101,24 @@ func (m *Message) GetLastResponse(db *sqlx.DB) error {
 }
 
 func (r *Response) QuestionLanguage() bool {
-	log.Println("questionlanguage: sent:", r.Sentence)
-	if r.Sentence == "Where are you now?" ||
-		r.Sentence[0:17] == "Are you still in " {
+	if r.Sentence == "Where are you now?" {
 		return true
 	}
-	return false
+	return len(r.Sentence) >= 17 && r.Sentence[0:17] == "Are you still in "
 }
 
 func (m *Message) NewResponse() *Response {
-	log.Println("forming response")
 	var uid int
 	if m.User != nil {
 		uid = m.User.ID
 	}
-	return &Response{
+	res := &Response{
 		UserID:  uid,
 		InputID: m.Input.ID,
 		Route:   m.Route,
 	}
+	if m.LastResponse != nil {
+		res.State = m.LastResponse.State
+	}
+	return res
 }

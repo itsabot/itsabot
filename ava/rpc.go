@@ -80,11 +80,15 @@ Loop:
 			log.Println("couldn't find last package")
 			return p, route, false, ErrMissingPackage
 		}
-		p = regPkgs[m.LastResponse.Route]
-		log.Println("last route", m.LastResponse.Route)
+		route = m.LastResponse.Route
+		p = regPkgs[route]
 		if p == nil {
 			return p, route, true, ErrMissingPackage
 		}
+		// TODO pass LastResponse directly to packages via rpc gob
+		// encoding, removing the need to nil this out and then look it
+		// up again in the package
+		m.LastResponse = nil
 		return p, route, false, nil
 	} else {
 		return p, route, false, nil
@@ -111,6 +115,7 @@ func callPkg(m *datatypes.Message, ctxAdded bool) (*datatypes.ResponseMsg,
 		c += ".Run"
 	}
 	m.Route = route
+	log.Println("calling pkg with", fmt.Sprintf("%+v", m))
 	if err := pw.RPCClient.Call(c, m, reply); err != nil {
 		log.Println("invalid response")
 		return reply, pw.P.Config.Name, route, err
