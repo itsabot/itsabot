@@ -453,7 +453,7 @@ func validateParams(c *echo.Context) (int, string, int) {
 	var tmp interface{}
 	tmp = c.Get("uid")
 	if tmp != nil {
-		uid, err = strconv.Atoi(tmp.(string))
+		uid, ok = strconv.Atoi(tmp.(string))
 		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 			uid = 0
 		} else if err != nil {
@@ -469,12 +469,9 @@ func validateParams(c *echo.Context) (int, string, int) {
 	}
 	tmp = c.Get("flexidtype")
 	if tmp != nil {
-		fidT, err = tmp.(int)
+		fidT = tmp.(int)
 		if fidT == 0 {
 			log.Fatalln("flexidtype cannot be 0")
-		}
-		if err != nil {
-			log.Fatalln(err)
 		}
 	}
 	return uid, fid, fidT
