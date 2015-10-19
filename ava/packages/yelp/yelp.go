@@ -229,6 +229,7 @@ func getAddress(r *datatypes.Response, offset int) string {
 }
 
 func (c *client) get(urlStr string, params url.Values, v interface{}) error {
+	log.Println(urlStr, params)
 	resp, err := c.client.Get(nil, &c.token, urlStr, params)
 	if err != nil {
 		log.Println("1")
