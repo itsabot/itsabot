@@ -6,8 +6,17 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "bitbucket.org/pkg/inflect",
+			"Comment": "go.r60-12",
+			"Rev": "8961c3750a47b8c0b3e118d52513b97adf85a7e8"
+		},
+		{
 			"ImportPath": "github.com/NickPresta/GoURLShortener",
 			"Rev": "eaed3e167e4ca10342e1446e8fc81b092dd76a17"
+		},
+		{
+			"ImportPath": "github.com/bradfitz/http2",
+			"Rev": "6608b73ef18668469ee5365431dc3a106502c449"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/cli",
@@ -34,9 +43,18 @@
 			"Rev": "ba4a01049d0773acb2890d3d8cc6833a71cd0865"
 		},
 		{
+			"ImportPath": "github.com/labstack/gommon/color",
+			"Comment": "v0.0.3-7-g3c61341",
+			"Rev": "3c613419957bbd5afea3fc87bbc0f9f2dca19196"
+		},
+		{
 			"ImportPath": "github.com/lib/pq",
 			"Comment": "go1.0-cutoff-23-g835d5eb",
 			"Rev": "835d5eb08da4541f26181e6958d7400da769e44b"
+		},
+		{
+			"ImportPath": "github.com/subosito/figo",
+			"Rev": "4f2709582c104a76b1ef6c24d47a682ec1b085c3"
 		},
 		{
 			"ImportPath": "github.com/subosito/twilio",
@@ -46,6 +64,14 @@
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
 			"Rev": "f7445b17d61953e333441674c2d11e91ae4559d3"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/blowfish",
+			"Rev": "f7445b17d61953e333441674c2d11e91ae4559d3"
+		},
+		{
+			"ImportPath": "golang.org/x/net/websocket",
+			"Rev": "4b709d93778b93d2f34943e3142c71578d83ad31"
 		}
 	]
 }
