@@ -2,11 +2,10 @@ package datatypes
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strconv"
 	"time"
-
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 type User struct {
@@ -31,7 +30,7 @@ func (u *User) isAuthenticated() (bool, error) {
 			return false, errors.New("negative REQUIRE_AUTH_IN_HOURS")
 		}
 	} else {
-		log.Warn("REQUIRE_AUTH_IN_HOURS environment variable is not set.",
+		log.Println("REQUIRE_AUTH_IN_HOURS environment variable is not set.",
 			" Using 168 hours (one week) as the default.")
 		t = 168
 	}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/gommon/color"
+	"github.com/labstack/gommon/color"
 )
 
 func Logger() echo.MiddlewareFunc {

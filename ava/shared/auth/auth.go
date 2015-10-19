@@ -2,8 +2,7 @@ package auth
 
 import (
 	"errors"
-
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"log"
 )
 
 type Method int
@@ -40,6 +39,6 @@ const (
 // possible, selecting the highest authentication method for which the user has
 // previously authenticated. TODO implement
 func Authenticate(m Method) (Method, error) {
-	log.Error("Authenticate not implemented")
+	log.Println("Authenticate not implemented")
 	return Method(0), errors.New("not implemented")
 }

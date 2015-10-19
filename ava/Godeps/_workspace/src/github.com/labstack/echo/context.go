@@ -11,7 +11,7 @@ import (
 	"net/url"
 
 	"bytes"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+	"golang.org/x/net/websocket"
 )
 
 type (

@@ -2,9 +2,8 @@ package language
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
-
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 func Greeting(r *rand.Rand, name string) string {
@@ -28,7 +27,7 @@ func Greeting(r *rand.Rand, name string) string {
 			return "Hello. What can I do for you?"
 		}
 	}
-	log.Error("greeting failed to return a response")
+	log.Println("greeting failed to return a response")
 	return ""
 }
 
@@ -42,7 +41,7 @@ func FirstMeeting() string {
 	case 2:
 		return "Hi, my name's Ava. What's your name?"
 	}
-	log.Error("firstmeeting failed to return a response")
+	log.Println("firstmeeting failed to return a response")
 	return ""
 }
 
@@ -59,7 +58,7 @@ func NiceMeetingYou() string {
 		return "Great to meet you! Can you sign up for me here to " +
 			"get started? "
 	}
-	log.Error("nicemeetingyou failed to return a response")
+	log.Println("nicemeetingyou failed to return a response")
 	return ""
 }
 
@@ -75,7 +74,7 @@ func Confused() string {
 	case 3:
 		return "What should I do?"
 	}
-	log.Error("confused failed to return a response")
+	log.Println("confused failed to return a response")
 	return ""
 }
 
@@ -91,7 +90,7 @@ func SuggestedPlace(s string) string {
 	case 3:
 		return "You could try this: " + s
 	}
-	log.Error("suggestedPlace failed to return a response")
+	log.Println("suggestedPlace failed to return a response")
 	return ""
 }
 
