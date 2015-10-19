@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
@@ -29,6 +30,7 @@ type Pkg struct {
 type PkgConfig struct {
 	Name          string
 	ServerAddress string
+	Route         string
 	Port          int
 }
 
@@ -81,7 +83,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	if err != nil {
 		return err
 	}
-	var notused error
+	var notused string
 	log.Println("calling register", p.Config.Name)
 	err = client.Call("Ava.RegisterPackage", p, &notused)
 	if err != nil {
@@ -100,6 +102,32 @@ func (p *Pkg) Register(pkgT interface{}) error {
 		}
 		go rpc.ServeConn(conn)
 	}
+	return nil
+}
+
+// SaveResponse is handled in shared/pkg because rpc gob encoding doesn't work
+// well with arbitrary interface{} types. Since a Response had a nested
+// map[string]interface{} type, jsonrpc wouldn't work either. Since it's not
+// easy to transfer the data from the package back to Ava for saving, the
+// packages will be responsible for saving their own responses. This is not
+// ideal, but it'll work for now.
+func SaveResponse(respMsg *datatypes.ResponseMsg, r *datatypes.Response) error {
+	q := `
+		INSERT INTO responses (userid, inputid, sentence, route, state)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id`
+	state, err := json.Marshal(r.State)
+	if err != nil {
+		return err
+	}
+	var rid int
+	err = db.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, state).
+		Scan(&rid)
+	if err != nil {
+		return err
+	}
+	respMsg.ResponseID = rid
+	respMsg.Sentence = r.Sentence
 	return nil
 }
 

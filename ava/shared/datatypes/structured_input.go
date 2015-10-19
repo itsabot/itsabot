@@ -42,6 +42,26 @@ func (si *StructuredInput) String() string {
 	return s[:len(s)-1] + "\n"
 }
 
+func (si *StructuredInput) All() string {
+	var s string
+	if len(si.Commands) > 0 {
+		s += strings.Join(si.Commands, " ") + " "
+	}
+	if len(si.Actors) > 0 {
+		s += strings.Join(si.Actors, " ") + " "
+	}
+	if len(si.Objects) > 0 {
+		s += strings.Join(si.Objects, " ") + " "
+	}
+	if len(si.Times) > 0 {
+		s += strings.Join(si.Times, " ") + " "
+	}
+	if len(si.Places) > 0 {
+		s += strings.Join(si.Places, " ") + " "
+	}
+	return s[0 : len(s)-1]
+}
+
 // Add pairs of words with their classes to a structured input. Params should
 // follow the ("Order", "Command"), ("noon", "Time") form.
 func (si *StructuredInput) Add(wc []WordClass) error {

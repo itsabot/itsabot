@@ -31,22 +31,27 @@ func main() {
 	}
 }
 
-func (t *Onboard) Run(m *datatypes.Message, resp *string) error {
+func (t *Onboard) Run(m *datatypes.Message,
+	respMsg *datatypes.ResponseMsg) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
 	}
-	*resp = "Hi, I'm Ava. To get started, you can sign up here: " + u
-	return nil
+	log.Println("M", m)
+	resp := m.NewResponse()
+	resp.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
+	return pkg.SaveResponse(respMsg, resp)
 }
 
-func (t *Onboard) FollowUp(m *datatypes.Message, resp *string) error {
+func (t *Onboard) FollowUp(m *datatypes.Message,
+	respMsg *datatypes.ResponseMsg) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
 	}
-	*resp = "Hi, I'm Ava. To get started, you can sign up here: " + u
-	return nil
+	resp := m.NewResponse()
+	resp.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
+	return pkg.SaveResponse(respMsg, resp)
 }
 
 func getURL(m *datatypes.Message) (string, error) {
@@ -56,7 +61,6 @@ func getURL(m *datatypes.Message) (string, error) {
 		"flexid":     {fid},
 		"flexidtype": {strconv.Itoa(fidT)},
 	}
-	v.Set("encodedpath", v.Encode())
 	u := os.Getenv("BASE_URL") + "signup?" + v.Encode()
 	u, err := goisgd.Shorten(u)
 	if err != nil {

@@ -74,10 +74,13 @@ func main() {
 	}
 }
 
-func (t *Yelp) Run(m *datatypes.Message, resp *datatypes.Response) error {
+func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
+	log.Println("running")
+	resp := m.NewResponse()
 	resp.State = map[string]interface{}{
 		"query":    "",
 		"location": "",
+		"offset":   float64(0),
 	}
 	si := m.Input.StructuredInput
 	query := ""
@@ -91,6 +94,7 @@ func (t *Yelp) Run(m *datatypes.Message, resp *datatypes.Response) error {
 	if len(si.Places) == 0 {
 		loc, question, err := knowledge.GetLocation(db, m.User)
 		if err != nil {
+			log.Println("3")
 			return err
 		}
 		if len(question) > 0 {
@@ -98,38 +102,39 @@ func (t *Yelp) Run(m *datatypes.Message, resp *datatypes.Response) error {
 				resp.State["location"] = loc.Name
 			}
 			resp.Sentence = question
-			return nil
+			return pkg.SaveResponse(respMsg, resp)
 		}
 		resp.State["location"] = loc.Name
 	}
 	t.searchYelp(resp)
-	return nil
+	return pkg.SaveResponse(respMsg, resp)
 }
 
 // FollowUp handles dialog question/answers and additional user queries
-func (t *Yelp) FollowUp(m *datatypes.Message, resp *datatypes.Response) error {
+func (t *Yelp) FollowUp(m *datatypes.Message,
+	respMsg *datatypes.ResponseMsg) error {
+	log.Println("following up")
 	if err := m.GetLastResponse(db); err != nil {
+		log.Println("err getting last response")
 		return err
 	}
-	resp = m.LastResponse
+	resp := m.LastResponse
 
 	// First we handle dialog. If we asked for a location, use the response
 	log.Println("state", resp.State)
-	if resp.State["location"] == nil && m.LastResponse.QuestionLanguage() {
-		if len(m.Input.StructuredInput.Places) == 0 {
-			resp.State["location"] = m.Input.Sentence
-		} else {
-			loc := strings.Join(m.Input.StructuredInput.Places, " ")
-			resp.State["location"] = loc
-		}
+	if resp.State["location"] == "" && m.LastResponse.QuestionLanguage() {
+		loc := m.Input.StructuredInput.All()
+		// TODO handle no location sent.
+		resp.State["location"] = loc
+		log.Println("detected location", loc)
 		t.searchYelp(resp)
-		return nil
+		return pkg.SaveResponse(respMsg, resp)
 	}
 
 	// If no businesses are returned inform the user now
 	if len(resp.State["Businesses"].([]interface{})) == 0 {
 		resp.Sentence = "I couldn't find anything like that"
-		return nil
+		return pkg.SaveResponse(respMsg, resp)
 	}
 
 	// Responses were returned, and the user has asked this package an
@@ -142,26 +147,36 @@ func (t *Yelp) FollowUp(m *datatypes.Message, resp *datatypes.Response) error {
 		case "rating", "review", "recommend", "recommended":
 			s = fmt.Sprintf("It has a %s review on Yelp",
 				getRating(resp))
+			resp.Sentence = s
 		case "number", "phone", "call":
 			s = getPhone(resp)
+			resp.Sentence = s
 		case "information", "info":
 			s = fmt.Sprintf("Here's some more info: %s",
 				getURL(resp))
-		case "where", "location", "address", "direction", "directions":
+			resp.Sentence = s
+		case "where", "location", "address", "direction", "directions",
+			"addr":
 			s = fmt.Sprintf("It's at %s", getAddress(resp))
+			resp.Sentence = s
 		case "pictures", "pic", "pics":
 			s = fmt.Sprintf("I found some pics here: %s",
 				getURL(resp))
+			resp.Sentence = s
 		case "menu", "have":
 			s = fmt.Sprintf("Yelp might have a menu... %s",
 				getURL(resp))
+			resp.Sentence = s
+		case "not", "else", "no":
+			tmp := resp.State["offset"].(float64)
+			resp.State["offset"] = tmp + 1
+			t.searchYelp(resp)
 		}
-		resp.Sentence = s
 		if len(resp.Sentence) > 0 {
-			return nil
+			return pkg.SaveResponse(respMsg, resp)
 		}
 	}
-	return nil
+	return pkg.SaveResponse(respMsg, resp)
 }
 
 func getRating(r *datatypes.Response) string {
@@ -189,22 +204,26 @@ func getAddress(r *datatypes.Response) string {
 	return location["DisplayAddress"].(string)
 }
 
-// TODO: Add support for custom sorting, locations
-func (t *Yelp) search(query, location string, offset int) (string, error) {
+func (t *Yelp) search(query, location string, offset float64) (string, error) {
 	form := url.Values{
 		"term":     {query},
 		"location": {location},
-		"limit":    {"1"},
+		"limit":    {fmt.Sprintf("%.0f", offset+1)},
 	}
 	var data yelpResp
 	err := c.get("http://api.yelp.com/v2/search", form, &data)
 	if err != nil {
+		log.Println("2")
 		return "", err
 	}
 	if len(data.Businesses) == 0 {
 		return "I couldn't find any places like that nearby.", nil
 	}
-	b := data.Businesses[0]
+	offI := int(offset)
+	if len(data.Businesses) <= offI {
+		return "That's all I could find.", nil
+	}
+	b := data.Businesses[offI]
 	addr := ""
 	if len(b.Location.DisplayAddress) > 0 {
 		addr = b.Location.DisplayAddress[0]
@@ -216,6 +235,7 @@ func (t *Yelp) search(query, location string, offset int) (string, error) {
 func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 	resp, err := c.client.Get(nil, &c.token, urlStr, params)
 	if err != nil {
+		log.Println("1")
 		return err
 	}
 	defer resp.Body.Close()
@@ -243,8 +263,10 @@ func connectDB() *sqlx.DB {
 }
 
 func (t *Yelp) searchYelp(resp *datatypes.Response) {
-	r, err := t.search(resp.State["query"].(string),
-		resp.State["location"].(string), 0)
+	q := resp.State["query"].(string)
+	loc := resp.State["location"].(string)
+	offset := resp.State["offset"].(float64)
+	r, err := t.search(q, loc, offset)
 	if err != nil {
 		log.Println("err: search yelp", err)
 		r = "I can't find that for you now. Let's try again later."

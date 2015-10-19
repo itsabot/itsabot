@@ -33,6 +33,7 @@ var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	rand.Seed(time.Now().UnixNano())
 	app := cli.NewApp()
 	app.Name = "ava"
@@ -247,16 +248,17 @@ func processText(c *echo.Context) (string, error) {
 	}
 	ret, pname, route, err := callPkg(m, ctxAdded)
 	if err != nil && err != ErrMissingPackage {
-		return ret, err
+		return "", err
 	}
-	if len(ret) == 0 {
-		ret = language.Confused()
+	if len(ret.Sentence) == 0 {
+		ret.Sentence = language.Confused()
 	}
 	in.StructuredInput = si
-	if err := saveStructuredInput(in, ret, pname, route); err != nil {
-		return ret, err
+	err = saveStructuredInput(m, ret.ResponseID, pname, route)
+	if err != nil {
+		return ret.Sentence, err
 	}
-	return ret, nil
+	return ret.Sentence, nil
 }
 
 func sendMessage(to, msg string) error {
@@ -444,36 +446,33 @@ Response:
 }
 
 func validateParams(c *echo.Context) (int, string, int) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("validateParams recovered from panic", r)
-		}
-	}()
 	var uid, fidT int
 	var fid string
 	var err error
 	tmp := c.Get("uid")
 	if tmp != nil {
 		uid, err = strconv.Atoi(tmp.(string))
-		if err != nil {
-			panic(err)
+		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+			uid = 0
+		} else if err != nil {
+			log.Fatalln(err)
 		}
 	}
 	tmp = c.Get("flexid")
 	if tmp != nil {
 		fid = tmp.(string)
 		if len(fid) == 0 {
-			panic(errors.New("flexid is blank"))
+			log.Fatalln("flexid is blank")
 		}
 	}
 	tmp = c.Get("flexidtype")
 	if tmp != nil {
 		fidT, err = strconv.Atoi(tmp.(string))
 		if fidT == 0 {
-			panic(errors.New("flexidtype cannot be 0"))
+			log.Fatalln("flexidtype cannot be 0")
 		}
 		if err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
 	}
 	return uid, fid, fidT

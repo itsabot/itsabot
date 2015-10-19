@@ -13,14 +13,9 @@ var (
 	ErrMissingFlexIDType = errors.New("missing flexidtype")
 )
 
-func saveStructuredInput(in *datatypes.Input, rsp, pkg, route string) error {
-	// TODO
+func saveStructuredInput(m *datatypes.Message, rid int, pkg,
+	route string) error {
 	q := `
-		INSERT INTO responses (userid, inputid, response, state)
-		VALUES ($1, $2, $3, $4)
-		RETURNING id`
-	// TODO Change 0 to $10 below with responseid
-	q = `
 		INSERT INTO inputs (
 			userid,
 			flexid,
@@ -34,11 +29,12 @@ func saveStructuredInput(in *datatypes.Input, rsp, pkg, route string) error {
 			responseid,
 			package,
 			route
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11)`
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+	in := m.Input
 	si := in.StructuredInput
 	_, err := db.Exec(
 		q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence,
-		si.Commands, si.Objects, si.Actors, si.Times, si.Places,
+		si.Commands, si.Objects, si.Actors, si.Times, si.Places, rid,
 		pkg, route)
 	return err
 }
