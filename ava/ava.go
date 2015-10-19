@@ -453,7 +453,7 @@ func validateParams(c *echo.Context) (int, string, int) {
 	var tmp interface{}
 	tmp = c.Get("uid")
 	if tmp != nil {
-		uid, ok = strconv.Atoi(tmp.(string))
+		uid, err = strconv.Atoi(tmp.(string))
 		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 			uid = 0
 		} else if err != nil {
