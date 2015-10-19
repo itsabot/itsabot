@@ -3,6 +3,7 @@
 package knowledge
 
 import (
+	"database/sql"
 	"errors"
 	"time"
 
@@ -26,7 +27,10 @@ func GetLocation(db *sqlx.DB, u *datatypes.User) (*datatypes.Location, string,
 		FROM locations
 		WHERE userid=$1
 		ORDER BY createdat DESC`
-	if err := db.Get(loc, q, u.ID); err != nil {
+	err := db.Get(loc, q, u.ID)
+	if err == sql.ErrNoRows {
+		return loc, language.QuestionLocation(""), nil
+	} else if err != nil {
 		return loc, "", err
 	}
 	yesterday := time.Now().AddDate(0, 0, -1)

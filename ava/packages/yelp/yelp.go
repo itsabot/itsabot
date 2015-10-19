@@ -96,7 +96,11 @@ func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
 	resp.State["query"] = query
 	if len(si.Places) == 0 {
 		log.Println("no place entered, getting location")
+		// TODO fix bug right here
 		loc, question, err := knowledge.GetLocation(db, m.User)
+		log.Println("loc", loc)
+		log.Println("question", question)
+		log.Println("err", err)
 		if err != nil {
 			log.Println("3")
 			return err
