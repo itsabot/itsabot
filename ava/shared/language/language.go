@@ -146,7 +146,33 @@ func Foods() []string {
 
 func QuestionLocation(loc string) string {
 	if len(loc) == 0 {
-		return "Where are you now?"
+		n := rand.Intn(12)
+		switch n {
+		case 0:
+			return "Where are you?"
+		case 1:
+			return "Where should I look?"
+		case 2:
+			return "Sure. Where are you?"
+		case 3:
+			return "Sure. Where should I look?"
+		case 4:
+			return "Happy to help. Where are you?"
+		case 5:
+			return "Happy to help. Where should I look?"
+		case 6:
+			return "Sure thing. Where are you?"
+		case 7:
+			return "Sure thing. Where should I look?"
+		case 8:
+			return "Can do. Where are you?"
+		case 9:
+			return "Can do. Where should I look?"
+		case 10:
+			return "I can help with that. Where are you?"
+		case 11:
+			return "I can help with that. Where should I look?"
+		}
 	}
 	return fmt.Sprintf("Are you still near %s?", loc)
 }

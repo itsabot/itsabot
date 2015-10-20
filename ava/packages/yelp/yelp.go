@@ -96,13 +96,24 @@ func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
 	resp.State["query"] = query
 	if len(si.Places) == 0 {
 		log.Println("no place entered, getting location")
-		// TODO fix bug right here
 		loc, question, err := knowledge.GetLocation(db, m.User)
-		log.Println("loc", loc)
-		log.Println("question", question)
-		log.Println("err", err)
 		if err != nil {
-			log.Println("3")
+			return err
+		}
+		if len(question) > 0 {
+			if loc != nil && len(loc.Name) > 0 {
+				resp.State["location"] = loc.Name
+			}
+			resp.Sentence = question
+			return pkg.SaveResponse(respMsg, resp)
+		}
+		resp.State["location"] = loc.Name
+	}
+	// Occurs in the case of "nearby" or other contextual place terms, where
+	// no previous context was available to expand it.
+	if len(resp.State["location"].(string)) == 0 {
+		loc, question, err := knowledge.GetLocation(db, m.User)
+		if err != nil {
 			return err
 		}
 		if len(question) > 0 {
@@ -188,7 +199,8 @@ func (t *Yelp) FollowUp(m *datatypes.Message,
 				log.Println(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
-		case "good", "great", "yes":
+		// with bayesian classification
+		case "good", "great", "yes", "perfect":
 			// TODO feed into learning engine
 			resp.Sentence = language.Positive()
 		case "thanks", "thank":
@@ -296,8 +308,8 @@ func (t *Yelp) searchYelp(resp *datatypes.Response) error {
 		addr = b.Location.DisplayAddress[0]
 	}
 	if offI == 0 {
-		resp.Sentence = "How does this place look? " + b.Name + " at " +
-			addr
+		resp.Sentence = "Ok. How does this place look? " + b.Name +
+			" at " + addr
 	} else {
 		resp.Sentence = fmt.Sprintf("What about %s instead?", b.Name)
 	}
