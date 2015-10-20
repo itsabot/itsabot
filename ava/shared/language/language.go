@@ -4,7 +4,45 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"strings"
 )
+
+var yes map[string]bool = map[string]bool{
+	"yes":          true,
+	"yea":          true,
+	"yeah":         true,
+	"yup":          true,
+	"sure":         true,
+	"that's right": true,
+	"thats right":  true,
+	"think so":     true,
+}
+
+var no map[string]bool = map[string]bool{
+	"no":          true,
+	"nope":        true,
+	"nah":         true,
+	"not sure":    true,
+	"dunno":       true,
+	"don't know":  true,
+	"do not know": true,
+}
+
+// Join concatenates triggers together, like Recommend() and Broken(), ensuring
+// no duplicates exist
+func Join(ss ...[]string) []string {
+	used := map[string]bool{}
+	var s []string
+	for _, tmp := range ss {
+		for _, w := range tmp {
+			if !used[w] {
+				s = append(s, w)
+			}
+			used[w] = true
+		}
+	}
+	return s
+}
 
 func Greeting(r *rand.Rand, name string) string {
 	var n int
@@ -144,35 +182,145 @@ func Foods() []string {
 	}
 }
 
+func Vehicles() []string {
+	return []string{
+		"car",
+		"vehicle",
+		"automotive",
+		"automobile",
+		"motorcycle",
+	}
+}
+
+func AutomotiveBrands() []string {
+	return []string{
+		"abarth",
+		"acura",
+		"alfa",
+		"ascari",
+		"aston",
+		"audi",
+		"bentley",
+		"bowler",
+		"bmw",
+		"bugatti",
+		"buick",
+		"cadillac",
+		"caterham",
+		"chevrolet",
+		"chevy",
+		"chrysler",
+		"citroen",
+		"corvette",
+		"datsun",
+		"dodge",
+		"ferrari",
+		"fiat",
+		"fisker",
+		"ford",
+		"gmc",
+		"honda",
+		"hummer",
+		"hyundai",
+		"infiniti",
+		"isuzu",
+		"jaguar",
+		"jeep",
+		"kia",
+		"koenigsegg",
+		"ktm",
+		"lambo",
+		"lamborghini",
+		"lancia",
+		"rover",
+		"lexus",
+		"lincoln",
+		"lotus",
+		"maserati",
+		"maybach",
+		"mazda",
+		"mclaren",
+		"merc",
+		"mercedes",
+		"benz",
+		"mg",
+		"mini",
+		"mitsubishi",
+		"nissan",
+		"pagani",
+		"peugeot",
+		"porsche",
+		"ram",
+		"renault",
+		"rolls",
+		"rolls-royce",
+		"saab",
+		"saleen",
+		"saturn",
+		"scion",
+		"seat",
+		"skoda",
+		"smart",
+		"subaru",
+		"suzuki",
+		"tata",
+		"tesla",
+		"toyota",
+		"tvr",
+		"vauxhall",
+		"volkswagen",
+		"volvo",
+	}
+}
+
+func Recommend() []string {
+	return []string{
+		"find",
+		"show",
+		"where",
+		"recommend",
+		"recommended",
+		"recommendation",
+		"recommendations",
+	}
+}
+
+func Broken() []string {
+	return []string{
+		"broke",
+		"broken",
+		"help",
+		"start",
+	}
+}
+
 func QuestionLocation(loc string) string {
 	if len(loc) == 0 {
-		n := rand.Intn(12)
+		n := rand.Intn(6)
 		switch n {
 		case 0:
 			return "Where are you?"
 		case 1:
-			return "Where should I look?"
-		case 2:
 			return "Sure. Where are you?"
-		case 3:
-			return "Sure. Where should I look?"
-		case 4:
+		case 2:
 			return "Happy to help. Where are you?"
-		case 5:
-			return "Happy to help. Where should I look?"
-		case 6:
+		case 3:
 			return "Sure thing. Where are you?"
-		case 7:
-			return "Sure thing. Where should I look?"
-		case 8:
+		case 4:
 			return "Can do. Where are you?"
-		case 9:
-			return "Can do. Where should I look?"
-		case 10:
+		case 5:
 			return "I can help with that. Where are you?"
-		case 11:
-			return "I can help with that. Where should I look?"
 		}
 	}
 	return fmt.Sprintf("Are you still near %s?", loc)
+}
+
+func Yes(s string) bool {
+	s = strings.ToLower(s)
+	return yes[s]
+}
+
+func No(s string) bool {
+	s = strings.ToLower(s)
+	return no[s]
 }

@@ -100,13 +100,6 @@ func (m *Message) GetLastResponse(db *sqlx.DB) error {
 	return nil
 }
 
-func (r *Response) QuestionLanguage() bool {
-	if r.Sentence == "Where are you now?" {
-		return true
-	}
-	return len(r.Sentence) >= 17 && r.Sentence[0:17] == "Are you still in "
-}
-
 func (m *Message) NewResponse() *Response {
 	var uid int
 	if m.User != nil {

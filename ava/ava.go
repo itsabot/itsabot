@@ -469,7 +469,17 @@ func validateParams(c *echo.Context) (int, string, int) {
 	}
 	tmp = c.Get("flexidtype")
 	if tmp != nil {
-		fidT = tmp.(int)
+		var ok bool
+		fidT, ok = tmp.(int)
+		if !ok {
+			fidT, err = strconv.Atoi(tmp.(string))
+			if err != nil && err.Error() ==
+				`strconv.ParseInt: parsing "": invalid syntax` {
+				fidT = 0
+			} else if err != nil {
+				log.Fatalln(err)
+			}
+		}
 		if fidT == 0 {
 			log.Fatalln("flexidtype cannot be 0")
 		}

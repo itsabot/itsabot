@@ -18,7 +18,7 @@ import (
 	"github.com/avabot/ava/shared/pkg"
 )
 
-type Yelp string
+type Mechanic string
 
 type client struct {
 	client oauth.Client
@@ -54,44 +54,42 @@ func main() {
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
 	db = connectDB()
 	trigger := &datatypes.StructuredInput{
-		Commands: []string{
-			"find",
-			"where",
-			"show",
-			"recommend",
-			"recommendation",
-			"recommendations",
-		},
-		Objects: language.Foods(),
+		Commands: language.Join(
+			language.Recommend(),
+			language.Broken(),
+		),
+		Objects: language.Join(
+			language.Vehicles(),
+			language.AutomotiveBrands(),
+		),
 	}
-	p, err := pkg.NewPackage("yelp", *port, trigger)
+	log.Println(trigger)
+	p, err := pkg.NewPackage("mechanic", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
-	yelp := new(Yelp)
-	if err := p.Register(yelp); err != nil {
+	mechanic := new(Mechanic)
+	if err := p.Register(mechanic); err != nil {
 		log.Fatalln("registering package ", err)
 	}
 }
 
-func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
-	// NOTE optional: get state before this package was run, enabling
-	// chaining. For instance, allow passing context from a FourSquare
-	// result into this. See the opening lines of FollowUp() for an example
+func (p *Mechanic) Run(m *datatypes.Message,
+	respMsg *datatypes.ResponseMsg) error {
 	resp := m.NewResponse()
 	resp.State = map[string]interface{}{
 		"query":      "",
 		"location":   "",
 		"offset":     float64(0),
 		"businesses": []interface{}{},
+		"warranty":   "",
+		"preference": "",
+		"brand":      "",
 	}
 	si := m.Input.StructuredInput
 	query := ""
 	for _, o := range si.Objects {
 		query += o + " "
-	}
-	for _, p := range si.Places {
-		query += p + " "
 	}
 	resp.State["query"] = query
 	if len(si.Places) == 0 {
@@ -125,14 +123,13 @@ func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
 		}
 		resp.State["location"] = loc.Name
 	}
-	if err := t.searchYelp(resp); err != nil {
+	if err := p.searchYelp(resp); err != nil {
 		log.Println(err)
 	}
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-// FollowUp handles dialog question/answers and additional user queries
-func (t *Yelp) FollowUp(m *datatypes.Message,
+func (p *Mechanic) FollowUp(m *datatypes.Message,
 	respMsg *datatypes.ResponseMsg) error {
 	// Retrieve the conversation's context
 	if err := m.GetLastResponse(db); err != nil {
@@ -141,13 +138,62 @@ func (t *Yelp) FollowUp(m *datatypes.Message,
 	}
 	resp := m.NewResponse()
 
-	// First we handle dialog. If we asked for a location, use the response
-	log.Printf("state %+v\n", resp.State)
+	// First we handle dialog, filling out the user's location
 	if resp.State["location"] == "" {
 		loc := m.Input.StructuredInput.All()
-		resp.State["location"] = loc
-		if err := t.searchYelp(resp); err != nil {
-			log.Println(err)
+		if len(loc) > 0 {
+			resp.State["location"] = loc
+			resp.Sentence = "What kind of car do you drive?"
+		}
+		return pkg.SaveResponse(respMsg, resp)
+	}
+
+	// Check the automotive brand
+	if resp.State["brand"] == "" {
+		brand := m.Input.StructuredInput.Objects
+		if len(brand) > 0 {
+			var tmp string
+			for _, b := range brand {
+				tmp += b + " "
+			}
+			resp.State["brand"] = tmp[0 : len(tmp)-1]
+			resp.Sentence = "Is your car still in warranty?"
+		}
+		return pkg.SaveResponse(respMsg, resp)
+	}
+
+	// Check warranty information
+	if resp.State["warranty"] == "" {
+		warr := m.Input.StructuredInput.All()
+		if language.Yes(warr) {
+			resp.State["warranty"] = "yes"
+			resp.State["preference"] = "dealer"
+			if err := p.searchYelp(resp); err != nil {
+				log.Println(err)
+			}
+		} else if language.No(warr) {
+			resp.State["warranty"] = "no"
+			resp.Sentence = "Do you prefer the dealership or a recommended mechanic?"
+		}
+		return pkg.SaveResponse(respMsg, resp)
+	}
+
+	// Does the user prefer dealerships or mechanics?
+	if resp.State["preference"] == "" {
+		words := strings.Fields(m.Input.Sentence)
+		for _, w := range words {
+			if w == "dealer" || w == "dealers" {
+				resp.State["preference"] = "dealer"
+				break
+			} else if w == "mechanic" || w == "mechanics" {
+				resp.State["preference"] = "mechanic"
+				break
+			}
+		}
+		if resp.State["preference"] != "" {
+			if err := p.searchYelp(resp); err != nil {
+				log.Println(err)
+			}
 		}
 		return pkg.SaveResponse(respMsg, resp)
 	}
@@ -176,7 +222,7 @@ func (t *Yelp) FollowUp(m *datatypes.Message,
 			s = getPhone(resp, offI)
 			resp.Sentence = s
 		case "call":
-			s = fmt.Sprintf("You can reach them here: %s",
+			s = fmt.Sprintf("Try this one: %s",
 				getPhone(resp, offI))
 			resp.Sentence = s
 		case "information", "info":
@@ -191,13 +237,9 @@ func (t *Yelp) FollowUp(m *datatypes.Message,
 			s = fmt.Sprintf("I found some pics here: %s",
 				getURL(resp, offI))
 			resp.Sentence = s
-		case "menu", "have":
-			s = fmt.Sprintf("Yelp might have a menu... %s",
-				getURL(resp, offI))
-			resp.Sentence = s
 		case "not", "else", "no", "anything", "something":
 			resp.State["offset"] = float64(offI + 1)
-			if err := t.searchYelp(resp); err != nil {
+			if err := p.searchYelp(resp); err != nil {
 				log.Println(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
@@ -277,10 +319,18 @@ func connectDB() *sqlx.DB {
 	return db
 }
 
-func (t *Yelp) searchYelp(resp *datatypes.Response) error {
+func (p *Mechanic) searchYelp(resp *datatypes.Response) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
+	pref := resp.State["preference"].(string)
+	log.Println("BRAND", resp.State["brand"])
+	brand := resp.State["brand"].(string)
 	offset := resp.State["offset"].(float64)
+	if brand != "" {
+		q = fmt.Sprintf("%s %s", brand, pref)
+	} else {
+		q = fmt.Sprintf("%s mechanic", q)
+	}
 	log.Println("searching yelp", q, loc, offset)
 	form := url.Values{
 		"term":     {q},

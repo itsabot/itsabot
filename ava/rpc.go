@@ -31,11 +31,11 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	for _, c := range p.Trigger.Commands {
 		c = strings.ToLower(c)
 		for _, o := range p.Trigger.Objects {
-			s := strings.ToLower(c + o)
+			s := strings.ToLower(c + "_" + o)
 			if regPkgs[s] != nil {
-				return fmt.Errorf(
-					"duplicate package or trigger: %s",
-					p.Config.Name)
+				log.Println(
+					"warn: duplicate package or trigger",
+					p.Config.Name, s)
 			}
 			regPkgs[s] = &pkg.PkgWrapper{P: p, RPCClient: cl}
 		}
@@ -62,9 +62,9 @@ Loop:
 		c = strings.Split(c, "'")[0]
 		for _, o := range si.Objects {
 			o = strings.Split(o, "'")[0]
-			route = strings.ToLower(c + o)
+			route = strings.ToLower(c + "_" + o)
 			p = regPkgs[route]
-			log.Println("searching for " + strings.ToLower(c+o))
+			log.Println("searching for " + strings.ToLower(c+"_"+o))
 			if p != nil {
 				log.Println("found pkg")
 				break Loop
