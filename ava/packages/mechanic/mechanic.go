@@ -143,20 +143,27 @@ func (p *Mechanic) FollowUp(m *datatypes.Message,
 		loc := m.Input.StructuredInput.All()
 		if len(loc) > 0 {
 			resp.State["location"] = loc
-			resp.Sentence = "What kind of car do you drive?"
+			resp.Sentence = "Ok. I'll find you help. " +
+				"What kind of car do you drive?"
 		}
 		return pkg.SaveResponse(respMsg, resp)
 	}
 
 	// Check the automotive brand
 	if resp.State["brand"] == "" {
-		brand := m.Input.StructuredInput.Objects
-		if len(brand) > 0 {
-			var tmp string
-			for _, b := range brand {
-				tmp += b + " "
+		var brand string
+		tmp := m.Input.StructuredInput.Objects
+	Loop:
+		for _, w1 := range language.AutomotiveBrands() {
+			for _, w2 := range tmp {
+				if w1 == strings.ToLower(w2) {
+					brand = w2
+					break Loop
+				}
 			}
-			resp.State["brand"] = tmp[0 : len(tmp)-1]
+		}
+		if len(brand) > 0 {
+			resp.State["brand"] = brand
 			resp.Sentence = "Is your car still in warranty?"
 		}
 		return pkg.SaveResponse(respMsg, resp)
@@ -323,7 +330,6 @@ func (p *Mechanic) searchYelp(resp *datatypes.Response) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
 	pref := resp.State["preference"].(string)
-	log.Println("BRAND", resp.State["brand"])
 	brand := resp.State["brand"].(string)
 	offset := resp.State["offset"].(float64)
 	if brand != "" {
