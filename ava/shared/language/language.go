@@ -296,20 +296,28 @@ func Broken() []string {
 
 func QuestionLocation(loc string) string {
 	if len(loc) == 0 {
-		n := rand.Intn(6)
+		n := rand.Intn(10)
 		switch n {
 		case 0:
 			return "Where are you?"
 		case 1:
-			return "Sure. Where are you?"
+			return "Where are you now?"
 		case 2:
-			return "Happy to help. Where are you?"
-		case 3:
 			return "Sure thing. Where are you?"
+		case 3:
+			return "Sure thing. Where are you now?"
 		case 4:
-			return "Can do. Where are you?"
+			return "Happy to help. Where are you?"
 		case 5:
+			return "Happy to help. Where are you now?"
+		case 6:
 			return "I can help with that. Where are you?"
+		case 7:
+			return "I can help with that. Where are you now?"
+		case 8:
+			return "I can help solve this. Where are you?"
+		case 9:
+			return "I can help solve this. Where are you now?"
 		}
 	}
 	return fmt.Sprintf("Are you still near %s?", loc)
