@@ -56,6 +56,7 @@ func getPkg(m *datatypes.Message) (*pkg.PkgWrapper, string, bool, error) {
 		}
 	}
 	var route string
+	var shortRoute string
 	si := m.Input.StructuredInput
 Loop:
 	for _, c := range si.Commands {
@@ -66,10 +67,21 @@ Loop:
 			p = regPkgs[route]
 			log.Println("searching for " + strings.ToLower(c+"_"+o))
 			if p != nil {
-				log.Println("found pkg")
+				shortRoute = ""
 				break Loop
 			}
+			p = regPkgs[o]
+			if p != nil {
+				shortRoute = o
+			}
 		}
+		p = regPkgs[c]
+		if p != nil {
+			shortRoute = c
+		}
+	}
+	if len(shortRoute) > 0 {
+		route = shortRoute
 	}
 	if p == nil {
 		log.Println("p is nil, getting last response route")
