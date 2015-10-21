@@ -4,6 +4,7 @@
 	"dependencies": {
 		"yelp": "*",
 		"mechanic": "*",
+		"wish": "*",
 		"onboard": "*"
 	}
 }
