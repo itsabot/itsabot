@@ -26,14 +26,28 @@ type ResponseMsg struct {
 }
 
 type Response struct {
-	ID        int
-	UserID    int
-	InputID   int
+	ID         int
+	UserID     int
+	InputID    int
+	FeedbackID int
+	Sentence   string
+	Route      string
+	State      map[string]interface{}
+	CreatedAt  time.Time
+}
+
+type Feedback struct {
+	Id        int
 	Sentence  string
-	Route     string
-	State     map[string]interface{}
+	Sentiment int
 	CreatedAt time.Time
 }
+
+const (
+	SentimentNegative = -1
+	SentimentNeutral  = 0
+	SentimentPositive = 1
+)
 
 type Input struct {
 	ID              int

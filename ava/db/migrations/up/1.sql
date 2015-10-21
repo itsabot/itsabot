@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
 	id SERIAL,
 	name VARCHAR(255) NOT NULL,
 	email VARCHAR(255) UNIQUE NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 	PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS inputs (
+CREATE TABLE inputs (
 	id SERIAL,
 	userid INTEGER,
 	flexid VARCHAR(255),
@@ -28,11 +28,10 @@ CREATE TABLE IF NOT EXISTS inputs (
 	PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS responses (
+CREATE TABLE responses (
 	id SERIAL,
 	userid INTEGER NOT NULL,
 	inputid INTEGER NOT NULL,
-	feedbackid INTEGER,
 	sentence VARCHAR(255) NOT NULL,
 	route VARCHAR(255) NOT NULL,
 	state JSONB,
@@ -40,16 +39,7 @@ CREATE TABLE IF NOT EXISTS responses (
 	PRIMARY KEY (id)
 );
 
-CREATE TABLE IF NOT EXISTS feedbacks (
-	id SERIAL,
-	sentence VARCHAR(255),
-	-- -1 negative, 0 neutral, 1 positive
-	sentiment INTEGER NOT NULL,
-	createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-	PRIMARY KEY (id)
-);
-
-CREATE TABLE IF NOT EXISTS userflexids (
+CREATE TABLE userflexids (
 	userid INTEGER NOT NULL,
 	flexid VARCHAR(255) NOT NULL,
 	flexidtype INTEGER NOT NULL,
@@ -57,7 +47,7 @@ CREATE TABLE IF NOT EXISTS userflexids (
 	PRIMARY KEY (userid, flexid)
 );
 
-CREATE TABLE IF NOT EXISTS locations (
+CREATE TABLE locations (
 	id SERIAL,
 	name VARCHAR(255),
 	lat FLOAT,
