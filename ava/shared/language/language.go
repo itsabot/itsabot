@@ -285,12 +285,25 @@ func Recommend() []string {
 	}
 }
 
+func Repair() []string {
+	return []string{
+		"repair",
+		"repairing",
+		"fix",
+		"fixing",
+	}
+}
+
 func Broken() []string {
 	return []string{
 		"broke",
 		"broken",
+		"breaking",
 		"help",
 		"start",
+		"stop",
+		"stopped",
+		"stopping",
 	}
 }
 

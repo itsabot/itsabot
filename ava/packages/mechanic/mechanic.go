@@ -57,6 +57,7 @@ func main() {
 		Commands: language.Join(
 			language.Recommend(),
 			language.Broken(),
+			language.Repair(),
 		),
 		Objects: language.Join(
 			language.Vehicles(),
@@ -89,6 +90,12 @@ func (p *Mechanic) Run(m *datatypes.Message,
 	si := m.Input.StructuredInput
 	query := ""
 	for _, o := range si.Objects {
+		for _, b := range language.AutomotiveBrands() {
+			if strings.ToLower(o) == b {
+				resp.State["brand"] = b
+				break
+			}
+		}
 		query += o + " "
 	}
 	resp.State["query"] = query
@@ -143,7 +150,7 @@ func (p *Mechanic) FollowUp(m *datatypes.Message,
 		loc := m.Input.StructuredInput.All()
 		if len(loc) > 0 {
 			resp.State["location"] = loc
-			resp.Sentence = "Ok. I'll find you help. " +
+			resp.Sentence = "Ok. I can help you. " +
 				"What kind of car do you drive?"
 		}
 		return pkg.SaveResponse(respMsg, resp)
