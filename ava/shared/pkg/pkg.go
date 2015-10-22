@@ -91,7 +91,8 @@ func (p *Pkg) Register(pkgT interface{}) error {
 		return err
 	}
 	log.Println("connected with ava", p.Config.Name)
-	if err = connectDB(); err != nil {
+	db, err = ConnectDB()
+	if err != nil {
 		return err
 	}
 	log.Println("connected with database", p.Config.Name)
@@ -133,7 +134,8 @@ func SaveResponse(respMsg *datatypes.ResponseMsg, r *datatypes.Response) error {
 	return nil
 }
 
-func connectDB() error {
+func ConnectDB() (*sqlx.DB, error) {
+	var db *sqlx.DB
 	var err error
 	if os.Getenv("AVA_ENV") == "production" {
 		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
@@ -141,5 +143,5 @@ func connectDB() error {
 		db, err = sqlx.Connect("postgres",
 			"user=egtann dbname=ava sslmode=disable")
 	}
-	return err
+	return db, err
 }

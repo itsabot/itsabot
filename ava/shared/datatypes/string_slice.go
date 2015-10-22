@@ -67,3 +67,11 @@ func (s StringSlice) String() string {
 	}
 	return ss[1:]
 }
+
+func (s StringSlice) StringSlice() []string {
+	ss := []string{}
+	for _, tmp := range s {
+		ss = append(ss, tmp)
+	}
+	return ss
+}

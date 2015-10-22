@@ -345,3 +345,28 @@ func No(s string) bool {
 	s = strings.ToLower(s)
 	return no[s]
 }
+
+func SliceToString(ss []string, andor string) string {
+	l := len(ss)
+	if l == 0 {
+		return ""
+	}
+	if l == 1 {
+		return ss[0]
+	}
+	if l == 2 {
+		return fmt.Sprintf("%s %s %s", ss[0], andor, ss[1])
+	}
+	var ret string
+	for i, s := range ss {
+		if i < l-2 {
+			ret += fmt.Sprintf("%s %s", s, andor)
+			continue
+		} else if i < l-1 {
+			ret += s
+			break
+		}
+		ret += s + ", "
+	}
+	return ret
+}

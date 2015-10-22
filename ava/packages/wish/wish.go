@@ -6,9 +6,9 @@ import (
 	"math/rand"
 	"os"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
-	"github.com/jmoiron/sqlx"
 )
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
