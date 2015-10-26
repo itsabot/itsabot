@@ -18,6 +18,12 @@ var db *sqlx.DB
 
 type Meeting string
 
+type MeetingState struct {
+	Times  []time.Time
+	Actors []Actor
+	Places string
+}
+
 type Actor struct {
 	Name  string
 	Phone string
@@ -31,7 +37,8 @@ func main() {
 	}
 	flag.Parse()
 	trigger := &datatypes.StructuredInput{
-		Commands: []string{"meeting"},
+		Commands: []string{"schedule"},
+		Objects:  []string{"meeting"},
 	}
 	p, err := pkg.NewPackage("meeting", *port, trigger)
 	if err != nil {
@@ -47,8 +54,6 @@ func (p *Meeting) Run(m *datatypes.Message,
 	respMsg *datatypes.ResponseMsg) error {
 	resp := m.NewResponse()
 	timeString := m.Input.StructuredInput.Times.String()
-	timeSlice := m.Input.StructuredInput.Times.StringSlice()
-	timesString := language.SliceToString(timeSlice, "or")
 	times, err := timeparse.Parse(timeString)
 	if err != nil {
 		return err
@@ -61,16 +66,14 @@ func (p *Meeting) Run(m *datatypes.Message,
 			names = append(names, a)
 		}
 	}
-	actorsString := language.SliceToString(names, "and")
 	places := language.SliceToString(m.Input.StructuredInput.Places, "or")
-	resp.State = map[string]interface{}{
-		"Times":        times,
-		"Actors":       actors,
-		"Places":       places,
-		"TimesString":  timesString,
-		"ActorsString": actorsString,
+	tmp := &MeetingState{
+		Times:  times,
+		Actors: actors,
+		Places: places,
 	}
-	if stateIncomplete(resp) {
+	resp.State = tmp.ToMap()
+	if stateIncomplete(tmp, resp) {
 		return pkg.SaveResponse(respMsg, resp)
 	}
 	resp.Sentence = "Sure, I'll meeting that for you."
@@ -84,10 +87,9 @@ func (p *Meeting) FollowUp(m *datatypes.Message,
 	}
 	resp := m.LastResponse
 	resp.Sentence = ""
-	if len(resp.State["Times"].([]time.Time)) == 0 {
+	state := MapToMeetingState(resp.State)
+	if len(state.Times) == 0 {
 		timeString := m.Input.StructuredInput.Times.String()
-		timeSlice := m.Input.StructuredInput.Times.StringSlice()
-		timesString := language.SliceToString(timeSlice, "or")
 		times, err := timeparse.Parse(timeString)
 		if err != nil {
 			return err
@@ -95,13 +97,13 @@ func (p *Meeting) FollowUp(m *datatypes.Message,
 		if len(times) == 0 {
 			return pkg.SaveResponse(respMsg, resp)
 		}
-		resp.State["Times"] = times
-		resp.State["TimesString"] = timesString
-		if stateIncomplete(resp) {
+		state.Times = times
+		if stateIncomplete(state, resp) {
+			resp.State = state.ToMap()
 			return pkg.SaveResponse(respMsg, resp)
 		}
 	}
-	if len(resp.State["Actors"].([]Actor)) == 0 {
+	if len(state.Actors) == 0 {
 		actors := []Actor{}
 		names := []string{}
 		for _, a := range m.Input.StructuredInput.Actors {
@@ -113,16 +115,25 @@ func (p *Meeting) FollowUp(m *datatypes.Message,
 		actorsString := language.SliceToString(names, "and")
 		resp.State["Actors"] = actors
 		resp.State["ActorsString"] = actorsString
-		if stateIncomplete(resp) {
+		if stateIncomplete(state, resp) {
+			resp.State = state.ToMap()
 			return pkg.SaveResponse(respMsg, resp)
 		}
 	}
-	if len(resp.State["Places"].([]string)) == 0 {
-		resp.State["Places"] = m.Input.StructuredInput.Places
-		if stateIncomplete(resp) {
+	if len(state.Places) == 0 {
+		if len(m.Input.StructuredInput.Places) == 0 {
+			resp.Sentence = ""
+		} else {
+			resp.State["Places"] = language.SliceToString(
+				m.Input.StructuredInput.Places, "or")
+		}
+		if stateIncomplete(state, resp) {
+			resp.State = state.ToMap()
 			return pkg.SaveResponse(respMsg, resp)
 		}
 	}
+	resp.Sentence = "Ok. I'll work with them to schedule it!"
+	// TODO set a marker that it requires outside communication, follow-up
 	return pkg.SaveResponse(respMsg, resp)
 }
 
@@ -138,18 +149,38 @@ func (p *Meeting) Repeat(m *datatypes.Message,
 	return nil
 }
 
-func stateIncomplete(resp *datatypes.Response) bool {
-	if len(resp.State["Times"].([]time.Time)) == 0 {
+func stateIncomplete(state *MeetingState, resp *datatypes.Response) bool {
+	if len(state.Times) == 0 {
 		resp.Sentence = "What time would you like to have the meeting?"
 		return true
 	}
-	if len(resp.State["Actors"].([]Actor)) == 0 {
+	if len(state.Actors) == 0 {
 		resp.Sentence = "Who should I invite?"
 		return true
 	}
-	if len(resp.State["Places"].([]string)) == 0 {
+	if len(state.Places) == 0 {
 		resp.Sentence = "Where do you want to have the meeting?"
 		return true
 	}
 	return false
+}
+
+func (ms *MeetingState) ToMap() map[string]interface{} {
+	mp := map[string]interface{}{}
+	mp["Times"] = ms.Times
+	mp["Actors"] = ms.Actors
+	mp["Places"] = ms.Places
+	return mp
+}
+
+func MapToMeetingState(m map[string]interface{}) *MeetingState {
+	ms := MeetingState{}
+	var ok bool
+	ms.Times, ok = m["Times"].([]time.Time)
+	if !ok {
+		ms.Times = []time.Time{}
+	}
+	ms.Actors, ok = m["Actors"].([]Actor)
+	ms.Places = m["Places"].(string)
+	return &ms
 }

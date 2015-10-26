@@ -4,11 +4,53 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
 		<link rel="stylesheet" href="/public/css/main.css">
+		<link href='https://fonts.googleapis.com/css?family=PT+Serif:400,400italic|700italic|Montserrat:700' rel='stylesheet' type='text/css'>
+		<script src="/public/js/mithril.min.js"></script>
 		<script src="/public/js/signup.js"></script>
+		<script src="/public/js/train.js"></script>
 	</head>
 	<body>
-		<div class="container">
+		<header>
+			<div class="container">
+				<a href="/" class="navbar-brand">
+					<div>
+						<img src="/public/images/logo.svg" />
+						<span class="margin-top-xs">&nbsp;Ava</span>
+					</div>
+				</a>
+				<div class="text-right navbar-right">
+					<a href="/">Home</a>
+					<a href="#">Tour</a>
+					<a href="#">About Us</a>
+				</div>
+			</div>
+		</header>
+		<div class="body container">
 			{{.}}
 		</div>
+		<footer>
+			<div class="container">
+				<div class="row">
+					<div class="col-sm-3 border-right">
+						<div class="big-name">Ava</div>
+						<div class="big-name big-name-gray">Assistant</div>
+						<div class="margin-top-sm">&copy; 2015 Evan Tann.</div>
+						<div>All rights reserved.</div>
+					</div>
+					<div class="col-sm-2">
+						<div><a href="/">Food</a></div>
+						<div class="margin-top-xs"><a href="/">Travel</a></div>
+						<div class="margin-top-xs"><a href="/">Health</a></div>
+						<div class="margin-top-xs"><a href="/">Shopping</a></div>
+						<div class="margin-top-xs"><a href="/">Entertainment</a></div>
+					</div>
+					<div class="col-sm-7 de-emphasized">
+						<div><a href="/">Home</a></div>
+						<div class="margin-top-xs"><a href="/">Tour</a></div>
+						<div class="margin-top-xs"><a href="/">About us</a></div>
+					</div>
+				</div>
+			</div>
+		</footer>
 	</body>
 </html>

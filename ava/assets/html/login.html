@@ -5,7 +5,9 @@
 	<div class="col-sm-6 col-sm-push-3">
 		<h2 class="text-center">Log into Ava</h2>
 		{{if .Error}}
-			<div class="alert alert-danger margin-top-sm" role="alert">{{.Error}}</div>
+			<div class="alert alert-danger margin-top-sm" role="alert">
+				{{.Error}}
+			</div>
 		{{end}}
 		<form action="/login" method="post">
 			<div class="form-group">

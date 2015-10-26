@@ -39,6 +39,15 @@ func saveStructuredInput(m *datatypes.Message, rid int, pkg,
 	return err
 }
 
+func saveTrainingSentence(s string) error {
+	q := `INSERT INTO trainings (sentence) VALUES $1`
+	_, err := db.Exec(q, s)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getUser(in *datatypes.Input) (*datatypes.User, error) {
 	if in.UserID == 0 {
 		q := `SELECT userid

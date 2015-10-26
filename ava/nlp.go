@@ -134,7 +134,7 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, err
 	ws := strings.Fields(s)
 	var wc []datatypes.WordClass
 	for i := range ws {
-		tmp, err := classifyTrigram(c, ws, i)
+		tmp, err := classifyTrigram(c, s, ws, i)
 		if err != nil {
 			return si, err
 		}
@@ -257,7 +257,7 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 // given its surrounding context (i, i+1, i+2). Underflow on the returned
 // probabilities is possible, but ignored, since classifyTrigram prefers a >=70%
 // confidence level.
-func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
+func classifyTrigram(c *bayesian.Classifier, s string, ws []string, i int) (
 	datatypes.WordClass, error) {
 	// TODO: Given the last 2 words of a sentence, construct the trigram
 	// including prior words.
@@ -298,6 +298,9 @@ func classifyTrigram(c *bayesian.Classifier, ws []string, i int) (
 	m = max(probs)
 	if m <= 0.7 {
 		log.Println(word1, " || ", datatypes.String[likely+1], " || ", m)
+		if err := saveTrainingSentence(s); err != nil {
+			log.Println("err: saving training sentence", err)
+		}
 	}
 	return datatypes.WordClass{word1, likely + 1}, nil
 }

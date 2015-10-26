@@ -147,10 +147,13 @@ func initRoutes(e *echo.Echo) {
 	e.Get("/login", handlerLogin)
 	e.Post("/login", handlerLoginSubmit)
 	e.Get("/success", handlerLoginSuccess)
+	e.Get("/train", handlerTrain)
 
 	// API routes
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
+	e.Get("/api/sentence.json", handlerSentence)
+	e.Put("/api/sentence.json", handlerTrainSentence)
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -159,6 +162,30 @@ func handlerIndex(c *echo.Context) error {
 		log.Fatalln(err)
 	}
 	tmplIndex, err := template.ParseFiles("assets/html/index.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var s []byte
+	b := bytes.NewBuffer(s)
+	if err := tmplIndex.Execute(b, struct{}{}); err != nil {
+		log.Fatalln(err)
+	}
+	b2 := bytes.NewBuffer(s)
+	if err := tmplLayout.Execute(b2, b); err != nil {
+		log.Fatalln(err)
+	}
+	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
+		return err
+	}
+	return nil
+}
+
+func handlerTrain(c *echo.Context) error {
+	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	tmplIndex, err := template.ParseFiles("assets/html/train.html")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -192,6 +219,54 @@ func handlerTwilio(c *echo.Context) error {
 		resp = twilioResp{Message: ret}
 	}
 	if err = c.XML(http.StatusOK, resp); err != nil {
+		return err
+	}
+	return nil
+}
+
+func handlerSentence(c *echo.Context) error {
+	q := `
+		SELECT id, sentence FROM trainings
+		WHERE trained=FALSE
+		ORDER BY createdat DESC`
+	var sent struct {
+		Id       int
+		Sentence string
+	}
+	err := db.Get(&sent, q)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if err = c.JSON(http.StatusOK, sent); err != nil {
+		return err
+	}
+	return nil
+}
+
+func handlerTrainSentence(c *echo.Context) error {
+	var data struct {
+		Id       int
+		Sentence string
+	}
+	if err := c.Bind(&data); err != nil {
+		return err
+	}
+	if err := train(bayes, data.Sentence); err != nil {
+		return err
+	}
+	q := `UPDATE trainings SET trained=TRUE WHERE id=$1`
+	res, err := db.Exec(q, data.Id)
+	if err != nil {
+		return err
+	}
+	num, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if num == 0 {
+		return sql.ErrNoRows
+	}
+	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return err
 	}
 	return nil
