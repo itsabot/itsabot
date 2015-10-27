@@ -3,58 +3,106 @@ body {
 	height: 100%;
 	position: relative;
 }
-
-h1, h2, h3, h4, a.btn {
+h1,
+h2,
+h3,
+h4,
+a.btn {
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 	font-weight: 700;
 }
-
-header {
+a.btn.btn-green {
+	color: white;
+	background-color: #3CA773;
+	border: 1px solid #3CA773;
+}
+a.btn.btn-green:hover {
+	color: white;
+	background-color: #81CF89;
+	border: 1px solid #81CF89;
+}
+.gradient {
 	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#3023ae+0,6747a6+100 */
-	background: #3023ae; /* Old browsers */
-	background: -moz-linear-gradient(-45deg,  #3023ae 0%, #6747a6 100%); /* FF3.6+ */
-	background: -webkit-gradient(linear, left top, right bottom, color-stop(0%,#3023ae), color-stop(100%,#6747a6)); /* Chrome,Safari4+ */
-	background: -webkit-linear-gradient(-45deg,  #3023ae 0%,#6747a6 100%); /* Chrome10+,Safari5.1+ */
-	background: -o-linear-gradient(-45deg,  #3023ae 0%,#6747a6 100%); /* Opera 11.10+ */
-	background: -ms-linear-gradient(-45deg,  #3023ae 0%,#6747a6 100%); /* IE10+ */
-	background: linear-gradient(135deg,  #3023ae 0%,#6747a6 100%); /* W3C */
-	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#3023ae', endColorstr='#6747a6',GradientType=1 ); /* IE6-9 fallback on horizontal gradient */
+	background: #3023ae;
+	/* Old browsers */
+	background: -moz-linear-gradient(-45deg, #3023ae 0%, #6747a6 100%);
+	/* FF3.6+ */
+	background: -webkit-gradient(linear, left top, right bottom, color-stop(0%, #3023ae), color-stop(100%, #6747a6));
+	/* Chrome,Safari4+ */
+	background: -webkit-linear-gradient(-45deg, #3023ae 0%, #6747a6 100%);
+	/* Chrome10+,Safari5.1+ */
+	background: -o-linear-gradient(-45deg, #3023ae 0%, #6747a6 100%);
+	/* Opera 11.10+ */
+	background: -ms-linear-gradient(-45deg, #3023ae 0%, #6747a6 100%);
+	/* IE10+ */
+	background: linear-gradient(135deg, #3023ae 0%, #6747a6 100%);
+	/* W3C */
+	filter: progid: DXImageTransform.Microsoft.gradient(startColorstr='#3023ae', endColorstr='#6747a6', GradientType=1);
+	/* IE6-9 fallback on horizontal gradient */
+	height: 100%;
+	width: 100%;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+.gradient.gradient-bright {
+	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#3023ae+0,c86dd7+100 */
+	background: #3023ae;
+	/* Old browsers */
+	background: -moz-linear-gradient(-45deg, #3023ae 0%, #c86dd7 100%);
+	/* FF3.6+ */
+	background: -webkit-gradient(linear, left top, right bottom, color-stop(0%, #3023ae), color-stop(100%, #c86dd7));
+	/* Chrome,Safari4+ */
+	background: -webkit-linear-gradient(-45deg, #3023ae 0%, #c86dd7 100%);
+	/* Chrome10+,Safari5.1+ */
+	background: -o-linear-gradient(-45deg, #3023ae 0%, #c86dd7 100%);
+	/* Opera 11.10+ */
+	background: -ms-linear-gradient(-45deg, #3023ae 0%, #c86dd7 100%);
+	/* IE10+ */
+	background: linear-gradient(135deg, #3023ae 0%, #c86dd7 100%);
+	/* W3C */
+	filter: progid: DXImageTransform.Microsoft.gradient(startColorstr='#3023ae', endColorstr='#c86dd7', GradientType=1);
+	/* IE6-9 fallback on horizontal gradient */
+}
+.gradient.gradient-big {
+	height: 650px;
+}
+img.img-big {
+	position: absolute;
+	top: -7em;
+	height: 600px;
+}
+header {
 	height: 5em;
 	border-radius: 0;
 	border: none;
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
-
 header a {
 	color: white;
 }
-
 header a:hover {
 	text-decoration: none;
+	color: #838D8F;
 }
-
 .navbar-brand {
 	padding-left: 0;
 	padding-top: 0.8em;
 	font-weight: 700;
 	font-size: 1.5em;
 }
-
 .navbar-right {
 	margin-top: 1.75em;
 }
-
 .navbar-right a {
 	padding: 1.2em 1em;
 	margin-left: 1em;
 }
-
 .body {
 	padding-bottom: 220px;
 	margin-top: 2em;
 	margin-bottom: 5em;
 }
-
 footer {
 	position: absolute;
 	bottom: 0;
@@ -64,34 +112,28 @@ footer {
 	background-color: #3C3D41;
 	color: #999;
 }
-
 footer a {
 	color: white;
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 	text-transform: uppercase;
 }
-
 footer a:hover {
 	text-decoration: none;
 }
-
 footer .de-emphasized a {
 	color: #999;
 	text-transform: none;
 }
-
 .big-name {
 	font-size: 1.5em;
 	color: white;
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
-
 .big-name-gray {
 	color: #999;
 	position: relative;
 	top: -0.25em;
 }
-
 a.btn {
 	text-transform: uppercase;
 	color: #333;
@@ -100,153 +142,167 @@ a.btn {
 	padding: 1em 3.5em;
 	letter-spacing: 8px;
 }
-
+.gradient a.btn {
+	color: white;
+}
+.jumbo a.btn {
+	letter-spacing: 4px;
+	padding: 1em 2em;
+}
+.row.row-jumbo {
+	height: 650px;
+	margin-bottom: 1em;
+	margin-right: 0;
+}
 a.btn:hover {
 	color: #838D8F;
 }
-
 a.btn-primary {
 	border: none;
 	color: white;
 	background-color: #277CEA;
 }
-
 a.btn-primary:hover {
 	color: white;
 	background-color: #277CEA;
 	opacity: 0.7;
 }
-
 a.btn-lg {
 	padding: 1.5em 3.5em;
 	margin-left: 1.5em;
 }
-
 #train-sentence {
 	position: relative;
 }
-
 .highlight-red {
 	background: rgba(255, 63, 63, 0.32);
 }
-
 .highlight-yellow {
 	background: rgba(251, 212, 34, 0.39);
 }
-
 p {
 	font-size: 16px;
 }
-
 p.light {
 	color: #999;
 }
-
 p.big {
 	font-size: 32px;
 	margin: 1.5em 0 1.75em;
 }
-
 p.subhead {
 	font-weight: 300;
 	font-size: 1.4em;
 }
-
 .display {
 	font-weight: 300;
 }
-
 h1.display {
 	font-size: 5em;
 }
-
 h2.display {
 	font-size: 2.5em;
 }
-
 .subhead {
 	margin-top: 0;
 }
-
 .main {
 	margin-top: 6em;
 }
-
+.label {
+	text-transform: uppercase;
+}
+.label.label-primary {
+	background-color: #6B3DE4;
+	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
 .border-right {
 	border-right: 1px solid #555;
 	padding: 1em 0;
 	margin: -1em 0;
 }
-
+a.bold {
+	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+	text-transform: uppercase;
+	font-weight: 700;
+	color: #AAA;
+}
 .margin-top-xs {
 	margin-top: 0.5em;
 }
-
 .margin-top-sm {
 	margin-top: 2em;
 }
-
 .margin-top-sm {
 	margin-top: 2em;
 }
-
 .margin-tb-sm {
 	margin-top: 2em;
 	margin-bottom: 1em;
 }
-
 .icon {
 	width: 160px;
 }
-
 .icon-md {
 	width: 100px;
 }
-
 .icon-sm {
 	width: 60px;
 }
-
 h2.heading {
 	margin-top: 0;
 }
-
 span.heading {
 	border-bottom: 3px solid #000;
 }
-
 .no-select {
 	-webkit-user-select: none;
 }
-
 .red {
 	background-color: rgba(255, 63, 63, 0.32);
 }
-
 .blue {
 	background-color: rgba(16, 60, 211, 0.28);
 }
-
 .green {
 	background-color: rgba(16, 211, 67, 0.27);
 }
-
 .yellow {
 	background-color: rgba(251, 212, 34, 0.39);
 }
-
 .pink {
 	background-color: rgba(208, 16, 211, 0.28);
 }
-
 .dialog-left {
 	color: #70B7BA;
 	font-weight: 900;
 	font-size: 1.4em;
 }
-
 .dialog-right {
 	margin-left: 1em;
 	color: #3D4C53;
 	font-weight: 900;
+}
+.jumbo {
+	margin-top: 10em;
+}
+.jumbo h1 {
+	color: white;
+	font-size: 48px;
+	margin: 0;
+	padding: 0;
+	line-height: 0.8em;
+}
+.jumbo p {
+	color: white;
+	font-size: 24px;
+	margin: 1.5em 0;
+}
+.jumbo .btn {
+	margin-right: 2em;
+}
+@media (max-width: 992px) {
+	.img-big {
+		display: none;
+	}
 }
