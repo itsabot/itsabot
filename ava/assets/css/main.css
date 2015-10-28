@@ -39,11 +39,7 @@ a.btn.btn-green:hover {
 	/* W3C */
 	filter: progid: DXImageTransform.Microsoft.gradient(startColorstr='#3023ae', endColorstr='#6747a6', GradientType=1);
 	/* IE6-9 fallback on horizontal gradient */
-	height: 100%;
 	width: 100%;
-	position: absolute;
-	top: 0;
-	left: 0;
 }
 .gradient.gradient-bright {
 	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#3023ae+0,c86dd7+100 */
@@ -66,6 +62,9 @@ a.btn.btn-green:hover {
 }
 .gradient.gradient-big {
 	height: 650px;
+	position: absolute;
+	top: 0;
+	left: 0;
 }
 img.img-big {
 	position: absolute;
@@ -81,7 +80,8 @@ header {
 header a {
 	color: white;
 }
-header a:hover {
+header a:hover,
+footer a:hover {
 	text-decoration: none;
 	color: #838D8F;
 }
@@ -100,7 +100,6 @@ header a:hover {
 }
 .body {
 	padding-bottom: 220px;
-	margin-top: 2em;
 	margin-bottom: 5em;
 }
 footer {
@@ -216,6 +215,9 @@ h2.display {
 	background-color: #6B3DE4;
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
+.color-primary {
+	color: #6B3DE4;
+}
 .border-right {
 	border-right: 1px solid #555;
 	padding: 1em 0;
@@ -305,4 +307,25 @@ span.heading {
 	.img-big {
 		display: none;
 	}
+}
+.fade {
+	-webkit-transition: opacity .4s ease-in-out;
+	-moz-transition: opacity .4s ease-in-out;
+	-o-transition: opacity .4s ease-in-out;
+	-ms-transition: opacity .4s ease-in-out;
+	transition: opacity .4s ease-in-out;
+	opacity: 0;
+}
+.fade.fade-in {
+	opacity: 1;
+}
+.phone {
+	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+	white-space: nowrap;
+}
+.tour-icon {
+	display: block;
+	margin: 0.8em auto 0;
+	max-width: 100%;
+	max-height: 50px;
 }

@@ -16,7 +16,7 @@ header.view = function() {
 					}),
 					m("span", {
 						class: "margin-top-xs"
-					}, " Ava"),
+					}, m.trust(" &nbsp;Ava")),
 				])
 			]),
 			m("div", {
@@ -26,12 +26,17 @@ header.view = function() {
 					href: "/"
 				}, "Home"),
 				m("a", {
-					href: "#"
+					href: "/tour",
+					config: m.route
 				}, "Tour"),
 				m("a", {
-					href: "#"
-				}, "About Us")
+					href: "/updates",
+					config: m.route
+				}, "Updates")
 			])
-		])
+		]),
+		m("div", {
+			id: "content"
+		})
 	]);
 };

@@ -8,15 +8,15 @@ var Trainer = function() {
 	};
 	this.save = function() {
 		var sentence = "";
-		for (var i = 0; i < train.vm.words.length; ++i) {
-			var word = train.vm.words[i];
+		for (var i = 0; i < Train.vm.words.length; ++i) {
+			var word = Train.vm.words[i];
 			if (word.type() === "") {
 				word.type("_N(" + word.value() + ")");
 			}
 			sentence += word.type() + " ";
 		}
 		var data = {
-			Id: train.vm.state.id,
+			Id: Train.vm.state.id,
 			Sentence: sentence
 		};
 		return m.request({
@@ -44,7 +44,7 @@ var Word = function(word) {
 		if (this.classList.length > 0) {
 			return this.className = "";
 		}
-		switch (train.vm.trainingCategory()) {
+		switch (Train.vm.trainingCategory()) {
 			case "COMMANDS":
 				_this.type("_C(" + _this.value() + ")");
 				return this.classList.add("red");
@@ -63,68 +63,68 @@ var Word = function(word) {
 			default:
 				console.error(
 					"invalid training state: " +
-					train.vm.trainingCategory()
+					Train.vm.trainingCategory()
 				);
 		};
 	};
 };
 
-var train = {};
-train.controller = {
+var Train = {};
+Train.controller = {
 	init: function() {
-		train.controller.trainer = new Trainer();
-		train.controller.trainer.sentence().then(function(data) {
+		Train.controller.trainer = new Trainer();
+		Train.controller.trainer.sentence().then(function(data) {
 			if (data.Id === 0) {
 				m.render(
 					document.getElementById("trainer"),
-					train.viewEmpty()
+					Train.viewEmpty()
 				);
 			} else {
-				train.vm.init(data);
+				Train.vm.init(data);
 				m.render(
 					document.getElementById("trainer"),
-					train.view(train.controller)
+					Train.view(Train.controller)
 				);
 			}
 		});
 	}
 };
 
-train.vm = {
+Train.vm = {
 	init: function(data) {
-		train.vm.trainer = new Trainer();
+		Train.vm.trainer = new Trainer();
 		var words = data.Sentence.split(/\s+/);
-		train.vm.words = [];
+		Train.vm.words = [];
 		for (var i = 0; i < words.length; ++i) {
-			train.vm.words[i] = new Word(words[i]);
+			Train.vm.words[i] = new Word(words[i]);
 		}
-		train.vm.trainingCategory = m.prop("COMMANDS");
-		train.vm.state = {};
-		train.vm.state.id = data.Id;
-		train.vm.nextCategory = function() {
+		Train.vm.trainingCategory = m.prop("COMMANDS");
+		Train.vm.state = {};
+		Train.vm.state.id = data.Id;
+		Train.vm.nextCategory = function() {
 			var el = document.getElementById("training-category");
 			var helpTitle = document.getElementById("help-title");
 			var helpBody = document.getElementById("help-body");
-			switch (train.vm.trainingCategory()) {
+			switch (Train.vm.trainingCategory()) {
 				case "COMMANDS":
-					train.vm.trainingCategory("OBJECTS");
+					Train.vm.trainingCategory("OBJECTS");
 					var btn = document.getElementById("back-btn");
 					btn.classList.remove("hidden");
 					helpTitle.innerText = "What is an object? ";
 					helpBody.innerText = "Objects are the direct objects of the sentence.";
 					break;
 				case "OBJECTS":
-					train.vm.trainingCategory("ACTORS");
+					Train.vm.trainingCategory("ACTORS");
 					helpTitle.innerText = "What is an actor? ";
 					helpBody.innerText = "Actors are often the indirect objects of the sentence.";
 					break;
 				case "ACTORS":
-					train.vm.trainingCategory("TIMES");
+					Train.vm.trainingCategory("TIMES");
 					helpTitle.innerText = "What are times? ";
 					helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. Etc.";
 					break;
 				case "TIMES":
-					train.vm.trainingCategory("PLACES");
+					Train.vm.trainingCategory("PLACES");
 					var btn = document.getElementById("continue-btn");
 					helpTitle.innerText = "What are places? ";
 					helpBody.innerText = "A place is any description of where an event should take place. Starbucks. Nearby. Etc.";
@@ -133,7 +133,7 @@ train.vm = {
 				case "PLACES":
 					var btn = document.getElementById("continue-btn");
 					if (btn.innerText !== "Saving...") {
-						train.controller.trainer.save()
+						Train.controller.trainer.save()
 							.then(function() {
 								window.location.reload();
 							}, console.error("we got probs"));
@@ -143,34 +143,34 @@ train.vm = {
 					}
 					return;
 			};
-			el.innerText = train.vm.trainingCategory();
-			el.className = train.vm.categoryColor();
+			el.innerText = Train.vm.trainingCategory();
+			el.className = Train.vm.categoryColor();
 		};
-		train.vm.prevCategory = function() {
+		Train.vm.prevCategory = function() {
 			var el = document.getElementById("training-category");
-			switch (train.vm.trainingCategory()) {
+			switch (Train.vm.trainingCategory()) {
 				case "OBJECTS":
-					train.vm.trainingCategory("COMMANDS");
+					Train.vm.trainingCategory("COMMANDS");
 					var btn = document.getElementById("back-btn");
 					btn.classList.add("hidden");
 					break;
 				case "ACTORS":
-					train.vm.trainingCategory("OBJECTS");
+					Train.vm.trainingCategory("OBJECTS");
 					break;
 				case "TIMES":
-					train.vm.trainingCategory("ACTORS");
+					Train.vm.trainingCategory("ACTORS");
 					break;
 				case "PLACES":
-					train.vm.trainingCategory("TIMES");
+					Train.vm.trainingCategory("TIMES");
 					var btn = document.getElementById("continue-btn");
 					btn.innerText = "Continue";
 					break;
 			};
-			el.innerText = train.vm.trainingCategory();
-			el.className = train.vm.categoryColor();
+			el.innerText = Train.vm.trainingCategory();
+			el.className = Train.vm.categoryColor();
 		};
-		train.vm.categoryColor = function() {
-			switch (train.vm.trainingCategory()) {
+		Train.vm.categoryColor = function() {
+			switch (Train.vm.trainingCategory()) {
 				case "COMMANDS":
 					return "red";
 				case "OBJECTS":
@@ -186,7 +186,7 @@ train.vm = {
 	}
 };
 
-train.view = function(controller) {
+Train.view = function(controller) {
 	return m("div", {
 		class: "row"
 	}, [
@@ -195,7 +195,7 @@ train.view = function(controller) {
 		}, [
 			m("a", {
 				class: "btn",
-				onclick: train.controller.trainer.skip
+				onclick: Train.controller.trainer.skip
 			}, "Skip Sentence"),
 		]),
 		m("div", {
@@ -205,8 +205,8 @@ train.view = function(controller) {
 				"Tap the ",
 				m("span", {
 					id: "training-category",
-					class: train.vm.categoryColor()
-				}, train.vm.trainingCategory()),
+					class: Train.vm.categoryColor()
+				}, Train.vm.trainingCategory()),
 				" in this sentence:"
 			),
 			m("p", {
@@ -229,7 +229,7 @@ train.view = function(controller) {
 				id: "train-sentence",
 				class: "big no-select"
 			}, [
-				train.vm.words.map(function(word, i) {
+				Train.vm.words.map(function(word, i) {
 					return [
 						m("span", {
 							onclick: word.setClass,
@@ -246,19 +246,19 @@ train.view = function(controller) {
 				id: "back-btn",
 				href: "#/",
 				class: "btn hidden",
-				onclick: train.vm.prevCategory
+				onclick: Train.vm.prevCategory
 			}, "Go back"),
 			m("a", {
 				id: "continue-btn",
 				href: "#/",
 				class: "btn btn-primary btn-lg",
-				onclick: train.vm.nextCategory
+				onclick: Train.vm.nextCategory
 			}, "Continue")
 		])
 	]);
 };
 
-train.viewEmpty = function() {
+Train.viewEmpty = function() {
 	return m("div", {
 		class: "col-sm-12 text-center"
 	}, [
@@ -268,11 +268,11 @@ train.viewEmpty = function() {
 };
 
 window.onload = function() {
-	train.controller.init();
+	Train.controller.init();
 	window.addEventListener("keypress", function(ev) {
 		if (ev.keyCode === 102 /* 'f' key */ ) {
 			ev.preventDefault();
-			train.vm.nextCategory();
+			Train.vm.nextCategory();
 		}
 	});
 };
