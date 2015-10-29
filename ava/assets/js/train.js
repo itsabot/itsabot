@@ -152,20 +152,30 @@ Train.vm = {
 	},
 	prevCategory: function() {
 		var el = document.getElementById("training-category");
+		var helpTitle = document.getElementById("help-title");
+		var helpBody = document.getElementById("help-body");
 		switch (Train.vm.trainingCategory()) {
 			case "OBJECTS":
 				Train.vm.trainingCategory("COMMANDS");
+				helpTitle.innerText = "What is a command? ";
+				helpBody.innerText = 'A command is a verb, like "Find," "Walk," or "Meet."';
 				var btn = document.getElementById("back-btn");
 				btn.classList.add("hidden");
 				break;
 			case "ACTORS":
 				Train.vm.trainingCategory("OBJECTS");
+				helpTitle.innerText = "What is an object? ";
+				helpBody.innerText = "Objects are the direct objects of the sentence.";
 				break;
 			case "TIMES":
 				Train.vm.trainingCategory("ACTORS");
+				helpTitle.innerText = "What is an actor? ";
+				helpBody.innerText = "Actors are often the indirect objects of the sentence.";
 				break;
 			case "PLACES":
 				Train.vm.trainingCategory("TIMES");
+				helpTitle.innerText = "What are times? ";
+				helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. This Wednesday. Etc.";
 				var btn = document.getElementById("continue-btn");
 				btn.innerText = "Continue";
 				break;
