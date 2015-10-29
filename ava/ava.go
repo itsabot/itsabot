@@ -202,12 +202,13 @@ func handlerTwilio(c *echo.Context) error {
 func handlerSentence(c *echo.Context) error {
 	var q string
 	var sent struct {
-		ID       int
-		Sentence string
+		ID        int
+		ForeignID string
+		Sentence  string
 	}
 	if len(c.Query("id")) > 0 {
 		q = `
-		SELECT id, sentence FROM trainings
+		SELECT id, foreignid, sentence FROM trainings
 		WHERE trained=FALSE AND id=$1
 		ORDER BY createdat DESC`
 		err := db.Get(&sent, q, c.Query("id"))
@@ -216,7 +217,7 @@ func handlerSentence(c *echo.Context) error {
 		}
 	} else {
 		q = `
-		SELECT id, sentence FROM trainings
+		SELECT id, foreignid, sentence FROM trainings
 		WHERE trained=FALSE
 		ORDER BY createdat DESC`
 		err := db.Get(&sent, q)

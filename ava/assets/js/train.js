@@ -318,7 +318,7 @@ Train.viewEmpty = function() {
 			])
 		])
 	]);
-	if (Train.vm.state.id === 0) {
+	if (Train.vm.state.id === 0 || Train.vm.state.id === undefined) {
 		return view;
 	}
 };
