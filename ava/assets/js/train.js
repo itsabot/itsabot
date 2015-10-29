@@ -17,7 +17,9 @@ var Trainer = function() {
 			sentence += word.type() + " ";
 		}
 		var data = {
-			Id: Train.vm.state.id,
+			ID: Train.vm.state.id,
+			AssignmentID: Train.vm.state.assignmentId,
+			ForeignID: Train.vm.state.foreignId,
 			Sentence: sentence
 		};
 		return m.request({
@@ -85,7 +87,9 @@ Train.vm = {
 		Train.vm.state = {};
 		Train.vm.trainer = new Trainer();
 		Train.vm.trainingCategory = m.prop("COMMANDS");
-		Train.vm.state.id = data.Id;
+		Train.vm.state.id = data.ID;
+		Train.vm.state.assignmentId = m.route.param("assignmentId");
+		Train.vm.state.foreignId = data.ForeignID;
 		Train.vm.words = [];
 		var words = data.Sentence.split(/\s+/);
 		for (var i = 0; i < words.length; ++i) {

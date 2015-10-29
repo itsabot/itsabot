@@ -202,7 +202,7 @@ func handlerTwilio(c *echo.Context) error {
 func handlerSentence(c *echo.Context) error {
 	var q string
 	var sent struct {
-		Id       int
+		ID       int
 		Sentence string
 	}
 	if len(c.Query("id")) > 0 {
@@ -232,8 +232,10 @@ func handlerSentence(c *echo.Context) error {
 
 func handlerTrainSentence(c *echo.Context) error {
 	var data struct {
-		Id       int
-		Sentence string
+		ID           int
+		ForeignID    string
+		AssignmentID string
+		Sentence     string
 	}
 	if err := c.Bind(&data); err != nil {
 		return err
@@ -242,7 +244,7 @@ func handlerTrainSentence(c *echo.Context) error {
 		return err
 	}
 	q := `UPDATE trainings SET trained=TRUE WHERE id=$1`
-	res, err := db.Exec(q, data.Id)
+	res, err := db.Exec(q, data.ID)
 	if err != nil {
 		return err
 	}
@@ -252,6 +254,9 @@ func handlerTrainSentence(c *echo.Context) error {
 	}
 	if num == 0 {
 		return sql.ErrNoRows
+	}
+	if err = approveAssignment(data.ForeignID, data.AssignmentID); err != nil {
+		return err
 	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return err
