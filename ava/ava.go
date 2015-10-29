@@ -298,7 +298,7 @@ func processText(c *echo.Context) (string, error) {
 		}
 		return "", nil
 	}
-	si, err := classify(bayes, cmd)
+	si, needsTraining, err := classify(bayes, cmd)
 	if err != nil {
 		log.Println("classifying sentence ", err)
 	}
@@ -333,6 +333,12 @@ func processText(c *echo.Context) (string, error) {
 	err = saveStructuredInput(m, ret.ResponseID, pname, route)
 	if err != nil {
 		return ret.Sentence, err
+	}
+	if needsTraining {
+		log.Println("needed training")
+		if err = supervisedTrain(in.Sentence); err != nil {
+			return ret.Sentence, err
+		}
 	}
 	return ret.Sentence, nil
 }

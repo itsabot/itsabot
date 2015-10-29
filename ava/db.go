@@ -39,13 +39,14 @@ func saveStructuredInput(m *datatypes.Message, rid int, pkg,
 	return err
 }
 
-func saveTrainingSentence(s string) error {
-	q := `INSERT INTO trainings (sentence) VALUES $1`
-	_, err := db.Exec(q, s)
-	if err != nil {
-		return err
+func saveTrainingSentence(s string) (int, error) {
+	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
+	var id int
+	row := db.QueryRowx(q, s)
+	if err := row.Scan(&id); err != nil {
+		return 0, err
 	}
-	return nil
+	return id, nil
 }
 
 func getUser(in *datatypes.Input) (*datatypes.User, error) {

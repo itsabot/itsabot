@@ -6,57 +6,71 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/AdRoll/goamz/exp/mturk"
+	"github.com/goamz/goamz/aws"
+	"github.com/goamz/goamz/exp/mturk"
 )
 
 var mt *mturk.MTurk
 
-func aidedTrain(trainID int) error {
-	var categorizationMasterQualID string
-	if os.Getenv("AVA_ENV") == "production" {
-		mt = mturk.New(auth, false)
-		categorizationMasterQualID = "2NDP2L92HECWY8NS8H3CK0CP5L9GHO"
-	} else {
-		mt = mturk.New(auth, true)
-		categorizationMasterQualID = "2F1KVCNHMVHV8E9PBUB2A4J79LU20F"
-	}
-	title := "Identify elements of a sentence."
-	desc := "Find and identify commands, objects, actors, times, and places in a sentence."
-	qxn := &ExternalQuestion{
-		ExternalURL: os.Getenv("BASE_URL") + "train",
-		FrameHeight: 700,
-	}
-	reward := Price{
-		Amount:       0.03,
-		CurrencyCode: "USD",
-	}
-	timelimitInSeconds := 300
-	lifetimeInSeconds := 31536000 // 365 days
-	keywords := "ava,machine,learning,language,speech,english,train"
-	maxAssignments := 1
-	qualReq := &QualificationRequirement{
-		QualificationTypeId: categorizationMasterQualID,
-		Comparator:          "Exists",
-		RequiredToPreview:   true,
-	}
-	annotation := strconv.Itoa(trainID)
-	hit, err := mt.CreateHIT(title, desc, qxn, reward,
-		timelimitInSeconds, lifetimeInSeconds, keywords, maxAssignments,
-		qualReq, annotation)
+func supervisedTrain(s string) error {
+	trainID, err := saveTrainingSentence(s)
 	if err != nil {
 		return err
 	}
-	hit.HITTypeId
+	if err = aidedTrain(trainID); err != nil {
+		return err
+	}
+	return nil
+}
+
+func aidedTrain(trainID int) error {
+	auth, err := aws.EnvAuth()
+	if err != nil {
+		return err
+	}
+	//var categorizationMasterQualID string
+	if os.Getenv("AVA_ENV") == "production" {
+		mt = mturk.New(auth, false)
+		//categorizationMasterQualID = "2NDP2L92HECWY8NS8H3CK0CP5L9GHO"
+	} else {
+		mt = mturk.New(auth, true)
+		//categorizationMasterQualID = "2F1KVCNHMVHV8E9PBUB2A4J79LU20F"
+	}
+	title := "Identify elements of a sentence."
+	desc := "Find and identify commands, objects, actors, times, and places in a sentence."
+	qxn := &mturk.ExternalQuestion{
+		ExternalURL: os.Getenv("BASE_URL") + "train",
+		FrameHeight: 700,
+	}
+	reward := mturk.Price{
+		Amount:       "0.03",
+		CurrencyCode: "USD",
+	}
+	timelimitInSeconds := uint(300)
+	lifetimeInSeconds := uint(31536000) // 365 days
+	keywords := "ava,machine,learning,language,speech,english,train"
+	maxAssignments := uint(1)
+	/*
+		qualReq := &mturk.QualificationRequirement{
+			QualificationTypeId: categorizationMasterQualID,
+			Comparator:          "Exists",
+			RequiredToPreview:   true,
+		}
+	*/
+	annotation := strconv.Itoa(trainID)
+	hit, err := mt.CreateHIT(title, desc, qxn, reward,
+		timelimitInSeconds, lifetimeInSeconds, keywords, maxAssignments,
+		nil, annotation)
+	if err != nil {
+		return err
+	}
+	log.Printf("HIT id", hit.HITId)
 	return nil
 }
 
 // cronTrain runs every few minutes, checking HIT statuses and training the
 // bayes classifier when each is complete.
 func cronTrain() error {
-	var t struct {
-		ID        int
-		ForeignID string
-	}
 	// No LIMIT here, since that could create a queue, which would go
 	// unnoticed/need monitoring. Instead, allow the requests to pile up and
 	// overload memory, which monitoring services will catch and alert that
@@ -90,7 +104,7 @@ func cronTrain() error {
 }
 
 func trainTask(id int, foreignID string) error {
-	a, err := mt.GetAssignmentsForHITResponse(foreignID)
+	a, err := mt.GetAssignmentsForHIT(foreignID)
 	if err != nil {
 		return err
 	}
