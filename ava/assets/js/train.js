@@ -14,9 +14,6 @@ var Trainer = function() {
 		var sentence = "";
 		for (var i = 0; i < Train.vm.words.length; ++i) {
 			var word = Train.vm.words[i];
-			if (word.type() === "") {
-				word.type("_N(" + word.value() + ")");
-			}
 			sentence += word.type() + " ";
 		}
 		var data = {
@@ -43,9 +40,10 @@ var Trainer = function() {
 var Word = function(word) {
 	var _this = this;
 	this.value = m.prop(word);
-	this.type = m.prop("");
+	this.type = m.prop("_N(" + _this.value() + ")");
 	this.setClass = function() {
 		if (this.classList.length > 0) {
+			_this.type("_N(" + _this.value() + ")");
 			return this.className = "";
 		}
 		switch (Train.vm.trainingCategory()) {
@@ -93,6 +91,15 @@ Train.vm = {
 		for (var i = 0; i < words.length; ++i) {
 			Train.vm.words[i] = new Word(words[i]);
 		}
+		window.addEventListener("keypress", function(ev) {
+			if (ev.keyCode === 102 /* 'f' key */ ) {
+				ev.preventDefault();
+				Train.vm.nextCategory();
+			} else if (ev.keyCode === 98 /* 'b' key */ ) {
+				ev.preventDefault();
+				Train.vm.prevCategory();
+			}
+		});
 	},
 	nextCategory: function() {
 		var el = document.getElementById("training-category");
@@ -125,10 +132,13 @@ Train.vm = {
 				break;
 			case "PLACES":
 				var btn = document.getElementById("continue-btn");
-				if (btn.innerText !== "Saving...") {
+				if (btn.innerText !== "Saving..." && btn.innerText !== "Thank you!") {
 					Train.vm.save();
 					Train.controller.trainer.save().then(function() {
 						Train.vm.saveComplete();
+						setTimeout(function() {
+							window.location.reload();
+						}, 2000);
 					});
 				}
 				return;
@@ -308,13 +318,3 @@ Train.viewEmpty = function() {
 		return view;
 	}
 };
-
-window.addEventListener("keypress", function(ev) {
-	if (ev.keyCode === 102 /* 'f' key */ ) {
-		ev.preventDefault();
-		Train.vm.nextCategory();
-	} else if (ev.keyCode === 98 /* 'b' key */ ) {
-		ev.preventDefault();
-		Train.vm.prevCategory();
-	}
-});
