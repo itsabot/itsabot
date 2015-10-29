@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"database/sql"
 	"errors"
 	"log"
 	"os"
@@ -31,7 +33,13 @@ func train(c *bayesian.Classifier, s string) error {
 	if err := trainClassifier(c, s); err != nil {
 		return err
 	}
-	if err := c.WriteToFile(path.Join("data", "bayes.dat")); err != nil {
+	buf := bytes.NewBuffer([]byte{})
+	if err := c.WriteTo(buf); err != nil {
+		return err
+	}
+	q := `UPDATE ml SET data=$1 WHERE name='ner'`
+	_, err := db.Exec(q, buf.Bytes())
+	if err != nil {
 		return err
 	}
 	return nil
@@ -39,17 +47,25 @@ func train(c *bayesian.Classifier, s string) error {
 
 func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	log.Println("loading classifier")
-	filename := path.Join("data", "bayes.dat")
 	var err error
-	c, err = bayesian.NewClassifierFromFile(filename)
-	if err != nil && err.Error() == "open data/bayes.dat: no such file or directory" {
-		log.Println("warn: classifier file not found. building...")
+	q := `SELECT data FROM ml WHERE name='ner' LIMIT 1`
+	row := db.QueryRowx(q)
+	var tmp []byte
+	err = row.Scan(&tmp)
+	buf := bytes.NewBuffer(tmp)
+	if err == sql.ErrNoRows {
 		c, err = buildClassifier(c)
 		if err != nil {
+			log.Println("err building classifier")
 			return c, err
 		}
 	} else if err != nil {
-		log.Println("error loading bayes.dat", err)
+		log.Println("err getting classifier from DB")
+		return c, err
+	}
+	c, err = bayesian.NewClassifierFromReader(buf)
+	if err != nil {
+		log.Println("err building new classifier from reader", err)
 		return c, err
 	}
 	return c, nil
@@ -71,10 +87,17 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 		}
 		line++
 	}
-	if err = scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		return c, err
 	}
-	if err = c.WriteToFile(path.Join("data", "bayes.dat")); err != nil {
+	buf := bytes.NewBuffer([]byte{})
+	if err := c.WriteTo(buf); err != nil {
+		return c, err
+	}
+	q := `INSERT INTO ml (name, data) VALUES ('ner', $1)`
+	_, err = db.Exec(q, buf.Bytes())
+	if err != nil {
+		log.Println("err updating ml.ner", err)
 		return c, err
 	}
 	log.Println("new classifier trained")
@@ -82,10 +105,7 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 }
 
 func trainClassifier(c *bayesian.Classifier, s string) error {
-	if len(s) == 0 {
-		return ErrSentenceTooShort
-	}
-	if s[0] == '/' {
+	if len(s) == 0 || s[0] == '/' {
 		return nil
 	}
 	ws := strings.Fields(s)
