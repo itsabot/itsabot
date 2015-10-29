@@ -28,6 +28,14 @@
 			"Rev": "3131beb69b81ff119923bdefbf029318f1f53794"
 		},
 		{
+			"ImportPath": "github.com/goamz/goamz/aws",
+			"Rev": "be371d06631a6ea076cccefc6654fa5c29be074d"
+		},
+		{
+			"ImportPath": "github.com/goamz/goamz/exp/mturk",
+			"Rev": "be371d06631a6ea076cccefc6654fa5c29be074d"
+		},
+		{
 			"ImportPath": "github.com/jbrukh/bayesian",
 			"Comment": "1.0-19-g78b283a",
 			"Rev": "78b283ad3339530e700f96c41b960dccecde991c"
@@ -60,6 +68,10 @@
 			"ImportPath": "github.com/subosito/twilio",
 			"Comment": "v0.0.1-22-gca29365",
 			"Rev": "ca29365f195cd8e9dfb805d4b8aca69ce8057564"
+		},
+		{
+			"ImportPath": "github.com/vaughan0/go-ini",
+			"Rev": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",

@@ -6,8 +6,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/goamz/goamz/aws"
-	"github.com/goamz/goamz/exp/mturk"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/exp/mturk"
 )
 
 var mt *mturk.MTurk
