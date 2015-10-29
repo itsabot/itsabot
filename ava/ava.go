@@ -147,7 +147,6 @@ func initRoutes(e *echo.Echo) {
 	e.Get("/login", handlerLogin)
 	e.Post("/login", handlerLoginSubmit)
 	e.Get("/success", handlerLoginSuccess)
-	e.Get("/train", handlerTrain)
 
 	// API routes
 	e.Post("/", handlerMain)
@@ -162,30 +161,6 @@ func handlerIndex(c *echo.Context) error {
 		log.Fatalln(err)
 	}
 	tmplIndex, err := template.ParseFiles("assets/html/index.html")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	var s []byte
-	b := bytes.NewBuffer(s)
-	if err := tmplIndex.Execute(b, struct{}{}); err != nil {
-		log.Fatalln(err)
-	}
-	b2 := bytes.NewBuffer(s)
-	if err := tmplLayout.Execute(b2, b); err != nil {
-		log.Fatalln(err)
-	}
-	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
-		return err
-	}
-	return nil
-}
-
-func handlerTrain(c *echo.Context) error {
-	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	tmplIndex, err := template.ParseFiles("assets/html/train.html")
 	if err != nil {
 		log.Fatalln(err)
 	}

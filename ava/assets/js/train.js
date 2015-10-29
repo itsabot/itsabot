@@ -124,11 +124,12 @@ Train.vm = {
 				btn.innerText = "Save";
 				break;
 			case "PLACES":
+				var btn = document.getElementById("continue-btn");
 				if (btn.innerText !== "Saving...") {
+					Train.vm.save();
 					Train.controller.trainer.save().then(function() {
 						Train.vm.saveComplete();
 					});
-					Train.vm.save();
 				}
 				return;
 		};
@@ -308,11 +309,12 @@ Train.viewEmpty = function() {
 	}
 };
 
-window.onload = function() {
-	window.addEventListener("keypress", function(ev) {
-		if (ev.keyCode === 102 /* 'f' key */ ) {
-			ev.preventDefault();
-			Train.vm.nextCategory();
-		}
-	});
-};
+window.addEventListener("keypress", function(ev) {
+	if (ev.keyCode === 102 /* 'f' key */ ) {
+		ev.preventDefault();
+		Train.vm.nextCategory();
+	} else if (ev.keyCode === 98 /* 'b' key */ ) {
+		ev.preventDefault();
+		Train.vm.prevCategory();
+	}
+});

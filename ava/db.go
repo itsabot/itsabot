@@ -49,6 +49,15 @@ func saveTrainingSentence(s string) (int, error) {
 	return id, nil
 }
 
+func updateTraining(trainID int, hitID string) error {
+	q := `UPDATE trainings SET foreignid=$1 WHERE id=$2`
+	_, err := db.Exec(q, hitID, trainID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func getUser(in *datatypes.Input) (*datatypes.User, error) {
 	if in.UserID == 0 {
 		q := `SELECT userid

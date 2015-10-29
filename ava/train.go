@@ -1,8 +1,6 @@
 package main
 
 import (
-	"database/sql"
-	"log"
 	"os"
 	"strconv"
 
@@ -54,50 +52,8 @@ func aidedTrain(trainID int) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("HIT %+v\n", hit)
-	return nil
-}
-
-// cronTrain runs every few minutes, checking HIT statuses and training the
-// bayes classifier when each is complete.
-func cronTrain() error {
-	// No LIMIT here, since that could create a queue, which would go
-	// unnoticed/need monitoring. Instead, allow the requests to pile up and
-	// overload memory, which monitoring services will catch and alert that
-	// something needs to change -- likely the price of the MTurk HIT. And
-	// since we scan over the rows, it's unlikely without a HUGE amount of
-	// traffic to cause a problem. Something left for another time/dev :)
-	q := `
-		SELECT id, foreignid
-		FROM trainings
-		WHERE trained=FALSE
-		ORDER BY createdat DESC`
-	rows, err := db.Queryx(q)
-	if err != nil && err != sql.ErrNoRows {
+	if err = updateTraining(trainID, hit.HITId); err != nil {
 		return err
 	}
-	for rows.Next() {
-		var id int
-		var foreignID string
-		err = rows.Scan(&id, &foreignID)
-		if err != nil {
-			rows.Close()
-			return err
-		}
-		err = trainTask(id, foreignID)
-		if err != nil {
-			rows.Close()
-			return err
-		}
-	}
-	return nil
-}
-
-func trainTask(id int, foreignID string) error {
-	a, err := mt.GetAssignmentsForHIT(foreignID)
-	if err != nil {
-		return err
-	}
-	log.Println("mturk answers", a.Answers())
 	return nil
 }
