@@ -39,7 +39,7 @@ func aidedTrain(trainID int) error {
 		FrameHeight: 889,
 	}
 	reward := mturk.Price{
-		Amount:       "0.03",
+		Amount:       "0.05",
 		CurrencyCode: "USD",
 	}
 	timelimitInSeconds := uint(300)

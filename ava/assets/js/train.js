@@ -121,7 +121,7 @@ Train.vm = {
 			case "ACTORS":
 				Train.vm.trainingCategory("TIMES");
 				helpTitle.innerText = "What are times? ";
-				helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. Etc.";
+				helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. This Wednesday. Etc.";
 				break;
 			case "TIMES":
 				Train.vm.trainingCategory("PLACES");
