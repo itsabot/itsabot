@@ -90,7 +90,7 @@ Tour.view = function() {
 				m("div", {
 					class: "col-md-11 margin-top-sm"
 				}, [
-					m("h4", "Hear it first"),
+					m("h4", "Take a vacation"),
 					m("p", "Want to get away? Ava books travel, finding the best value within your budget."),
 				]),
 				m("div", {

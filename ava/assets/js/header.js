@@ -8,7 +8,8 @@ header.view = function() {
 		}, [
 			m("a", {
 				class: "navbar-brand",
-				href: "/"
+				href: "/",
+				config: m.route
 			}, [
 				m("div", [
 					m("img", {
@@ -23,15 +24,15 @@ header.view = function() {
 				class: "text-right navbar-right"
 			}, [
 				m("a", {
-					href: "/"
+					href: "/",
+					config: m.route
 				}, "Home"),
 				m("a", {
 					href: "/tour",
 					config: m.route
 				}, "Tour"),
 				m("a", {
-					href: "/updates",
-					config: m.route
+					href: "https://medium.com/ava-updates/latest"
 				}, "Updates")
 			])
 		]),

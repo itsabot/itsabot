@@ -25,7 +25,8 @@ Index.view = function() {
 					}, [
 						m("a", {
 							class: "navbar-brand",
-							href: "/"
+							href: "/",
+							config: m.route
 						}, [
 							m("div", [
 								m("img", {
@@ -37,7 +38,8 @@ Index.view = function() {
 							class: "text-right navbar-right"
 						}, [
 							m("a", {
-								href: "/"
+								href: "/",
+								config: m.route
 							}, "Home"),
 							m("a", {
 								href: "/tour",

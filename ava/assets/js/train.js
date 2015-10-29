@@ -70,37 +70,24 @@ var Word = function(word) {
 };
 
 var Train = {};
-Train.controller = {
-	init: function() {
-		Train.controller.trainer = new Trainer();
-		Train.controller.trainer.sentence().then(function(data) {
-			if (data.Id === 0) {
-				m.render(
-					document.getElementById("trainer"),
-					Train.viewEmpty()
-				);
-			} else {
-				Train.vm.init(data);
-				m.render(
-					document.getElementById("trainer"),
-					Train.view(Train.controller)
-				);
-			}
-		});
-	}
+Train.controller = function() {
+	Train.controller.trainer = new Trainer();
+	Train.controller.trainer.sentence().then(function(data) {
+		Train.vm.init(data);
+	});
 };
 
 Train.vm = {
 	init: function(data) {
+		Train.vm.state = {};
 		Train.vm.trainer = new Trainer();
-		var words = data.Sentence.split(/\s+/);
+		Train.vm.trainingCategory = m.prop("COMMANDS");
+		Train.vm.state.id = data.Id;
 		Train.vm.words = [];
+		var words = data.Sentence.split(/\s+/);
 		for (var i = 0; i < words.length; ++i) {
 			Train.vm.words[i] = new Word(words[i]);
 		}
-		Train.vm.trainingCategory = m.prop("COMMANDS");
-		Train.vm.state = {};
-		Train.vm.state.id = data.Id;
 		Train.vm.nextCategory = function() {
 			var el = document.getElementById("training-category");
 			var helpTitle = document.getElementById("help-title");
@@ -188,87 +175,129 @@ Train.vm = {
 
 Train.view = function(controller) {
 	return m("div", {
-		class: "row"
+		class: "body"
+	}, [
+		header.view(),
+		Train.viewFull(),
+		Train.viewEmpty(),
+		Footer.view()
+	]);
+};
+
+Train.viewFull = function() {
+	var view = m("div", {
+		id: "full",
+		class: "container"
 	}, [
 		m("div", {
-			class: "col-sm-12 text-right"
+			class: "row margin-top-sm"
 		}, [
-			m("a", {
-				class: "btn",
-				onclick: Train.controller.trainer.skip
-			}, "Skip Sentence"),
+			m("div", {
+				class: "col-sm-12"
+			}, [
+				m("h1", "Train"),
+				m("p", "Train Ava to understand language.")
+			])
 		]),
 		m("div", {
-			class: "col-sm-12 margin-top-sm"
+			class: "row"
 		}, [
-			m("h2",
-				"Tap the ",
-				m("span", {
-					id: "training-category",
-					class: Train.vm.categoryColor()
-				}, Train.vm.trainingCategory()),
-				" in this sentence:"
-			),
-			m("p", {
-				class: "light"
+			m("div", {
+				class: "col-sm-12 text-right"
 			}, [
-				m("strong",
-					m("i", {
-						id: "help-title"
-					}, "What is a command? ")
+				m("a", {
+					class: "btn",
+					onclick: Train.controller.trainer.skip
+				}, "Skip Sentence"),
+			]),
+			m("div", {
+				class: "col-sm-12 margin-top-sm"
+			}, [
+				m("h2",
+					"Tap the ",
+					m("span", {
+						id: "training-category",
+						class: Train.vm.categoryColor()
+					}, Train.vm.trainingCategory()),
+					" in this sentence:"
 				),
-				m("span", {
-					id: "help-body"
-				}, 'A command is a verb, like "Find," "Walk," or "Meet."')
-			])
-		]),
-		m("div", {
-			class: "col-sm-12"
-		}, [
-			m("p", {
-				id: "train-sentence",
-				class: "big no-select"
+				m("p", {
+					class: "light"
+				}, [
+					m("strong",
+						m("i", {
+							id: "help-title"
+						}, "What is a command? ")
+					),
+					m("span", {
+						id: "help-body"
+					}, 'A command is a verb, like "Find," "Walk," or "Meet."')
+				])
+			]),
+			m("div", {
+				class: "col-sm-12"
 			}, [
-				Train.vm.words.map(function(word, i) {
-					return [
-						m("span", {
-							onclick: word.setClass,
-						}, word.value()),
-						m("span", " ")
-					]
-				})
+				m("p", {
+					id: "train-sentence",
+					class: "big no-select"
+				}, [
+					Train.vm.words.map(function(word, i) {
+						return [
+							m("span", {
+								onclick: word.setClass,
+							}, word.value()),
+							m("span", " ")
+						]
+					})
+				])
+			]),
+			m("div", {
+				class: "col-sm-12 text-right"
+			}, [
+				m("a", {
+					id: "back-btn",
+					href: "#/",
+					class: "btn hidden",
+					onclick: Train.vm.prevCategory
+				}, "Go back"),
+				m("a", {
+					id: "continue-btn",
+					href: "#/",
+					class: "btn btn-primary btn-lg",
+					onclick: Train.vm.nextCategory
+				}, "Continue")
 			])
-		]),
-		m("div", {
-			class: "col-sm-12 text-right"
-		}, [
-			m("a", {
-				id: "back-btn",
-				href: "#/",
-				class: "btn hidden",
-				onclick: Train.vm.prevCategory
-			}, "Go back"),
-			m("a", {
-				id: "continue-btn",
-				href: "#/",
-				class: "btn btn-primary btn-lg",
-				onclick: Train.vm.nextCategory
-			}, "Continue")
 		])
 	]);
+	if (Train.vm.state.id > 0) {
+		return view;
+	}
 };
 
 Train.viewEmpty = function() {
-	return m("div", {
-		class: "col-sm-12 text-center"
+	var view = m("div", {
+		id: "empty",
+		class: "container jumbo"
 	}, [
-		m("h2", "All done!"),
-		m("p", "No tasks need to be completed.")
+		m("div", {
+			class: "row margin-top-sm"
+		}, [
+			m("div", {
+				class: "col-sm-12 text-center"
+			}, [
+				m("h2", "All done!"),
+				m("p", {
+					style: "color:black"
+				}, "No tasks need to be completed.")
+			])
+		])
 	]);
+	if (Train.vm.state.id === 0) {
+		return view;
+	}
 };
 
 window.onload = function() {
-	Train.controller.init();
 	window.addEventListener("keypress", function(ev) {
 		if (ev.keyCode === 102 /* 'f' key */ ) {
 			ev.preventDefault();
