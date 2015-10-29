@@ -1,9 +1,13 @@
 var Trainer = function() {
 	this.id = m.prop(0);
-	this.sentence = function() {
+	this.sentence = function(id) {
+		var url = "/api/sentence.json";
+		if (id !== undefined) {
+			url += "?id=" + id;
+		}
 		return m.request({
 			method: "GET",
-			url: "/api/sentence.json"
+			url: url
 		})
 	};
 	this.save = function() {
@@ -71,8 +75,9 @@ var Word = function(word) {
 
 var Train = {};
 Train.controller = function() {
+	var id = m.route.param("sentenceID");
 	Train.controller.trainer = new Trainer();
-	Train.controller.trainer.sentence().then(function(data) {
+	Train.controller.trainer.sentence(id).then(function(data) {
 		Train.vm.init(data);
 	});
 };
@@ -88,88 +93,94 @@ Train.vm = {
 		for (var i = 0; i < words.length; ++i) {
 			Train.vm.words[i] = new Word(words[i]);
 		}
-		Train.vm.nextCategory = function() {
-			var el = document.getElementById("training-category");
-			var helpTitle = document.getElementById("help-title");
-			var helpBody = document.getElementById("help-body");
-			switch (Train.vm.trainingCategory()) {
-				case "COMMANDS":
-					Train.vm.trainingCategory("OBJECTS");
-					var btn = document.getElementById("back-btn");
-					btn.classList.remove("hidden");
-					helpTitle.innerText = "What is an object? ";
-					helpBody.innerText = "Objects are the direct objects of the sentence.";
-					break;
-				case "OBJECTS":
-					Train.vm.trainingCategory("ACTORS");
-					helpTitle.innerText = "What is an actor? ";
-					helpBody.innerText = "Actors are often the indirect objects of the sentence.";
-					break;
-				case "ACTORS":
-					Train.vm.trainingCategory("TIMES");
-					helpTitle.innerText = "What are times? ";
-					helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. Etc.";
-					break;
-				case "TIMES":
-					Train.vm.trainingCategory("PLACES");
-					var btn = document.getElementById("continue-btn");
-					helpTitle.innerText = "What are places? ";
-					helpBody.innerText = "A place is any description of where an event should take place. Starbucks. Nearby. Etc.";
-					btn.innerText = "Save";
-					break;
-				case "PLACES":
-					var btn = document.getElementById("continue-btn");
-					if (btn.innerText !== "Saving...") {
-						Train.controller.trainer.save()
-							.then(function() {
-								window.location.reload();
-							}, console.error("we got probs"));
-						btn.innerText = "Saving...";
-						btn = document.getElementById("back-btn");
-						btn.classList.add("hidden");
-					}
-					return;
-			};
-			el.innerText = Train.vm.trainingCategory();
-			el.className = Train.vm.categoryColor();
+	},
+	nextCategory: function() {
+		var el = document.getElementById("training-category");
+		var helpTitle = document.getElementById("help-title");
+		var helpBody = document.getElementById("help-body");
+		switch (Train.vm.trainingCategory()) {
+			case "COMMANDS":
+				Train.vm.trainingCategory("OBJECTS");
+				var btn = document.getElementById("back-btn");
+				btn.classList.remove("hidden");
+				helpTitle.innerText = "What is an object? ";
+				helpBody.innerText = "Objects are the direct objects of the sentence.";
+				break;
+			case "OBJECTS":
+				Train.vm.trainingCategory("ACTORS");
+				helpTitle.innerText = "What is an actor? ";
+				helpBody.innerText = "Actors are often the indirect objects of the sentence.";
+				break;
+			case "ACTORS":
+				Train.vm.trainingCategory("TIMES");
+				helpTitle.innerText = "What are times? ";
+				helpBody.innerText = "Every Tuesday. Noon. Friday. Tomorrow. Etc.";
+				break;
+			case "TIMES":
+				Train.vm.trainingCategory("PLACES");
+				var btn = document.getElementById("continue-btn");
+				helpTitle.innerText = "What are places? ";
+				helpBody.innerText = "A place is any description of where an event should take place. Starbucks. Nearby. Etc.";
+				btn.innerText = "Save";
+				break;
+			case "PLACES":
+				if (btn.innerText !== "Saving...") {
+					Train.controller.trainer.save().then(function() {
+						Train.vm.saveComplete();
+					});
+					Train.vm.save();
+				}
+				return;
 		};
-		Train.vm.prevCategory = function() {
-			var el = document.getElementById("training-category");
-			switch (Train.vm.trainingCategory()) {
-				case "OBJECTS":
-					Train.vm.trainingCategory("COMMANDS");
-					var btn = document.getElementById("back-btn");
-					btn.classList.add("hidden");
-					break;
-				case "ACTORS":
-					Train.vm.trainingCategory("OBJECTS");
-					break;
-				case "TIMES":
-					Train.vm.trainingCategory("ACTORS");
-					break;
-				case "PLACES":
-					Train.vm.trainingCategory("TIMES");
-					var btn = document.getElementById("continue-btn");
-					btn.innerText = "Continue";
-					break;
-			};
-			el.innerText = Train.vm.trainingCategory();
-			el.className = Train.vm.categoryColor();
+		el.innerText = Train.vm.trainingCategory();
+		el.className = Train.vm.categoryColor();
+	},
+	prevCategory: function() {
+		var el = document.getElementById("training-category");
+		switch (Train.vm.trainingCategory()) {
+			case "OBJECTS":
+				Train.vm.trainingCategory("COMMANDS");
+				var btn = document.getElementById("back-btn");
+				btn.classList.add("hidden");
+				break;
+			case "ACTORS":
+				Train.vm.trainingCategory("OBJECTS");
+				break;
+			case "TIMES":
+				Train.vm.trainingCategory("ACTORS");
+				break;
+			case "PLACES":
+				Train.vm.trainingCategory("TIMES");
+				var btn = document.getElementById("continue-btn");
+				btn.innerText = "Continue";
+				break;
 		};
-		Train.vm.categoryColor = function() {
-			switch (Train.vm.trainingCategory()) {
-				case "COMMANDS":
-					return "red";
-				case "OBJECTS":
-					return "blue";
-				case "ACTORS":
-					return "green";
-				case "TIMES":
-					return "yellow";
-				case "PLACES":
-					return "pink";
-			};
+		el.innerText = Train.vm.trainingCategory();
+		el.className = Train.vm.categoryColor();
+	},
+	categoryColor: function() {
+		switch (Train.vm.trainingCategory()) {
+			case "COMMANDS":
+				return "red";
+			case "OBJECTS":
+				return "blue";
+			case "ACTORS":
+				return "green";
+			case "TIMES":
+				return "yellow";
+			case "PLACES":
+				return "pink";
 		};
+	},
+	save: function() {
+		var btn = document.getElementById("continue-btn");
+		btn.innerText = "Saving...";
+		btn = document.getElementById("back-btn");
+		btn.classList.add("hidden");
+	},
+	saveComplete: function() {
+		var btn = document.getElementById("continue-btn");
+		btn.innerText = "Thank you!";
 	}
 };
 

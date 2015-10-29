@@ -28,19 +28,17 @@ func aidedTrain(trainID int) error {
 	if err != nil {
 		return err
 	}
-	//var categorizationMasterQualID string
 	if os.Getenv("AVA_ENV") == "production" {
 		mt = mturk.New(auth, false)
-		//categorizationMasterQualID = "2NDP2L92HECWY8NS8H3CK0CP5L9GHO"
 	} else {
 		mt = mturk.New(auth, true)
-		//categorizationMasterQualID = "2F1KVCNHMVHV8E9PBUB2A4J79LU20F"
 	}
 	title := "Identify elements of a sentence."
 	desc := "Find and identify commands, objects, actors, times, and places in a sentence."
+	annotation := strconv.Itoa(trainID)
 	qxn := &mturk.ExternalQuestion{
-		ExternalURL: os.Getenv("BASE_URL") + "train",
-		FrameHeight: 700,
+		ExternalURL: os.Getenv("BASE_URL") + "?/train/" + annotation,
+		FrameHeight: 889,
 	}
 	reward := mturk.Price{
 		Amount:       "0.03",
@@ -50,21 +48,13 @@ func aidedTrain(trainID int) error {
 	lifetimeInSeconds := uint(31536000) // 365 days
 	keywords := "ava,machine,learning,language,speech,english,train"
 	maxAssignments := uint(1)
-	/*
-		qualReq := &mturk.QualificationRequirement{
-			QualificationTypeId: categorizationMasterQualID,
-			Comparator:          "Exists",
-			RequiredToPreview:   true,
-		}
-	*/
-	annotation := strconv.Itoa(trainID)
 	hit, err := mt.CreateHIT(title, desc, qxn, reward,
 		timelimitInSeconds, lifetimeInSeconds, keywords, maxAssignments,
 		nil, annotation)
 	if err != nil {
 		return err
 	}
-	log.Println("HIT %+v\n", hit)
+	log.Printf("HIT %+v\n", hit)
 	return nil
 }
 

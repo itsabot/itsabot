@@ -225,19 +225,31 @@ func handlerTwilio(c *echo.Context) error {
 }
 
 func handlerSentence(c *echo.Context) error {
-	q := `
-		SELECT id, sentence FROM trainings
-		WHERE trained=FALSE
-		ORDER BY createdat DESC`
+	var q string
 	var sent struct {
 		Id       int
 		Sentence string
 	}
-	err := db.Get(&sent, q)
-	if err != nil && err != sql.ErrNoRows {
-		return err
+	if len(c.Query("id")) > 0 {
+		q = `
+		SELECT id, sentence FROM trainings
+		WHERE trained=FALSE AND id=$1
+		ORDER BY createdat DESC`
+		err := db.Get(&sent, q, c.Query("id"))
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
+	} else {
+		q = `
+		SELECT id, sentence FROM trainings
+		WHERE trained=FALSE
+		ORDER BY createdat DESC`
+		err := db.Get(&sent, q)
+		if err != nil && err != sql.ErrNoRows {
+			return err
+		}
 	}
-	if err = c.JSON(http.StatusOK, sent); err != nil {
+	if err := c.JSON(http.StatusOK, sent); err != nil {
 		return err
 	}
 	return nil
