@@ -64,7 +64,7 @@ func aidedTrain(trainID int) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("HIT id", hit.HITId)
+	log.Println("HIT id", hit.HITId)
 	return nil
 }
 
