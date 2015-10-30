@@ -234,16 +234,12 @@ func handlerSentence(c *echo.Context) error {
 
 func handlerTrainSentence(c *echo.Context) error {
 	var data TrainingData
-	log.Println("HERE")
 	if err := c.Bind(&data); err != nil {
-		log.Println("HERE 2")
 		return err
 	}
-	log.Println("HERE 3")
 	if err := train(bayes, data.Sentence); err != nil {
 		return err
 	}
-	log.Println("HERE 4")
 	q := `UPDATE trainings SET trained=TRUE WHERE id=$1`
 	res, err := db.Exec(q, data.ID)
 	if err != nil {

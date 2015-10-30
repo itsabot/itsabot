@@ -143,7 +143,7 @@ Train.vm = {
 					Train.controller.trainer.save().then(function() {
 						Train.vm.saveComplete();
 						setTimeout(function() {
-							window.location.reload();
+							m.route("/train");
 						}, 2000);
 					});
 				}
