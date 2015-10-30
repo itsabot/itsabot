@@ -12,26 +12,36 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/egtann/goamz/exp/mturk"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/exp/mturk"
+	"github.com/avabot/ava/shared/datatypes"
 )
 
 var mt *mturk.MTurk
 
-func supervisedTrain(s string) error {
-	trainID, err := saveTrainingSentence(s)
+type TrainingData struct {
+	ID             int
+	ForeignID      string
+	AssignmentID   string
+	Sentence       string
+	MaxAssignments int
+}
+
+func supervisedTrain(in *datatypes.Input) error {
+	trainID, err := saveTrainingSentence(in.Sentence)
 	if err != nil {
 		return err
 	}
-	if err = aidedTrain(trainID); err != nil {
+	if err = aidedTrain(in, trainID); err != nil {
 		return err
 	}
 	return nil
 }
 
-func aidedTrain(trainID int) error {
+func aidedTrain(in *datatypes.Input, trainID int) error {
 	if err := loadMT(); err != nil {
 		return err
 	}
@@ -49,28 +59,78 @@ func aidedTrain(trainID int) error {
 	timelimitInSeconds := uint(300)
 	lifetimeInSeconds := uint(31536000) // 365 days
 	keywords := "ava,machine,learning,language,speech,english,train"
-	maxAssignments := uint(1)
-	hit, err := mt.CreateHIT(title, desc, qxn, reward,
-		timelimitInSeconds, lifetimeInSeconds, keywords, maxAssignments,
-		nil, annotation)
+	maxAssignments := uint(3)
+	hit, err := mt.CreateHIT(title, desc, qxn, reward, timelimitInSeconds,
+		lifetimeInSeconds, keywords, maxAssignments, nil, annotation)
 	if err != nil {
 		return err
 	}
-	if err = updateTraining(trainID, hit.HITId); err != nil {
+	if err = updateTraining(trainID, hit.HITId, maxAssignments); err != nil {
 		return err
 	}
 	return nil
 }
 
-func approveAssignment(foreignID, assignmentID string) error {
+func checkConsensus(data *TrainingData) error {
 	if err := loadMT(); err != nil {
 		return err
 	}
-	if len(assignmentID) == 0 || assignmentID == "ASSIGNMENT_ID_NOT_AVAILABLE" {
-		// Assignment was completed outside of MTurk
-		err := expireHIT(foreignID)
+	if len(data.AssignmentID) == 0 ||
+		data.AssignmentID == "ASSIGNMENT_ID_NOT_AVAILABLE" {
+		// assignment was completed outside of MTurk
+		return expireHIT(data.ForeignID)
+	}
+	as, err := mt.GetAssignmentsForHIT(data.ForeignID)
+	if err != nil {
 		return err
 	}
+	consensus, assignmentID, err := captchaConsensus(data.ID, as)
+	if err != nil {
+		return err
+	}
+	if consensus {
+		return approveAssignment(assignmentID, data)
+	}
+	if len(as) == 3 {
+		return expireHIT(data.ForeignID)
+	}
+	return nil
+}
+
+// captchaConsensus compares what's known against a submitted answer. If that
+// matches, we trust the full answer.
+func captchaConsensus(inputID int, as []mturk.Assignment) (bool, string, error) {
+	a := as[len(as)]
+	annotation, err := getInputAnnotation(inputID)
+	if err != nil {
+		return false, "", err
+	}
+	wordsAnswer := strings.Fields(a.Answer)
+	wordsKnown := strings.Fields(annotation)
+	if len(wordsAnswer) != len(wordsKnown) {
+		return false, "",
+			errors.New("answer wordcount doesn't match expectations")
+	}
+	for i := range wordsAnswer {
+		_, entityKnown, err := extractEntity(wordsKnown[i])
+		if err != nil {
+			return false, "", err
+		}
+		if entityKnown == Unsure {
+			continue
+		}
+		_, entityAnswer, err := extractEntity(wordsAnswer[i])
+		if err != nil {
+			return false, "", err
+		}
+		if entityKnown != entityAnswer {
+			return false, a.AssignmentId, nil
+		}
+	}
+	return true, a.AssignmentId, nil
+}
+
+func approveAssignment(assignmentID string, data *TrainingData) error {
 	var resp interface{}
 	service := "AWSMechanicalTurkRequester"
 	timestamp := time.Now().UTC().Format("2006-01-02T15:04:05Z")
@@ -156,7 +216,7 @@ func loadMT() error {
 	}
 	if mt == nil {
 		if os.Getenv("AVA_ENV") == "production" {
-			mt = mturk.New(auth, false)
+			mt = mturk.New(auth, true)
 		} else {
 			mt = mturk.New(auth, true)
 		}

@@ -50,13 +50,14 @@ const (
 )
 
 type Input struct {
-	ID              int
-	UserID          int
-	FlexID          string
-	FlexIDType      int
-	Sentence        string
-	ResponseID      int
-	StructuredInput *StructuredInput
+	ID                int
+	UserID            int
+	FlexID            string
+	FlexIDType        int
+	Sentence          string
+	SentenceAnnotated string
+	ResponseID        int
+	StructuredInput   *StructuredInput
 }
 
 func (j *jsonState) Scan(value interface{}) error {

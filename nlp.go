@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -21,6 +22,7 @@ const (
 	Time    bayesian.Class = "Time"
 	Place   bayesian.Class = "Place"
 	None    bayesian.Class = "None"
+	Unsure  bayesian.Class = "Unsure"
 )
 
 var (
@@ -52,7 +54,6 @@ func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	row := db.QueryRowx(q)
 	var tmp []byte
 	err = row.Scan(&tmp)
-	buf := bytes.NewBuffer(tmp)
 	if err == sql.ErrNoRows {
 		c, err = buildClassifier(c)
 		if err != nil {
@@ -63,6 +64,7 @@ func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 		log.Println("err getting classifier from DB")
 		return c, err
 	}
+	buf := bytes.NewBuffer(tmp)
 	c, err = bayesian.NewClassifierFromReader(buf)
 	if err != nil {
 		log.Println("err building new classifier from reader", err)
@@ -148,27 +150,31 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 
 // classify builds a StructuredInput from a sentence. The bool specifies whether
 // additional training is needed for that sentence.
-func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput, bool, error) {
+func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput,
+	string, bool, error) {
 	si := &datatypes.StructuredInput{}
 	if len(s) == 0 {
-		return si, false, ErrSentenceTooShort
+		return si, "", false, ErrSentenceTooShort
 	}
 	ws := strings.Fields(s)
 	var wc []datatypes.WordClass
 	var needsTraining bool
+	var annotation string
 	for i := range ws {
 		var err error
 		var tmp datatypes.WordClass
 		tmp, needsTraining, err = classifyTrigram(c, s, ws, i)
 		if err != nil {
-			return si, false, err
+			return si, "", false, err
 		}
 		wc = append(wc, tmp)
+		annotation += fmt.Sprintf("_%s(%s) ")
 	}
+	annotation = annotation[0 : len(annotation)-1]
 	if err := si.Add(wc); err != nil {
-		return si, false, err
+		return si, "", false, err
 	}
-	return si, needsTraining, nil
+	return si, annotation, needsTraining, nil
 }
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
@@ -274,6 +280,8 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 		return w[3:], Place, nil
 	case 'N':
 		return w[3:], None, nil
+	case '?':
+		return w[3:], Unsure, nil
 	}
 	return w, "", errors.New("syntax error in entity")
 }

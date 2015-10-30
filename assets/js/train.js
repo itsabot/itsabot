@@ -20,7 +20,8 @@ var Trainer = function() {
 			ID: Train.vm.state.id,
 			AssignmentID: Train.vm.state.assignmentId,
 			ForeignID: Train.vm.state.foreignId,
-			Sentence: sentence
+			Sentence: sentence,
+			MaxAssignments: Train.vm.state.maxAssignments
 		};
 		return m.request({
 			method: "PUT",
@@ -90,6 +91,7 @@ Train.vm = {
 		Train.vm.state.id = data.ID;
 		Train.vm.state.assignmentId = m.route.param("assignmentId");
 		Train.vm.state.foreignId = data.ForeignID;
+		Train.vm.state.maxAssignments = data.MaxAssignments;
 		Train.vm.words = [];
 		var words = data.Sentence.split(/\s+/);
 		for (var i = 0; i < words.length; ++i) {

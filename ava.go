@@ -208,7 +208,7 @@ func handlerSentence(c *echo.Context) error {
 	}
 	if len(c.Query("id")) > 0 {
 		q = `
-		SELECT id, foreignid, sentence FROM trainings
+		SELECT id, foreignid, sentence, maxassignments FROM trainings
 		WHERE trained=FALSE AND id=$1
 		ORDER BY createdat DESC`
 		err := db.Get(&sent, q, c.Query("id"))
@@ -217,7 +217,7 @@ func handlerSentence(c *echo.Context) error {
 		}
 	} else {
 		q = `
-		SELECT id, foreignid, sentence FROM trainings
+		SELECT id, foreignid, sentence, maxassignments FROM trainings
 		WHERE trained=FALSE
 		ORDER BY createdat DESC`
 		err := db.Get(&sent, q)
@@ -232,13 +232,8 @@ func handlerSentence(c *echo.Context) error {
 }
 
 func handlerTrainSentence(c *echo.Context) error {
-	var data struct {
-		ID           int
-		ForeignID    string
-		AssignmentID string
-		Sentence     string
-	}
-	if err := c.Bind(&data); err != nil {
+	var data *TrainingData
+	if err := c.Bind(data); err != nil {
 		return err
 	}
 	if err := train(bayes, data.Sentence); err != nil {
@@ -256,7 +251,7 @@ func handlerTrainSentence(c *echo.Context) error {
 	if num == 0 {
 		return sql.ErrNoRows
 	}
-	if err = approveAssignment(data.ForeignID, data.AssignmentID); err != nil {
+	if err = checkConsensus(data); err != nil {
 		return err
 	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
@@ -291,17 +286,18 @@ func processText(c *echo.Context) (string, error) {
 		}
 		return "", nil
 	}
-	si, needsTraining, err := classify(bayes, cmd)
+	si, annotated, needsTraining, err := classify(bayes, cmd)
 	if err != nil {
 		log.Println("classifying sentence ", err)
 	}
 	uid, fid, fidT := validateParams(c)
 	in := &datatypes.Input{
-		Sentence:        cmd,
-		StructuredInput: si,
-		UserID:          uid,
-		FlexID:          fid,
-		FlexIDType:      fidT,
+		Sentence:          cmd,
+		StructuredInput:   si,
+		UserID:            uid,
+		FlexID:            fid,
+		FlexIDType:        fidT,
+		SentenceAnnotated: annotated,
 	}
 	u, err := getUser(in)
 	if err == ErrMissingUser {
@@ -329,7 +325,7 @@ func processText(c *echo.Context) (string, error) {
 	}
 	if needsTraining {
 		log.Println("needed training")
-		if err = supervisedTrain(in.Sentence); err != nil {
+		if err = supervisedTrain(in); err != nil {
 			return ret.Sentence, err
 		}
 	}

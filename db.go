@@ -49,9 +49,9 @@ func saveTrainingSentence(s string) (int, error) {
 	return id, nil
 }
 
-func updateTraining(trainID int, hitID string) error {
-	q := `UPDATE trainings SET foreignid=$1 WHERE id=$2`
-	_, err := db.Exec(q, hitID, trainID)
+func updateTraining(trainID int, hitID string, maxAssignments uint) error {
+	q := `UPDATE trainings SET foreignid=$1, maxassignments=$2 WHERE id=$3`
+	_, err := db.Exec(q, hitID, maxAssignments, trainID)
 	if err != nil {
 		return err
 	}
@@ -83,19 +83,13 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 	return &u, nil
 }
 
-func getLastInput(in *datatypes.Input) (*datatypes.Input, error) {
-	var input *datatypes.Input
-	q := `SELECT (
-		userid, flexid, flexidtype, commands, objects, actors,
-		times, places, sentence, responseid, package, route) `
-	if in.UserID > 0 {
-		q += `WHERE userid=$1`
-		if err := db.Get(input, q, in.UserID); err != nil {
-			log.Println("err: ", err)
-			return input, err
-		}
+func getInputAnnotation(id int) (string, error) {
+	var annotation string
+	q := `SELECT sentenceannotated FROM inputs WHERE trainid=$1`
+	if err := db.Get(&annotation, q, id); err != nil {
+		return "", err
 	}
-	return input, nil
+	return annotation, nil
 }
 
 func getLastInputFromUser(u *datatypes.User) (*datatypes.StructuredInput,

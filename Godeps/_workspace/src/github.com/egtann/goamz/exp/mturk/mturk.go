@@ -17,13 +17,13 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
 	"net/http"
-	//"net/http/httputil"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
 )
 
 type MTurk struct {
@@ -265,7 +265,7 @@ type GetAssignmentsForHITResponse struct {
 		NumResults      uint
 		TotalNumResults uint
 		PageNumber      uint
-		Assignment      Assignment
+		Assignments     []Assignment `xml:Assignment`
 	}
 }
 
@@ -367,7 +367,6 @@ func (mt *MTurk) CreateHIT(
 	if requesterAnnotation != "" {
 		params["RequesterAnnotation"] = requesterAnnotation
 	}
-
 	var response CreateHITResponse
 	err = mt.query(params, "CreateHIT", &response)
 	if err == nil {
@@ -395,7 +394,6 @@ func (mt *MTurk) CreateHITOfType(hitTypeId string, q ExternalQuestion, lifetimeI
 	if requesterAnnotation != "" {
 		params["RequesterAnnotation"] = requesterAnnotation
 	}
-
 	var response CreateHITResponse
 	err = mt.query(params, "CreateHIT", &response)
 	if err == nil {
@@ -405,13 +403,13 @@ func (mt *MTurk) CreateHITOfType(hitTypeId string, q ExternalQuestion, lifetimeI
 }
 
 // Get the Assignments for a HIT.
-func (mt *MTurk) GetAssignmentsForHIT(hitId string) (r *Assignment, err error) {
+func (mt *MTurk) GetAssignmentsForHIT(hitId string) (r []Assignment, err error) {
 	params := make(map[string]string)
 	params["HITId"] = hitId
 	var response GetAssignmentsForHITResponse
 	err = mt.query(params, "GetAssignmentsForHIT", &response)
 	if err == nil {
-		r = &response.GetAssignmentsForHITResult.Assignment
+		r = response.GetAssignmentsForHITResult.Assignments
 	}
 	return
 }
@@ -451,7 +449,7 @@ func (mt *MTurk) query(params map[string]string, operation string, resp interfac
 		return err
 	}
 	//dump, _ := httputil.DumpResponse(r, true)
-	//println("DUMP:\n", string(dump))
+	//log.Println("DUMP:\n", string(dump))
 	if r.StatusCode != 200 {
 		return errors.New(fmt.Sprintf("%d: unexpected status code", r.StatusCode))
 	}
