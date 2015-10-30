@@ -331,6 +331,9 @@ func classifyTrigram(c *bayesian.Classifier, s string, ws []string, i int) (
 }
 
 func max(slice []float64) float64 {
+	if len(slice) == 0 {
+		return 0.0
+	}
 	m := slice[0]
 	for index := 1; index < len(slice); index++ {
 		if slice[index] > m {
