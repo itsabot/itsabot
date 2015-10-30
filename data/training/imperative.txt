@@ -1,0 +1,26 @@
+// README
+// Sentences are labeled according to the following
+// C = Command, O = Object, A = Actor, P = Place, T = Time, N = None
+
+// Basic commands
+_C(Order) _N(an) _O(Uber).
+_C(Get) _N(an) _O(Uber).
+_C(Call) _N(an) _O(Uber).
+_C(Ask) _N(a) _O(doctor).
+_C(Call) _O(her).
+_C(Order) _A(me) _N(an) _O(Uber).
+_C(Order) _O(an Uber) _N(for) _A(me).
+_C(Order) _O(an Uber) _N(for) _A(Sarah).
+_C(Buy) _A(him) _N(an) _O(iPhone).
+_C(Get) _A(Jim) _N(an) _O(Uber).
+_C(Get) _A(Jim) _O(2) _O(shirts).
+_N(an) _O(Uber)
+_C(Get) _A(me) _T(at) _T(noon).
+_C(Get) _A(me) _T(before) _T(noon).
+_C(Wake) _A(me) _N(up) _T(after) _T(12PM).
+_C(Wake) _A(me) _N(up) _T(after) _T(12AM).
+_C(Wake) _A(me) _N(up) _T(after) _T(1) _T(PM).
+_C(Wake) _A(me) _N(up) _T(after) _T(1) _T(AM).
+_C(Charge) _O(it) _N(to) _O(my) _O(card).
+_C(Charge) _O(it) _N(to) _O(my) _O(Amex).
+_N(Ava), _C(where) _N(are) _N(the) _O(best) _O(restaurants) _P(near) _A(me)?

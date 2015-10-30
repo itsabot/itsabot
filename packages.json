@@ -1,0 +1,11 @@
+{
+	"name": "ava",
+	"version": "0.0.1",
+	"dependencies": {
+		"yelp": "*",
+		"mechanic": "*",
+		"meeting": "*",
+		"wish": "*",
+		"onboard": "*"
+	}
+}
