@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 )
 
@@ -15,8 +14,6 @@ type packagesConf struct {
 	Version      string
 	Dependencies map[string]string
 }
-
-// TODO Fetches packages via package manager, puts them in the packages dir
 
 func bootDependencies() {
 	// TODO Inspect for errors
@@ -39,8 +36,9 @@ func bootDependencies() {
 	for name := range conf.Dependencies {
 		p := strconv.Itoa(port + i)
 		log.Println("booting package", name, p)
-		pth := path.Join("packages", name, name)
-		cmd := exec.Command(pth, "-port", p)
+		// NOTE assumes packages are installed with go install ./...,
+		// matching Heroku's Go buildpack
+		cmd := exec.Command(name, "-port", p)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err = cmd.Start(); err != nil {
