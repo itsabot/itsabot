@@ -58,6 +58,9 @@ func (si *StructuredInput) All() string {
 	if len(si.Places) > 0 {
 		s += strings.Join(si.Places, " ") + " "
 	}
+	if len(s) == 0 {
+		return s
+	}
 	return s[0 : len(s)-1]
 }
 
