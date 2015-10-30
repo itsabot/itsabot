@@ -233,9 +233,9 @@ func handlerSentence(c *echo.Context) error {
 }
 
 func handlerTrainSentence(c *echo.Context) error {
-	var data *TrainingData
+	var data TrainingData
 	log.Println("HERE")
-	if err := c.Bind(data); err != nil {
+	if err := c.Bind(&data); err != nil {
 		log.Println("HERE 2")
 		return err
 	}
@@ -256,7 +256,7 @@ func handlerTrainSentence(c *echo.Context) error {
 	if num == 0 {
 		return sql.ErrNoRows
 	}
-	if err = checkConsensus(data); err != nil {
+	if err = checkConsensus(&data); err != nil {
 		return err
 	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
