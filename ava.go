@@ -202,9 +202,10 @@ func handlerTwilio(c *echo.Context) error {
 func handlerSentence(c *echo.Context) error {
 	var q string
 	var sent struct {
-		ID        int
-		ForeignID string
-		Sentence  string
+		ID             int
+		ForeignID      string
+		Sentence       string
+		MaxAssignments int
 	}
 	if len(c.Query("id")) > 0 {
 		q = `
