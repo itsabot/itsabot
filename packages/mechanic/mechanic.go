@@ -64,7 +64,6 @@ func main() {
 			language.AutomotiveBrands(),
 		),
 	}
-	log.Println(trigger)
 	p, err := pkg.NewPackage("mechanic", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)

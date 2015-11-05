@@ -24,15 +24,15 @@
 			"Rev": "bca61c476e3c752594983e4c9bcd5f62fb09f157"
 		},
 		{
-			"ImportPath": "github.com/egtann/goamz/exp/mturk",
-			"Rev": "e7bb01507b4eaeb47ac407f34af3ec32e096baec"
-		},
-		{
 			"ImportPath": "github.com/garyburd/go-oauth/oauth",
 			"Rev": "3131beb69b81ff119923bdefbf029318f1f53794"
 		},
 		{
 			"ImportPath": "github.com/goamz/goamz/aws",
+			"Rev": "be371d06631a6ea076cccefc6654fa5c29be074d"
+		},
+		{
+			"ImportPath": "github.com/goamz/goamz/exp/mturk",
 			"Rev": "be371d06631a6ea076cccefc6654fa5c29be074d"
 		},
 		{

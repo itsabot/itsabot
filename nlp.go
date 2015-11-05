@@ -168,13 +168,38 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput,
 			return si, "", false, err
 		}
 		wc = append(wc, tmp)
-		annotation += fmt.Sprintf("_%s(%s) ")
+		sym, err := bayesIntToSymbol(tmp.Class)
+		if err != nil {
+			return si, "", false, err
+		}
+		annotation += fmt.Sprintf("_%s(%s) ", sym, ws[i])
 	}
 	annotation = annotation[0 : len(annotation)-1]
 	if err := si.Add(wc); err != nil {
 		return si, "", false, err
 	}
 	return si, annotation, needsTraining, nil
+}
+
+func bayesIntToSymbol(c int) (string, error) {
+	switch c {
+	case datatypes.CommandI:
+		return "C", nil
+	case datatypes.ActorI:
+		return "A", nil
+	case datatypes.ObjectI:
+		return "O", nil
+	case datatypes.TimeI:
+		return "T", nil
+	case datatypes.PlaceI:
+		return "P", nil
+	case datatypes.NoneI:
+		return "N", nil
+	case datatypes.UnsureI:
+		return "?", nil
+	default:
+		return "", errors.New("unrecognized class (converting to symbol)")
+	}
 }
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which

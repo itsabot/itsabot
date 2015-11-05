@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/egtann/goamz/exp/mturk"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/exp/mturk"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
@@ -31,7 +31,7 @@ type TrainingData struct {
 }
 
 func supervisedTrain(in *datatypes.Input) error {
-	trainID, err := saveTrainingSentence(in.Sentence)
+	trainID, err := saveTrainingSentence(in)
 	if err != nil {
 		return err
 	}
@@ -75,15 +75,19 @@ func checkConsensus(data *TrainingData) error {
 	if err := loadMT(); err != nil {
 		return err
 	}
-	if len(data.AssignmentID) == 0 ||
-		data.AssignmentID == "ASSIGNMENT_ID_NOT_AVAILABLE" {
-		// assignment was completed outside of MTurk
-		return expireHIT(data.ForeignID)
-	}
+	/*
+		if len(data.AssignmentID) == 0 ||
+			data.AssignmentID == "ASSIGNMENT_ID_NOT_AVAILABLE" {
+			// assignment was completed outside of MTurk
+			return expireHIT(data.ForeignID)
+		}
+	*/
+	log.Println(data.ForeignID)
 	as, err := mt.GetAssignmentsForHIT(data.ForeignID)
 	if err != nil {
 		return err
 	}
+	log.Printf("%+v\n", as)
 	consensus, assignmentID, err := captchaConsensus(data.ID, as)
 	if err != nil {
 		return err
@@ -91,21 +95,28 @@ func checkConsensus(data *TrainingData) error {
 	if consensus {
 		return approveAssignment(assignmentID, data)
 	}
-	if len(as) == 3 {
-		return expireHIT(data.ForeignID)
-	}
+	/*
+		if len(as) == 3 {
+			return expireHIT(data.ForeignID)
+		}
+	*/
 	return nil
 }
 
 // captchaConsensus compares what's known against a submitted answer. If that
 // matches, we trust the full answer.
-func captchaConsensus(inputID int, as []mturk.Assignment) (bool, string, error) {
-	a := as[len(as)]
+func captchaConsensus(inputID int, as *mturk.Assignment) (bool, string, error) {
+	/*
+		if len(as) == 0 {
+			return false, "", errors.New("no mturk assignments found")
+		}
+	*/
+	//a := as[len(as)]
 	annotation, err := getInputAnnotation(inputID)
 	if err != nil {
 		return false, "", err
 	}
-	wordsAnswer := strings.Fields(a.Answer)
+	wordsAnswer := strings.Fields(as.Answer)
 	wordsKnown := strings.Fields(annotation)
 	if len(wordsAnswer) != len(wordsKnown) {
 		return false, "",
@@ -124,10 +135,10 @@ func captchaConsensus(inputID int, as []mturk.Assignment) (bool, string, error) 
 			return false, "", err
 		}
 		if entityKnown != entityAnswer {
-			return false, a.AssignmentId, nil
+			return false, as.AssignmentId, nil
 		}
 	}
-	return true, a.AssignmentId, nil
+	return true, as.AssignmentId, nil
 }
 
 func approveAssignment(assignmentID string, data *TrainingData) error {

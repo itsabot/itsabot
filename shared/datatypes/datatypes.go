@@ -14,6 +14,7 @@ const (
 	TimeI
 	PlaceI
 	NoneI
+	UnsureI
 )
 
 const (

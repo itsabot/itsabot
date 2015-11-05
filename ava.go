@@ -210,8 +210,8 @@ func handlerSentence(c *echo.Context) error {
 	if len(c.Query("id")) > 0 {
 		q = `
 		SELECT id, foreignid, sentence, maxassignments FROM trainings
-		WHERE trained=FALSE AND id=$1
-		ORDER BY createdat DESC`
+		WHERE trainedcount<3 AND id=$1
+		OFFSET FLOOR(RANDOM() * (SELECT COUNT(*) FROM trainings WHERE trainedcount<3 AND id=$1))`
 		err := db.Get(&sent, q, c.Query("id"))
 		if err != nil && err != sql.ErrNoRows {
 			return err
@@ -219,8 +219,8 @@ func handlerSentence(c *echo.Context) error {
 	} else {
 		q = `
 		SELECT id, foreignid, sentence, maxassignments FROM trainings
-		WHERE trained=FALSE
-		ORDER BY createdat DESC`
+		WHERE trainedcount<3
+		OFFSET FLOOR(RANDOM() * (SELECT COUNT(*) FROM trainings WHERE trainedcount<3))`
 		err := db.Get(&sent, q)
 		if err != nil && err != sql.ErrNoRows {
 			return err
@@ -240,7 +240,7 @@ func handlerTrainSentence(c *echo.Context) error {
 	if err := train(bayes, data.Sentence); err != nil {
 		return err
 	}
-	q := `UPDATE trainings SET trained=TRUE WHERE id=$1`
+	q := `UPDATE trainings SET trainedcount=trainedcount+1 WHERE id=$1`
 	res, err := db.Exec(q, data.ID)
 	if err != nil {
 		return err
@@ -320,10 +320,11 @@ func processText(c *echo.Context) (string, error) {
 		ret.Sentence = language.Confused()
 	}
 	in.StructuredInput = si
-	err = saveStructuredInput(m, ret.ResponseID, pname, route)
+	id, err := saveStructuredInput(m, ret.ResponseID, pname, route)
 	if err != nil {
 		return ret.Sentence, err
 	}
+	in.ID = id
 	if needsTraining {
 		log.Println("needed training")
 		if err = supervisedTrain(in); err != nil {

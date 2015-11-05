@@ -14,13 +14,14 @@ var (
 )
 
 func saveStructuredInput(m *datatypes.Message, rid int, pkg,
-	route string) error {
+	route string) (int, error) {
 	q := `
 		INSERT INTO inputs (
 			userid,
 			flexid,
 			flexidtype,
 			sentence,
+			sentenceannotated,
 			commands,
 			objects,
 			actors,
@@ -29,21 +30,32 @@ func saveStructuredInput(m *datatypes.Message, rid int, pkg,
 			responseid,
 			package,
 			route
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		RETURNING id`
 	in := m.Input
 	si := in.StructuredInput
-	_, err := db.Exec(
-		q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence,
+	row := db.QueryRowx(
+		q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence, in.SentenceAnnotated,
 		si.Commands, si.Objects, si.Actors, si.Times, si.Places, rid,
 		pkg, route)
-	return err
+	var id int
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
-func saveTrainingSentence(s string) (int, error) {
+func saveTrainingSentence(in *datatypes.Input) (int, error) {
 	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
 	var id int
-	row := db.QueryRowx(q, s)
+	row := db.QueryRowx(q, in.Sentence)
 	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+	q = `UPDATE inputs SET trainingid=$1 WHERE id=$2`
+	log.Println("updating input", id, in.ID)
+	_, err := db.Exec(q, id, in.ID)
+	if err != nil {
 		return 0, err
 	}
 	return id, nil
@@ -85,7 +97,7 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 
 func getInputAnnotation(id int) (string, error) {
 	var annotation string
-	q := `SELECT sentenceannotated FROM inputs WHERE trainid=$1`
+	q := `SELECT sentenceannotated FROM inputs WHERE trainingid=$1`
 	if err := db.Get(&annotation, q, id); err != nil {
 		return "", err
 	}

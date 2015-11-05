@@ -29,15 +29,6 @@ var Trainer = function() {
 			data: data
 		});
 	};
-	this.skip = function(id) {
-		return m.request({
-			method: "GET",
-			url: "/api/sentence.json",
-			data: {
-				id: id
-			}
-		});
-	};
 };
 
 var Word = function(word) {
@@ -245,7 +236,9 @@ Train.viewFull = function() {
 			}, [
 				m("a", {
 					class: "btn",
-					onclick: Train.controller.trainer.skip
+					onclick: function() {
+						m.route("/train");
+					}
 				}, "Skip Sentence"),
 			]),
 			m("div", {
