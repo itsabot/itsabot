@@ -5,6 +5,9 @@ window.onload = function() {
 		"/": Index,
 		"/tour": Tour,
 		"/train": Train,
-		"/train/:sentenceID": Train
+		"/train/:sentenceID": Train,
+		"/profile": Profile,
+		"/signup": Signup,
+		"/login": Login
 	});
 };

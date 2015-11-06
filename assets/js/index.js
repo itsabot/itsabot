@@ -47,7 +47,11 @@ Index.view = function() {
 							}, "Tour"),
 							m("a", {
 								href: "https://medium.com/ava-updates/latest"
-							}, "Updates")
+							}, "Updates"),
+							m("a", {
+								href: "/login",
+								config: m.route
+							}, "Log in")
 						])
 					])
 				]),

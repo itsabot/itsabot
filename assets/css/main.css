@@ -1,25 +1,33 @@
 body {
-	font-family: 'PT Serif', serif;
 	height: 100%;
 	position: relative;
+}
+p {
+	font-family: 'PT Serif', serif;
 }
 h1,
 h2,
 h3,
 h4,
-a.btn {
+label,
+.btn {
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 	font-weight: 700;
 }
-a.btn.btn-green {
+.btn.btn-green {
 	color: white;
-	background-color: #3CA773;
-	border: 1px solid #3CA773;
+	background-color: #3CA773 !important;
+	border: 1px solid #3CA773 !important;
 }
-a.btn.btn-green:hover {
+.btn.btn-green:hover {
 	color: white;
-	background-color: #81CF89;
-	border: 1px solid #81CF89;
+	background-color: #81CF89 !important;
+	border: 1px solid #81CF89 !important;
+}
+.btn.btn-sm {
+	letter-spacing: 5px;
+	border-radius: 20px;
+	padding: 1em 1.5em;
 }
 .gradient {
 	/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#3023ae+0,6747a6+100 */
@@ -133,18 +141,20 @@ footer .de-emphasized a {
 	position: relative;
 	top: -0.25em;
 }
-a.btn {
+.btn {
 	text-transform: uppercase;
 	color: #333;
 	border: 1px solid #979797;
 	border-radius: 40px;
 	padding: 1em 3.5em;
 	letter-spacing: 8px;
+	background-color: white;
 }
-.gradient a.btn {
+.gradient .btn {
 	color: white;
+	background-color: transparent;
 }
-.jumbo a.btn {
+.jumbo .btn {
 	letter-spacing: 4px;
 	padding: 1em 2em;
 }
@@ -153,20 +163,20 @@ a.btn {
 	margin-bottom: 1em;
 	margin-right: 0;
 }
-a.btn:hover {
+.btn:hover {
 	color: #838D8F;
 }
-a.btn-primary {
+.btn-primary {
 	border: none;
 	color: white;
 	background-color: #277CEA;
 }
-a.btn-primary:hover {
+.btn-primary:hover {
 	color: white;
 	background-color: #277CEA;
 	opacity: 0.7;
 }
-a.btn-lg {
+.btn-lg {
 	padding: 1.5em 3.5em;
 	margin-left: 1.5em;
 }
@@ -229,6 +239,9 @@ a.bold {
 	font-weight: 700;
 	color: #AAA;
 }
+.btn.btn-collection {
+	margin-left: 0.5em;
+}
 .margin-top-xs {
 	margin-top: 0.5em;
 }
@@ -250,6 +263,15 @@ a.bold {
 }
 .icon-sm {
 	width: 60px;
+}
+.icon-xs {
+	width: 15px;
+}
+.icon-delete {
+	opacity: 0.2;
+}
+.icon-delete:hover {
+	opacity: 1;
 }
 h2.heading {
 	margin-top: 0;
@@ -303,11 +325,6 @@ span.heading {
 .jumbo .btn {
 	margin-right: 2em;
 }
-@media (max-width: 992px) {
-	.img-big {
-		display: none;
-	}
-}
 .fade {
 	-webkit-transition: opacity .4s ease-in-out;
 	-moz-transition: opacity .4s ease-in-out;
@@ -328,4 +345,33 @@ span.heading {
 	margin: 0.8em auto 0;
 	max-width: 100%;
 	max-height: 50px;
+}
+.center {
+	margin-left: auto;
+	margin-right: auto;
+	display: block;
+}
+input.form-control {
+	color: #888;
+	background-color: #EEE;
+	border: 1px solid #E8E8E8;
+	border-top: 1px solid #DDD;
+}
+a,
+div,
+span,
+input.form-control {
+	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+@media (max-width: 992px) {
+	.img-big {
+		display: none;
+	}
+}
+@media (min-width: 992px) {
+	.card {
+		padding: 1em;
+		border-radius: 10px;
+		border: 1px solid #EEE;
+	}
 }

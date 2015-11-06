@@ -1,6 +1,6 @@
 var Trainer = function() {
-	this.id = m.prop(0);
-	this.sentence = function(id) {
+	Trainer.id = m.prop(0);
+	Trainer.sentence = function(id) {
 		var url = "/api/sentence.json";
 		if (id !== undefined) {
 			url += "?id=" + id;
@@ -10,7 +10,7 @@ var Trainer = function() {
 			url: url
 		})
 	};
-	this.save = function() {
+	Trainer.save = function() {
 		var sentence = "";
 		for (var i = 0; i < Train.vm.words.length; ++i) {
 			var word = Train.vm.words[i];
@@ -33,29 +33,29 @@ var Trainer = function() {
 
 var Word = function(word) {
 	var _this = this;
-	this.value = m.prop(word);
-	this.type = m.prop("_N(" + _this.value() + ")");
-	this.setClass = function() {
-		if (this.classList.length > 0) {
+	Word.value = m.prop(word);
+	Word.type = m.prop("_N(" + _this.value() + ")");
+	Word.setClass = function() {
+		if (Word.classList.length > 0) {
 			_this.type("_N(" + _this.value() + ")");
-			return this.className = "";
+			return Word.className = "";
 		}
 		switch (Train.vm.trainingCategory()) {
 			case "COMMANDS":
 				_this.type("_C(" + _this.value() + ")");
-				return this.classList.add("red");
+				return Word.classList.add("red");
 			case "OBJECTS":
 				_this.type("_O(" + _this.value() + ")");
-				return this.classList.add("blue");
+				return Word.classList.add("blue");
 			case "ACTORS":
 				_this.type("_A(" + _this.value() + ")");
-				return this.classList.add("green");
+				return Word.classList.add("green");
 			case "TIMES":
 				_this.type("_T(" + _this.value() + ")");
-				return this.classList.add("yellow");
+				return Word.classList.add("yellow");
 			case "PLACES":
 				_this.type("_P(" + _this.value() + ")");
-				return this.classList.add("pink");
+				return Word.classList.add("pink");
 			default:
 				console.error(
 					"invalid training state: " +
