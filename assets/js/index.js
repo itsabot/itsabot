@@ -48,10 +48,18 @@ Index.view = function() {
 							m("a", {
 								href: "https://medium.com/ava-updates/latest"
 							}, "Updates"),
-							m("a", {
-								href: "/login",
-								config: m.route
-							}, "Log in")
+							function() {
+								if (cookie.getItem("id") !== null) {
+									return m("a", {
+										href: "/profile",
+										config: m.route
+									}, "Profile")
+								}
+								return m("a", {
+									href: "/login",
+									config: m.route
+								}, "Log in")
+							}()
 						])
 					])
 				]),

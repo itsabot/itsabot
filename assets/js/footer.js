@@ -11,7 +11,7 @@ var Footer = {
 					class: "row"
 				}, [
 					m("div", {
-						class: "col-sm-3 border-right"
+						class: "col-md-3 border-right"
 					}, [
 						m("div", {
 							class: "big-name"
@@ -25,7 +25,7 @@ var Footer = {
 						m("div", "All rights reserved.")
 					]),
 					m("div", {
-						class: "col-sm-2"
+						class: "col-md-2"
 					}, [
 						m("div", m("a", {
 							href: "/",
@@ -65,7 +65,7 @@ var Footer = {
 						])
 					]),
 					m("div", {
-						class: "col-sm-7 de-emphasized"
+						class: "col-md-7 de-emphasized"
 					}, [
 						m("div", [
 							m("a", {

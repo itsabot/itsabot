@@ -11,23 +11,20 @@ var Login = {
 			},
 			url: "/api/login.json"
 		}).then(function(data) {
-			var addDays = function(days) {
-				var result = new Date();
-				result.setDate(result.getDate() + days);
-				return result;
+			var date = new Date();
+			var exp = date.setDate(date + 30);
+			var secure = true;
+			if (window.location.hostname === "localhost") {
+				secure = false;
 			}
-			var exp = new Date().setDate(date + 30).toUTCString();
-			cookie.setItem("id", data.Id, exp, null, null, true);
-			cookie.setItem("session_token", data.SessionToken, exp, null, null, true);
+			cookie.setItem("id", data.Id, exp, null, null, secure);
+			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
+			m.route("/profile");
 		}, function(err) {
 			Login.controller.error(err.Msg);
 		});
 	},
 	checkAuth: function(callback) {
-		// TODO
-		console.warn("Login.checkAuth not implemented");
-		console.log(cookie.getItem("id"));
-		console.log(cookie.getItem("session_token"));
 		if (cookie.getItem("id") !== null) {
 			callback(true);
 		}

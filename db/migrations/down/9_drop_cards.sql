@@ -1,2 +1,2 @@
 DROP TABLE cards;
-ALTER TABLE users DROP COLUMN stripeid;
+ALTER TABLE users DROP COLUMN stripecustomerid;

@@ -114,7 +114,7 @@ footer {
 	position: absolute;
 	bottom: 0;
 	width: 100%;
-	height: 220px;
+	min-height: 220px;
 	padding: 3em 0;
 	background-color: #3C3D41;
 	color: #999;
@@ -362,6 +362,9 @@ div,
 span,
 input.form-control {
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+.table>tbody>tr>td {
+	border: none;
 }
 @media (max-width: 992px) {
 	.img-big {
