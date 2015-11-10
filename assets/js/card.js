@@ -1,7 +1,76 @@
-var Card = function() {
-	this.id = m.prop(0);
-	this.last4 = m.prop(0);
-	this.expMonth = m.prop("00");
-	this.expYear = m.prop("0000");
-	this.brand = m.prop("");
+var Card = function(data) {
+	var _this = this;
+	data = data || {};
+	_this.id = m.prop(data.id || 0);
+	_this.cardholderName = m.prop(data.cardholderName || "");
+	_this.number = m.prop(data.number || "");
+	_this.brand = m.prop("");
+	if (data.expMonth != null && data.expYear != null) {
+		_this.expiry = m.prop(data.expMonth + " / " + data.expYear);
+	} else {
+		_this.expiry = m.prop(data.expiry || "");
+	}
+	_this.cvc = m.prop(data.cvc || "");
+	_this.last4 = m.prop(data.last4 || "");
+	_this.save = function() {
+		var deferred = m.deferred();
+		saveStripe().then(function(resp) {
+			_this.brand(resp.card.brand);
+			var data = {
+				UserID: parseInt(cookie.getItem("id")),
+				StripeID: resp.card.id,
+				CardholderName: resp.card.name,
+				ExpMonth: resp.card.exp_month,
+				ExpYear: resp.card.exp_year,
+				Brand: _this.brand(),
+				Last4: resp.card.last4
+			};
+			m.request({
+				method: "POST",
+				url: "/api/cards.json",
+				data: data
+			}).then(function(data) {
+				deferred.resolve(data);
+			}, function(err) {
+				deferred.reject(new Error(err.Msg));
+			});
+		}, function(err) {
+			deferred.reject(err);
+		});
+		return deferred.promise;
+	};
+	var saveStripe = function() {
+		var deferred = m.deferred();
+		Stripe.card.createToken({
+			customer: cookie.getItem("customer_id"),
+			number: _this.number(),
+			cvc: _this.cvc(),
+			exp: _this.expiry(),
+			name: _this.cardholderName()
+		}, function(status, response) {
+			if (response.error) {
+				return deferred.reject(new Error(response.error.message));
+			}
+			deferred.resolve(response);
+		});
+		return deferred.promise;
+	};
+};
+
+Card.brandIcon = function(brand) {
+	var icon;
+	console.log("brand: " + brand);
+	switch(brand) {
+	case "American Express", "Diners", "Discover", "JCB", "Maestro",
+		"MasterCard", "PayPal", "Visa":
+		var imgPath = brand.toLowerCase().replace(" ", "_");
+		imgPath = "card_" + imgPath + ".svg";
+		imgPath = "/public/images/" + imgPath;
+		icon = m("img", { src: imgPath, class: "icon-fit" });
+		break;
+	default:
+		icon = m("span", brand);
+		break;
+	}
+	return icon;
 };

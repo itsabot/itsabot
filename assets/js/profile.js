@@ -12,45 +12,40 @@ var Profile = {
 		});
 	}
 };
-Profile.vm = function() {
-	var userId = cookie.getItem("id");
-	Profile.data(userId).then(function(data) {
-		Profile.controller.email(data.Email);
-		Profile.controller.username(data.Name);
-		Profile.controller.phoneList.userId(userId);
-		Profile.controller.phoneList.data(data.Phones);
-		Profile.controller.phoneList.showAdd(false);
-		Profile.controller.phoneList.type("phones");
-		Profile.controller.cards.userId(userId);
-		Profile.controller.cards.data(data.Cards);
-		Profile.controller.cards.showAdd(true);
-		Profile.controller.cards.type("cards");
-	}, function(err) {
-		console.log(err);
-	});
-};
+
 Profile.controller = function() {
-	console.log(Profile.controller.name);
 	if (cookie.getItem("id") === null) {
 		return m.route("/login");
 	}
-	Profile.controller.username = m.prop("");
-	Profile.controller.email = m.prop("");
-	Profile.controller.phoneList = new List();
-	Profile.controller.cards = new List();
-	Profile.vm();
+	var _this = this;
+	_this.username = m.prop("");
+	_this.email = m.prop("");
+	_this.phones = new List({type: Phone});
+	_this.cards = new List({type: Card});
+	var userId = cookie.getItem("id");
+	Profile.data(userId).then(function(data) {
+		_this.email(data.Email);
+		_this.username(data.Name);
+		_this.phones.userId(userId);
+		_this.phones.data(data.Phones);
+		_this.cards.userId(userId);
+		_this.cards.data(data.Cards);
+	}, function(err) {
+		console.error(err);
+	});
 };
-Profile.view = function() {
+
+Profile.view = function(controller) {
 	return m("div", {
 		class: "body"
 	}, [
 		header.view(),
-		Profile.viewFull(),
+		Profile.viewFull(controller),
 		Footer.view()
 	]);
 };
 
-Profile.viewFull = function() {
+Profile.viewFull = function(controller) {
 	return m("div", {
 		id: "full",
 		class: "container"
@@ -82,7 +77,7 @@ Profile.viewFull = function() {
 						}, [
 							m("label", "Username"),
 							m("div", [
-								m("div", Profile.controller.email())
+								m("div", controller.email())
 							])
 						]),
 						m("div", {
@@ -106,7 +101,7 @@ Profile.viewFull = function() {
 									id: "username",
 									type: "text",
 									class: "form-control",
-									value: Profile.controller.username()
+									value: controller.username()
 								})
 							])
 						]),
@@ -129,7 +124,7 @@ Profile.viewFull = function() {
 						class: "form-group card"
 					}, [
 						m("div", [
-							Profile.controller.phoneList.view()
+							controller.phones.view()
 						])
 					]),
 					m("h3", {
@@ -139,7 +134,15 @@ Profile.viewFull = function() {
 						class: "form-group card"
 					}, [
 						m("div", [
-							Profile.controller.cards.view()
+							controller.cards.view(),
+							m("div", [
+								m("a", {
+									id: controller.cards.id + "-add-btn",
+									class: "btn btn-sm",
+									href: "/cards/new",
+									config: m.route
+								}, "+Add Card")
+							])
 						])
 					])
 				])

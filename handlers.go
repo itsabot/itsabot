@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -34,6 +35,7 @@ func initRoutes(e *echo.Echo) {
 	// API routes
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
+	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Get("/api/sentence.json", handlerAPISentence)
 	e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
@@ -46,23 +48,15 @@ func handlerIndex(c *echo.Context) error {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	tmplIndex, err := template.ParseFiles("assets/html/index.html")
-	if err != nil {
-		log.Fatalln(err)
-	}
 	var s []byte
 	b := bytes.NewBuffer(s)
 	data := struct {
 		StripeKey string
 	}{StripeKey: os.Getenv("STRIPE_PUBLIC_KEY")}
-	if err := tmplIndex.Execute(b, data); err != nil {
+	if err := tmplLayout.Execute(b, data); err != nil {
 		log.Fatalln(err)
 	}
-	b2 := bytes.NewBuffer(s)
-	if err := tmplLayout.Execute(b2, b); err != nil {
-		log.Fatalln(err)
-	}
-	if err = c.HTML(http.StatusOK, "%s", b2); err != nil {
+	if err = c.HTML(http.StatusOK, "%s", b); err != nil {
 		return err
 	}
 	return nil
@@ -167,8 +161,9 @@ func handlerMain(c *echo.Context) error {
 
 func handlerAPILoginSubmit(c *echo.Context) error {
 	var u struct {
-		Id       int
-		Password []byte
+		Id               int
+		Password         []byte
+		StripeCustomerId string
 	}
 	var req struct {
 		Email    string
@@ -177,11 +172,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return jsonError(err)
 	}
-	q := `SELECT id, password FROM users WHERE email=$1`
-	resp := struct {
-		Id           int
-		SessionToken string
-	}{}
+	q := `SELECT id, password, stripecustomerid FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		return jsonError(ErrInvalidUserPass)
@@ -198,12 +189,15 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	} else if err != nil {
 		return jsonError(err)
 	}
-	resp.Id = u.Id
-	tmp := uuid.NewV4()
-	if err != nil {
-		return jsonError(err)
+	var resp struct {
+		Id           int
+		SessionToken string
+		CustomerId   string
 	}
-	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp.Bytes())
+	resp.Id = u.Id
+	resp.CustomerId = u.StripeCustomerId
+	tmp := uuid.NewV4().Bytes()
+	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return jsonError(err)
@@ -243,7 +237,14 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	customerParams := &stripe.CustomerParams{Email: req.Email}
 	cust, err := customer.New(customerParams)
 	if err != nil {
-		return jsonError(err)
+		var js struct {
+			Message string
+		}
+		err = json.Unmarshal([]byte(err.Error()), &js)
+		if err != nil {
+			return jsonError(err)
+		}
+		return jsonError(errors.New(js.Message))
 	}
 	tx, err := db.Beginx()
 	if err != nil {
@@ -276,12 +277,17 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return jsonError(errors.New(
 			"Something went wrong. Please try again."))
 	}
-	resp := struct {
+	var resp struct {
 		Id           int
+		CustomerId   string
 		SessionToken string
-	}{}
-	tmp := uuid.NewV4()
-	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp.Bytes())
+	}
+	q = `SELECT stripecustomerid FROM users WHERE id=$1`
+	if err = db.Get(&resp.CustomerId, q, uid); err != nil {
+		return jsonError(err)
+	}
+	tmp := uuid.NewV4().Bytes()
+	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return jsonError(err)
@@ -302,11 +308,12 @@ func handlerAPIProfile(c *echo.Context) error {
 			Number string `db:"flexid"`
 		}
 		Cards []struct {
-			Id       int
-			Last4    string
-			ExpMonth string `db:"expmonth"`
-			ExpYear  string `db:"expyear"`
-			Brand    string
+			Id             int
+			CardholderName string
+			Last4          string
+			ExpMonth       string `db:"expmonth"`
+			ExpYear        string `db:"expyear"`
+			Brand          string
 		}
 		Addresses []struct {
 			Id      int
@@ -333,7 +340,7 @@ func handlerAPIProfile(c *echo.Context) error {
 		return jsonError(err)
 	}
 	q = `
-		SELECT id, name, last4, expmonth, expyear, brand
+		SELECT id, cardholdername, last4, expmonth, expyear, brand
 		FROM cards
 		WHERE userid=$1
 		LIMIT 10`
@@ -362,35 +369,35 @@ func handlerAPICardSubmit(c *echo.Context) error {
 		CardholderName string
 		Last4          string
 		Brand          string
-		Fingerprint    string
 		ExpMonth       int
 		ExpYear        int
 		UserID         int
 	}
 	if err := c.Bind(&req); err != nil {
-		return err
+		return jsonError(err)
 	}
-	var cid struct{ ID int }
+	var card struct{ ID int }
 	q := `
 		INSERT INTO cards
 		(userid, last4, cardholdername, expmonth, expyear, brand,
-			stripeid, fingerprint)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			stripeid)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id`
-	err := db.QueryRowx(q, req.UserID, req.Last4, req.CardholderName,
-		req.ExpMonth, req.ExpYear, req.Brand, req.StripeID,
-		req.Fingerprint).Scan(&cid.ID)
+	row := db.QueryRowx(q, req.UserID, req.Last4, req.CardholderName,
+		req.ExpMonth, req.ExpYear, req.Brand, req.StripeID)
+	err := row.Scan(&card.ID)
 	if err != nil {
 		return jsonError(err)
 	}
-	if err = c.JSON(http.StatusOK, cid); err != nil {
+	if err = c.JSON(http.StatusOK, card); err != nil {
 		return jsonError(err)
 	}
 	return nil
 }
 
 func jsonError(err error) error {
-	return errors.New(`{"Msg":"` + err.Error() + `"}`)
+	tmp := strings.Replace(err.Error(), `"`, "'", -1)
+	return errors.New(`{"Msg":"` + tmp + `"}`)
 }
 
 func validatePhone(s string) error {

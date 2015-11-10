@@ -18,6 +18,7 @@ var Login = {
 				secure = false;
 			}
 			cookie.setItem("id", data.Id, exp, null, null, secure);
+			cookie.setItem("customer_id", data.CustomerId, exp, null, null, false);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
 			m.route("/profile");
 		}, function(err) {

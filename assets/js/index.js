@@ -17,7 +17,7 @@ Index.view = function() {
 			class: "gradient gradient-big gradient-bright"
 		}, [
 			m("div", {
-				class: "row row-jumbo"
+				class: "jumbo-container"
 			}, [
 				m("header", [
 					m("div", {

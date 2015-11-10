@@ -158,7 +158,7 @@ footer .de-emphasized a {
 	letter-spacing: 4px;
 	padding: 1em 2em;
 }
-.row.row-jumbo {
+.jumbo-container {
 	height: 650px;
 	margin-bottom: 1em;
 	margin-right: 0;
@@ -264,6 +264,9 @@ a.bold {
 .icon-sm {
 	width: 60px;
 }
+.icon-fit {
+	width: 100%;
+}
 .icon-xs {
 	width: 15px;
 }
@@ -365,6 +368,10 @@ input.form-control {
 }
 .table>tbody>tr>td {
 	border: none;
+}
+.subtle {
+	font-style: italic;
+	color: #AAA;
 }
 @media (max-width: 992px) {
 	.img-big {

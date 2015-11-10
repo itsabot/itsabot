@@ -20,6 +20,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
+	"github.com/stripe/stripe-go"
 )
 
 var db *sqlx.DB
@@ -82,6 +83,7 @@ func startServer(port string) {
 	bootRPCServer(port)
 	bootTwilio()
 	bootDependencies()
+	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()
 	initRoutes(e)
 	log.Println("booted ava")

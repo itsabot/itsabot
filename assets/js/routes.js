@@ -6,8 +6,9 @@ window.onload = function() {
 		"/tour": Tour,
 		"/train": Train,
 		"/train/:sentenceID": Train,
-		"/profile": Profile,
 		"/signup": Signup,
-		"/login": Login
+		"/login": Login,
+		"/profile": Profile,
+		"/cards/new": Card
 	});
 };

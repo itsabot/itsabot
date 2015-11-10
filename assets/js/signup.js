@@ -18,11 +18,11 @@ var Signup = {
 			var date = new Date();
 			var exp = date.setDate(date + 30);
 			cookie.setItem("id", data.Id, exp, null, null, false);
+			cookie.setItem("customer_id", data.CustomerId, exp, null, null, false);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, false);
 			m.route("/profile");
 		}, function(err) {
 			Signup.controller.error(err.Msg);
-			console.log(document.getElementById("phone"));
 		});
 	}
 };
