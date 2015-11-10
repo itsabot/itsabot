@@ -17,10 +17,10 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/stripe/stripe-go"
 )
 
 var db *sqlx.DB

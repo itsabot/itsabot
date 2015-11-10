@@ -61,6 +61,15 @@
 			"Rev": "835d5eb08da4541f26181e6958d7400da769e44b"
 		},
 		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "6b8e5b55d20d01ad47ecfe98e5171688397c61e9"
+		},
+		{
+			"ImportPath": "github.com/stripe/stripe-go",
+			"Comment": "v8.0.0-28-g6eefb50",
+			"Rev": "6eefb50a2eb3a55110c5df73a031c99898541c8c"
+		},
+		{
 			"ImportPath": "github.com/subosito/figo",
 			"Rev": "4f2709582c104a76b1ef6c24d47a682ec1b085c3"
 		},

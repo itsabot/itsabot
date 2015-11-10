@@ -15,10 +15,10 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/satori/go.uuid"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
-	"github.com/satori/go.uuid"
-	"github.com/stripe/stripe-go"
-	"github.com/stripe/stripe-go/customer"
 )
 
 func initRoutes(e *echo.Echo) {
