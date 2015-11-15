@@ -10,6 +10,13 @@ var Profile = {
 			method: "GET",
 			url: "/api/profile.json?uid=" + uid
 		});
+	},
+	sendView: function(uid) {
+		return m.request({
+			method: "PUT",
+			url: "/api/profile.json",
+			data: { UserID: uid }
+		});
 	}
 };
 
@@ -33,6 +40,7 @@ Profile.controller = function() {
 	}, function(err) {
 		console.error(err);
 	});
+	Profile.sendView(userId);
 };
 
 Profile.view = function(controller) {

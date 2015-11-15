@@ -164,6 +164,24 @@ func SuggestedPlace(s string) string {
 	return ""
 }
 
+func SuggestedProduct(s string) string {
+	n := rand.Intn(5)
+	switch n {
+	case 0:
+		return "I found just the thing. " + s
+	case 1:
+		return "This is the one for you. " + s
+	case 2:
+		return "You'll love this. " + s
+	case 3:
+		return "This is a real treat. " + s
+	case 4:
+		return "This will amaze you. " + s
+	}
+	log.Println("suggestedProduct failed to return a response")
+	return ""
+}
+
 // TODO: Extend
 func Foods() []string {
 	return []string{
@@ -304,6 +322,17 @@ func Broken() []string {
 		"stop",
 		"stopped",
 		"stopping",
+	}
+}
+
+func Purchase() []string {
+	return []string{
+		"find",
+		"buy",
+		"purchase",
+		"recommend",
+		"recommendation",
+		"recommendations",
 	}
 }
 

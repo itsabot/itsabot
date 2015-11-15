@@ -1,12 +1,19 @@
 package auth
 
-import "errors"
+import (
+	"regexp"
+	"time"
+
+	"github.com/avabot/ava/shared/datatypes"
+)
 
 // Method allows you as the package developer to control the level of security
 // required in an authentication. Select an appropriate security level depending
 // upon your risk tolerance for fraud compared against the quality and ease of
 // the user experience.
 type Method int
+
+var regexNum = regexp.MustCompile(`\d+`)
 
 const (
 	// MethodCVV will require the CVV (3-4 digit security code) for a credit
@@ -41,16 +48,55 @@ const (
 // authentication method, whereas MethodZip will only allow MethodZip and above.
 // Ava will IMPROVE the quality of the authentication automatically whenever
 // possible, selecting the highest authentication method for which the user has
-// recently authenticated. Force will demand a new authentication using the
-// current method. Force is useful for large purchases (generally >= $1k), but
-// will annoy users and therefore should be avoided on smaller transactions.
-func Authenticate(m Method, force bool) error {
+// recently authenticated. Note that you'll never have to call Authenticate in a
+// Purchase flow. In order to drive a customer purchase, call Purchase directly,
+// which will also authenticate the user.
+func Authenticate(m Method, u *datatypes.User) (bool, error) {
+	// check last authentication date and method
+	if err := u.GetLastAuthentication(); err != nil {
+		return false, err
+	}
+	yesterday := time.Now().Add(time.Duration(time.Hour) * -24)
+	if u.LastAuthenticated != nil && u.LastAuthenticated.After(yesterday) {
+	}
+	authenticated, method, err := getLastAuthentication()
+	if err != nil {
+		return false, err
+	}
+	if authenticated && int(method) >= int(m) {
+		return true, nil
+	}
 	switch m {
 	case MethodCVV:
-
+		cards, err := getCards()
+		if err != nil {
+			return err
+		}
+		t := "Please confirm a card's security code (CVC)"
+		// send user confirmation text
+		// handle response
 	case MethodZip:
+		cards, err := getCards()
+		if err != nil {
+			return err
+		}
+		t := "Please confirm your billing zip code"
 	case MethodWebCache:
+		t := "Please prove you're logged in: https://www.avabot.com/?/profile"
 	case MethodWebLogin:
+		if err := deleteUserSession(); err != nil {
+			return err
+		}
+		t := "Please log in to prove it's you: https://www.avabot.com/?/login"
 	}
-	return errors.New("not implemented")
+	return false, nil
+}
+
+// Purchase will authenticate the user and then charge a card.
+func Purchase(m Method, price uint64, card *datatypes.Card) error {
+	if err := Authenticate(m); err != nil {
+		return err
+	}
+
+	return nil
 }

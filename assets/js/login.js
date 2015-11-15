@@ -33,8 +33,8 @@ var Login = {
 };
 
 Login.controller = function() {
-	Login.checkAuth(function(cb) {
-		if (cb) {
+	Login.checkAuth(function(loggedIn) {
+		if (loggedIn) {
 			return m.route("/profile");
 		}
 	});
