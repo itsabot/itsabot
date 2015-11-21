@@ -14,6 +14,7 @@ import (
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
+	"github.com/avabot/ava/shared/search"
 )
 
 type Purchase string
@@ -108,13 +109,13 @@ func (t *Purchase) FollowUp(m *datatypes.Message,
 
 	// if purchase has not been made, do we have all data we need to make a
 	// purchase?
-	complete, err := updateState()
+	complete, err := updateState(m, resp, respMsg)
 	if err != nil {
 		return err
 	}
 	// if not, collect all of the necessary data
 	for !complete {
-		complete, err = updateState()
+		complete, err = updateState(m, resp, respMsg)
 		if err != nil {
 			return err
 		}
@@ -130,17 +131,19 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 	respMsg *datatypes.ResponseMsg) error {
 	switch resp.State["state"].(State) {
 	case StatePreferences:
-		// TODO ensure Ava remembers past answers for budget
-		adjs := language.ExtractAdjectives(
-			m.Input.StructuredInput.Objects)
+		// TODO ensure Ava remembers past answers for preferences
+		adjs := m.Input.StructuredInput.Objects
 		if len(adjs) == 0 {
 			return pkg.SaveResponse(respMsg, resp)
 		}
 		resp.State["query"].(string) += " " + strings.Join(adjs, " ")
 		resp.State["state"] = StateBudget
-		resp.Sentence = "How much do you usually pay for a bottle of wine?"
+		resp.Sentence = "Ok. How much do you usually pay for a " +
+			"bottle of wine?"
 	case StateBudget:
-		budget, found := language.ExtractCurrency(m.Input.StructuredInput)
+		// TODO ensure Ava remembers past answers for budget
+		budget, found := language.ExtractCurrency(
+			m.Input.StructuredInput)
 		if !found {
 			return pkg.SaveResponse(respMsg, resp)
 		}
@@ -151,9 +154,10 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 	case StateRecommendations:
 		query := resp.State["query"].(string)
 		if len(query) == 0 {
-			log.Println("err: seeking recommendations without query")
+			log.Println("err:",
+				"seeking recommendations without query")
 		}
-		results, err := search.Find(query, "products/alcohol", 20)
+		results, err := search.FindProduct(query, "alcohol", 20)
 		if err != nil {
 			return err
 		}

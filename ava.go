@@ -21,9 +21,11 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
+	"github.com/avabot/ava/shared/search"
 )
 
 var db *sqlx.DB
+var ec *search.ElasticClient
 var bayes *bayesian.Classifier
 var phoneRegex *regexp.Regexp
 var ErrInvalidCommand = errors.New("invalid command")
@@ -82,6 +84,14 @@ func startServer(port string) {
 	log.Println("booting local server")
 	bootRPCServer(port)
 	bootTwilio()
+	ec = search.NewClient()
+	sent := "A blend of Cabernet Sauvignon, Syrah and Merlot, this is soft and sublime. The Cab and Syrah influences charge through the dense, substantial tannins and meatier notes of leather, cigar box and oak."
+	indices, err := language.Summarize(sent, "products_alcohol", 2)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println("==== SUMMARY ====")
+	log.Println(indices)
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()

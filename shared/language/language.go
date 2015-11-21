@@ -16,6 +16,7 @@ var yes map[string]bool = map[string]bool{
 	"that's right": true,
 	"thats right":  true,
 	"think so":     true,
+	"affirmative":  true,
 }
 
 var no map[string]bool = map[string]bool{
@@ -26,6 +27,7 @@ var no map[string]bool = map[string]bool{
 	"dunno":       true,
 	"don't know":  true,
 	"do not know": true,
+	"negative":    true,
 }
 
 // Join concatenates triggers together, like Recommend() and Broken(), ensuring
@@ -384,18 +386,22 @@ func SliceToString(ss []string, andor string) string {
 		return ss[0]
 	}
 	if l == 2 {
+		if andor == "." {
+			tmp := strings.Title(ss[1][:1]) + ss[1][1:]
+			return fmt.Sprintf("%s%s %s", ss[0], andor, tmp)
+		}
 		return fmt.Sprintf("%s %s %s", ss[0], andor, ss[1])
 	}
 	var ret string
+	// TODO handle andor == "."
 	for i, s := range ss {
-		if i < l-2 {
+		if i == l-2 {
 			ret += fmt.Sprintf("%s %s", s, andor)
-			continue
-		} else if i < l-1 {
-			ret += s
-			break
+		} else if i == l-1 {
+			ret += " " + s
+		} else {
+			ret += s + ", "
 		}
-		ret += s + ", "
 	}
 	return ret
 }
