@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
 	"github.com/avabot/ava/shared/search"
-	"github.com/mattbaird/elastigo/lib"
 )
 
 var regexArticle = regexp.MustCompile(`^(a|an|the|A|An|The)\s`)

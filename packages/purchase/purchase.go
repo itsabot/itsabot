@@ -15,12 +15,16 @@ import (
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/search"
+	"github.com/avabot/ava/shared/sms"
+	"github.com/subosito/twilio"
 )
 
 type Purchase string
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var db *sqlx.DB
+var ec *search.ElasticClient
+var tc *twilio.Client
 
 // resp enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
@@ -38,6 +42,7 @@ const (
 	StateRecommendations
 	StateProductSelection
 	StateShippingAddress
+	StateAuthorizing
 	StatePurchase
 	StateComplete
 )
@@ -45,13 +50,15 @@ const (
 func main() {
 	flag.Parse()
 	var err error
-	db, err = database.connectDB()
+	db, err = database.ConnectDB()
 	if err != nil {
 		log.Fatalln(err)
 	}
+	ec = search.NewClient()
+	tc = sms.NewClient()
 	trigger := &datatypes.StructuredInput{
 		Commands: language.Purchase(),
-		Objects:  language.Wines(),
+		Objects:  language.Alcohol(),
 	}
 	p, err := pkg.NewPackage("purchase", *port, trigger)
 	if err != nil {
@@ -72,7 +79,7 @@ func (t *Purchase) Run(m *datatypes.Message,
 		"budget":           "",                    // suggested price
 		"recommendations":  []datatypes.Product{}, // search results
 		"offset":           uint(0),               // index in search
-		"shippingAddress":  datatypes.Address,
+		"shippingAddress":  &datatypes.Address{},
 		"productsSelected": []datatypes.Product{},
 	}
 	si := m.Input.StructuredInput
@@ -87,14 +94,13 @@ func (t *Purchase) Run(m *datatypes.Message,
 		return pkg.SaveResponse(respMsg, resp)
 	}
 	// user provided us with a sufficiently detailed query, now search
-	currentResp = resp
-	return FollowUp(m, respMsg)
+	return t.FollowUp(m, respMsg)
 }
 
 func (t *Purchase) FollowUp(m *datatypes.Message,
 	respMsg *datatypes.ResponseMsg) error {
 	if resp == nil {
-		if err := m.GetLastResponse(); err != nil {
+		if err := m.GetLastResponse(db); err != nil {
 			return err
 		}
 		resp = m.LastResponse
@@ -107,20 +113,8 @@ func (t *Purchase) FollowUp(m *datatypes.Message,
 	// TODO allow the user to direct the conversation, e.g. say "something
 	// more expensive" and have Ava respond appropriately
 
-	// if purchase has not been made, do we have all data we need to make a
-	// purchase?
-	complete, err := updateState(m, resp, respMsg)
-	if err != nil {
-		return err
-	}
-	// if not, collect all of the necessary data
-	for !complete {
-		complete, err = updateState(m, resp, respMsg)
-		if err != nil {
-			return err
-		}
-	}
-	err := makePurchase(m.User.ID, resp.State["productsSelected"])
+	// if purchase has not been made, move user through the package's states
+	err := updateState(m, resp, respMsg)
 	if err != nil {
 		return err
 	}
@@ -136,14 +130,15 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 		if len(adjs) == 0 {
 			return pkg.SaveResponse(respMsg, resp)
 		}
-		resp.State["query"].(string) += " " + strings.Join(adjs, " ")
+		q := resp.State["query"].(string)
+		q += " " + strings.Join(adjs, " ")
+		resp.State["query"] = q
 		resp.State["state"] = StateBudget
 		resp.Sentence = "Ok. How much do you usually pay for a " +
 			"bottle of wine?"
 	case StateBudget:
 		// TODO ensure Ava remembers past answers for budget
-		budget, found := language.ExtractCurrency(
-			m.Input.StructuredInput)
+		budget, found := language.ExtractCurrency(m.Input.Sentence)
 		if !found {
 			return pkg.SaveResponse(respMsg, resp)
 		}
@@ -157,24 +152,40 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 			log.Println("err:",
 				"seeking recommendations without query")
 		}
-		results, err := search.FindProduct(query, "alcohol", 20)
+		results, err := ec.FindProduct(query, "alcohol", 20)
 		if err != nil {
 			return err
 		}
-		results = sales.SortByRecommendation(results)
+		if len(results) == 0 {
+			resp.Sentence = "I'm sorry. I couldn't find anything " +
+				"like that."
+			return pkg.SaveResponse(respMsg, resp)
+		}
+		// TODO - better recommendations
+		// results = sales.SortByRecommendation(results)
 		resp.State["recommendations"] = results
 		resp.State["state"] = StateProductSelection
-		tmp := fmt.Sprintf("A %s for $%f. Does that sound good?",
-			product.Name, float64(product.Price)/100)
+		product := results[0]
+		tmp := fmt.Sprintf("A %s for $%f. ", product.Name,
+			float64(product.Price)/100)
+		summary, err := language.Summarize(product.Name,
+			"products_alcohol")
+		if err != nil {
+			return err
+		}
+		if len(summary) > 0 {
+			tmp += summary
+		}
+		tmp += " Does that sound good?"
 		resp.Sentence = language.SuggestedProduct(tmp)
 	case StateProductSelection:
 		// was the recommendation Ava made good?
 		yes, found := language.ExtractYesNo(m.Input.Sentence)
 		if !found {
-			return handleKeywords(m, respMsg, resp)
+			return handleKeywords(m, resp, respMsg)
 		}
 		if !yes {
-			resp.State["offset"].(uint) += 1
+			resp.State["offset"] = resp.State["offset"].(uint) + 1
 			return pkg.SaveResponse(respMsg, resp)
 		}
 		selection, err := currentSelection(resp.State)
@@ -183,24 +194,37 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 		}
 		resp.State["productsSelected"] = append(
 			resp.State["productsSelected"].([]datatypes.Product),
-			selection)
+			*selection)
+		resp.State["state"] = StateShippingAddress
+		// skip to StateShippingAddress
+		return updateState(m, resp, respMsg)
 	case StateShippingAddress:
 		// TODO add memory of shipping addresses
 		addr, found := language.ExtractAddress(m.Input.StructuredInput)
 		if !found {
 			return pkg.SaveResponse(respMsg, resp)
 		}
-		if err := knowledge.NewAddress(addr); err != nil {
+		if err := m.User.SaveAddress(db, addr); err != nil {
 			return err
 		}
 		resp.State["shippingAddress"] = addr
-		resp.State["state"] = StatePurchase
-		price := float64(resp.State["price"]) / 100
+		resp.State["state"] = StateAuthorizing
+		price := float64(resp.State["price"].(uint64)) / 100
 		tmp := fmt.Sprintf("%s. Should I place the order?", price)
 		resp.Sentence = fmt.Sprintf("Ok. It comes to %s", tmp)
+	case StateAuthorizing:
+		yes, found := language.ExtractYesNo(m.Input.Sentence)
+		if !found {
+			return pkg.SaveResponse(respMsg, resp)
+		}
+		if !yes {
+			return handleKeywords(m, resp, respMsg)
+		}
+		// TODO complete
 	case StatePurchase:
 		// TODO ensure Ava follows up to ensure the
-		err := makePurchase(m.User.ID, resp.State["productsSelected"])
+		err := auth.Purchase(db, tc, datatypes.MethodZip, m,
+			resp.State["productsSelected"].([]datatypes.Product))
 		if err != nil {
 			return err
 		}
@@ -211,7 +235,7 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func currentSelection(state map[string]interface{}) (int, string, uint64,
+func currentSelection(state map[string]interface{}) (*datatypes.Product,
 	error) {
 	recs := state["recommendations"].([]datatypes.Product)
 	l := len(recs)
@@ -223,16 +247,7 @@ func currentSelection(state map[string]interface{}) (int, string, uint64,
 		err := errors.New("offset exceeds recommendation length")
 		return "", uint64(0), err
 	}
-	product := recs[offset]
-	return product.ID, product.Name, product.Price, nil
-}
-
-func makePurchase(uid int, products []datatypes.Product) error {
-	err := auth.Purchase(auth.Method, uid, products)
-	if err != nil {
-		return err
-	}
-	return nil
+	return recs[offset], nil
 }
 
 func handleKeywords(m *datatypes.Message, resp *datatypes.Response,

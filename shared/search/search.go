@@ -6,8 +6,8 @@ import (
 	"errors"
 	"os"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/mattbaird/elastigo/lib"
 )
 
 type ElasticClient struct {

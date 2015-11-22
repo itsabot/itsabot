@@ -15,6 +15,23 @@
 			"Rev": "eaed3e167e4ca10342e1446e8fc81b092dd76a17"
 		},
 		{
+			"ImportPath": "github.com/PuerkitoBio/goquery",
+			"Comment": "v0.3.2-79-gb444041",
+			"Rev": "b4440419d81240f8451a505b2f806c853bc2befc"
+		},
+		{
+			"ImportPath": "github.com/andybalholm/cascadia",
+			"Rev": "6122e68c2642b7b75c538a63b15168c6c80fb757"
+		},
+		{
+			"ImportPath": "github.com/araddon/gou",
+			"Rev": "0c2ab7394d785afff14c983fedce4be70ccc431f"
+		},
+		{
+			"ImportPath": "github.com/bitly/go-hostpool",
+			"Rev": "d0e59c22a56e8dadfed24f74f452cea5a52722d2"
+		},
+		{
 			"ImportPath": "github.com/bradfitz/http2",
 			"Rev": "6608b73ef18668469ee5365431dc3a106502c449"
 		},
@@ -61,6 +78,11 @@
 			"Rev": "835d5eb08da4541f26181e6958d7400da769e44b"
 		},
 		{
+			"ImportPath": "github.com/mattbaird/elastigo/lib",
+			"Comment": "v1.0-260-gd519ca3",
+			"Rev": "d519ca3a9c607c77ce27818bd11b0ee73ac41d10"
+		},
+		{
 			"ImportPath": "github.com/satori/go.uuid",
 			"Rev": "6b8e5b55d20d01ad47ecfe98e5171688397c61e9"
 		},
@@ -89,6 +111,10 @@
 		{
 			"ImportPath": "golang.org/x/crypto/blowfish",
 			"Rev": "f7445b17d61953e333441674c2d11e91ae4559d3"
+		},
+		{
+			"ImportPath": "golang.org/x/net/html",
+			"Rev": "4b709d93778b93d2f34943e3142c71578d83ad31"
 		},
 		{
 			"ImportPath": "golang.org/x/net/websocket",

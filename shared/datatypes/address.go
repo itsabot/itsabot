@@ -1,6 +1,7 @@
 package datatypes
 
 type Address struct {
+	Name           string
 	Line1          string
 	Line2          string
 	City           string

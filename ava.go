@@ -21,11 +21,15 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/search"
+	"github.com/avabot/ava/shared/sms"
 )
 
+// TODO variable routes. e.g. "Help me get drunk" could route to purchase
+// (alcohol) or bars nearby. Ava should ask the user which route to send them
+// to on packages with overlapping routes.
+
 var db *sqlx.DB
-var ec *search.ElasticClient
+var tc *twilio.Client
 var bayes *bayesian.Classifier
 var phoneRegex *regexp.Regexp
 var ErrInvalidCommand = errors.New("invalid command")
@@ -83,15 +87,7 @@ func startServer(port string) {
 	}
 	log.Println("booting local server")
 	bootRPCServer(port)
-	bootTwilio()
-	ec = search.NewClient()
-	sent := "A blend of Cabernet Sauvignon, Syrah and Merlot, this is soft and sublime. The Cab and Syrah influences charge through the dense, substantial tannins and meatier notes of leather, cigar box and oak."
-	indices, err := language.Summarize(sent, "products_alcohol", 2)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Println("==== SUMMARY ====")
-	log.Println(indices)
+	tc = sms.TwilioInit()
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()
@@ -198,16 +194,6 @@ func processText(c *echo.Context) (string, error) {
 		}
 	}
 	return ret.Sentence, nil
-}
-
-func sendMessage(to, msg string) error {
-	params := twilio.MessageParams{Body: msg}
-	_, resp, err := tc.Messages.Send("+14242971568", to, params)
-	log.Println(resp)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func validateParams(c *echo.Context) (int, string, int) {

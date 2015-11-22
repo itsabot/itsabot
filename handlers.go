@@ -19,6 +19,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
+	"github.com/avabot/ava/shared/datatypes"
 )
 
 func initRoutes(e *echo.Echo) {
@@ -303,11 +304,8 @@ func handlerAPIProfile(c *echo.Context) error {
 	var user struct {
 		Name   string
 		Email  string
-		Phones []struct {
-			Id     int
-			Number string `db:"flexid"`
-		}
-		Cards []struct {
+		Phones []datatypes.Phone
+		Cards  []struct {
 			Id             int
 			CardholderName string
 			Last4          string

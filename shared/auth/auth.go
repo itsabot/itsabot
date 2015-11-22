@@ -1,17 +1,17 @@
 package auth
 
 import (
+	"errors"
+	"fmt"
 	"regexp"
-	"time"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/sms"
 )
-
-// Method allows you as the package developer to control the level of security
-// required in an authentication. Select an appropriate security level depending
-// upon your risk tolerance for fraud compared against the quality and ease of
-// the user experience.
-type Method int
 
 var regexNum = regexp.MustCompile(`\d+`)
 
@@ -19,7 +19,7 @@ const (
 	// MethodCVV will require the CVV (3-4 digit security code) for a credit
 	// card on file. If the user has no credit cards on file, the user will
 	// be asked for one.
-	MethodCVV = Method{iota + 1}
+	MethodCVV datatypes.Method = iota + 1
 
 	// MethodZip requires the zip code associated with a credit card on
 	// file. Just like MethodCVV, the user will be asked for a credit card
@@ -51,52 +51,85 @@ const (
 // recently authenticated. Note that you'll never have to call Authenticate in a
 // Purchase flow. In order to drive a customer purchase, call Purchase directly,
 // which will also authenticate the user.
-func Authenticate(m Method, u *datatypes.User) (bool, error) {
+func Authenticate(db *sqlx.DB, tc *twilio.Client, m datatypes.Method,
+	msg *datatypes.Message) (bool, error) {
 	// check last authentication date and method
-	if err := u.GetLastAuthentication(); err != nil {
-		return false, err
-	}
-	yesterday := time.Now().Add(time.Duration(time.Hour) * -24)
-	if u.LastAuthenticated != nil && u.LastAuthenticated.After(yesterday) {
-	}
-	authenticated, method, err := getLastAuthentication()
+	authenticated, err := msg.User.IsAuthenticated(m)
 	if err != nil {
 		return false, err
 	}
-	if authenticated && int(method) >= int(m) {
+	if authenticated {
 		return true, nil
 	}
+	// send user confirmation text
+	var t string
 	switch m {
 	case MethodCVV:
-		cards, err := getCards()
-		if err != nil {
-			return err
-		}
-		t := "Please confirm a card's security code (CVC)"
-		// send user confirmation text
-		// handle response
+		t = "Please confirm a card's security code (CVC)"
 	case MethodZip:
-		cards, err := getCards()
-		if err != nil {
-			return err
-		}
-		t := "Please confirm your billing zip code"
+		t = "Please confirm your billing zip code"
 	case MethodWebCache:
-		t := "Please prove you're logged in: https://www.avabot.com/?/profile"
+		t = "Please prove you're logged in: https://www.avabot.com/?/profile"
 	case MethodWebLogin:
-		if err := deleteUserSession(); err != nil {
-			return err
+		if err := msg.User.DeleteSessions(db); err != nil {
+			return false, err
 		}
-		t := "Please log in to prove it's you: https://www.avabot.com/?/login"
+		t = "Please log in to prove it's you: https://www.avabot.com/?/login"
+	}
+	q := `INSERT INTO authorizations (authmethod) VALUES ($1) RETURNING id`
+	var aid int
+	if err = db.QueryRowx(q, m).Scan(&aid); err != nil {
+		return false, err
+	}
+	q = `UPDATE users SET authorizationid=$1 WHERE userid=$2`
+	if _, err = db.Exec(q, aid, msg.User.ID); err != nil {
+		return false, err
+	}
+	if msg.Input.FlexIDType == 2 {
+		if err = sms.SendMessage(tc, msg.Input.FlexID, t); err != nil {
+			return false, err
+		}
+	} else {
+		errMsg := fmt.Sprintf("unhandled flexidtype: %d",
+			msg.Input.FlexIDType)
+		return false, errors.New(errMsg)
 	}
 	return false, nil
 }
 
 // Purchase will authenticate the user and then charge a card.
-func Purchase(m Method, price uint64, card *datatypes.Card) error {
-	if err := Authenticate(m); err != nil {
+func Purchase(db *sqlx.DB, tc *twilio.Client, m datatypes.Method,
+	msg *datatypes.Message, p []datatypes.Product) error {
+	authenticated, err := Authenticate(db, tc, m, msg)
+	if err != nil {
 		return err
 	}
-
+	if !authenticated {
+		// TODO figure out this flow
+		return nil
+	}
+	var desc string
+	var price uint64
+	if len(p) == 0 {
+		return errors.New("no products to purchase")
+	} else if len(p) == 1 {
+		desc = fmt.Sprintf("Purchase of %s", p[0].Name)
+	} else {
+		desc = fmt.Sprintf("Purchase of %d products", len(p))
+		for _, prod := range p {
+			price += prod.Price
+		}
+	}
+	chargeParams := &stripe.ChargeParams{
+		Amount:   price,
+		Currency: "usd",
+		Desc:     desc,
+	}
+	if err = chargeParams.SetSource(msg.User.StripeCustomerID); err != nil {
+		return err
+	}
+	if _, err = charge.New(chargeParams); err != nil {
+		return err
+	}
 	return nil
 }
