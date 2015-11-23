@@ -42,20 +42,13 @@ func (ec *ElasticClient) FindProducts(query, typ string, count int) (
 	}
 	var products []datatypes.Product
 	for _, hit := range res.Hits.Hits {
-		var prod struct {
-			Name  string
-			Price uint64
-		}
+		var prod datatypes.Product
 		err = json.Unmarshal([]byte(*hit.Source), &prod)
 		if err != nil {
 			return products, err
 		}
-		product := datatypes.Product{
-			ID:    hit.Id,
-			Name:  prod.Name,
-			Price: prod.Price,
-		}
-		products = append(products, product)
+		prod.ID = hit.Id
+		products = append(products, prod)
 	}
 	return products, nil
 }

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/avabot/ava/shared/datatypes"
@@ -20,13 +21,21 @@ var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
 // to see if currency text was found. If the response is nil, no currency was
 // found. This API design also maintains consitency when we want to extract and
 // return a struct (which should be returned as a pointer).
-func ExtractCurrency(s string) *string {
+func ExtractCurrency(s string) (uint64, *string, error) {
 	found := regexCurrency.FindString(s)
 	if len(found) == 0 {
-		return nil
+		return 0, nil, nil
 	}
-	found = strings.Replace(found, ".", "", 1)
-	return &found
+	tmp := strings.Replace(found, ".", "", 1)
+	if found == tmp {
+		// no decimal. add cents to the number
+		tmp += "00"
+	}
+	val, err := strconv.ParseUint(tmp, 10, 64)
+	if err != nil {
+		return 0, &tmp, err
+	}
+	return val, &tmp, nil
 }
 
 func ExtractYesNo(s string) *bool {

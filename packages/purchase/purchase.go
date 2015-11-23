@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"reflect"
 	"strings"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -103,7 +102,6 @@ func (t *Purchase) FollowUp(m *datatypes.Message,
 		resp = m.LastResponse
 	}
 	// have we already made the purchase?
-	log.Println("State TYPE", reflect.TypeOf(resp.State["state"]))
 	if resp.State["state"].(float64) == StateComplete {
 		// if so, reset state to allow for other purchases
 		return t.Run(m, respMsg)
@@ -132,12 +130,15 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 			"bottle of wine?"
 	case StateBudget:
 		// TODO ensure Ava remembers past answers for budget
-		budget := language.ExtractCurrency(m.Input.Sentence)
+		log.Println("SENTENCE", m.Input.Sentence)
+		val, budget, err := language.ExtractCurrency(m.Input.Sentence)
+		if err != nil {
+			return err
+		}
 		if budget == nil {
 			return pkg.SaveResponse(respMsg, resp)
 		}
-		log.Println("GOT BUDGET", *budget)
-		resp.State["budget"] = *budget
+		resp.State["budget"] = val
 		resp.State["state"] = StateRecommendations
 		// skip to StateRecommendations
 		return updateState(m, resp, respMsg)
@@ -161,19 +162,10 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 		// results = sales.SortByRecommendation(results)
 		resp.State["recommendations"] = results
 		resp.State["state"] = StateProductSelection
-		product := results[0]
-		tmp := fmt.Sprintf("A %s for $%.2f. ", product.Name,
-			float64(product.Price)/100)
-		summary, err := language.Summarize(product.Name,
-			"products_alcohol")
-		if err != nil {
+		log.Println("OFFSET =", resp.State["offset"])
+		if err = recommendProduct(resp); err != nil {
 			return err
 		}
-		if len(summary) > 0 {
-			tmp += summary
-		}
-		tmp += " Does that sound good?"
-		resp.Sentence = language.SuggestedProduct(tmp)
 	case StateProductSelection:
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -258,7 +250,30 @@ func handleKeywords(m *datatypes.Message, resp *datatypes.Response,
 		case "price", "cost", "shipping", "how much":
 		case "similar", "else", "different":
 			resp.State["offset"] = resp.State["offset"].(uint) + 1
+			if err := recommendProduct(resp); err != nil {
+				return err
+			}
 		}
 	}
 	return pkg.SaveResponse(respMsg, resp)
+}
+
+func recommendProduct(resp *datatypes.Response) error {
+	results := resp.State["results"].([]datatypes.Product)
+	product := results[resp.State["offset"].(uint)]
+	tmp := fmt.Sprintf("A %s for $%.2f. ", product.Name,
+		float64(product.Price)/100)
+	if len(product.Reviews) > 0 {
+		summary, err := language.Summarize(
+			product.Reviews[0].Body, "products_alcohol")
+		if err != nil {
+			return err
+		}
+		if len(summary) > 0 {
+			tmp += summary + " "
+		}
+	}
+	tmp += "Does that sound good?"
+	resp.Sentence = language.SuggestedProduct(tmp)
+	return nil
 }

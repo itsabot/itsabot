@@ -2,6 +2,7 @@ package language
 
 import (
 	"encoding/json"
+	"log"
 	"math/rand"
 	"regexp"
 	"sort"
@@ -48,7 +49,7 @@ func Summarize(text, keywordSource string) (string, error) {
 	// TODO catch negative connations in a clause, so the summary does not
 	// include or emphasize them.
 	ec := search.NewClient()
-	//el := elastigo.NewConn()
+	log.Println("TEXT", text)
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]string{"Name": text},
@@ -63,8 +64,14 @@ func Summarize(text, keywordSource string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Println("=== KEYWORDS ===")
+	log.Println(keywords)
 	keywords = combineKeywordsIntoRanges(keywords)
+	log.Println("=== RANGES ===")
+	log.Println(keywords)
 	summary := buildSummary(keywords)
+	log.Println("=== SUMMARY ===")
+	log.Println(summary)
 	return summary, nil
 }
 
