@@ -2,7 +2,6 @@ package language
 
 import (
 	"encoding/json"
-	"log"
 	"math/rand"
 	"regexp"
 	"sort"
@@ -64,12 +63,7 @@ func Summarize(text, keywordSource string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Println("=== KEYWORDS ===")
-	log.Println(keywords)
 	keywords = combineKeywordsIntoRanges(keywords)
-	log.Println("=== RANGES ===")
-	log.Println(keywords)
-	log.Println("=== SUMMARY ===")
 	summary := buildSummary(keywords)
 	return summary, nil
 }
@@ -129,7 +123,6 @@ func buildSummary(keywords []WordT) string {
 		for _, noun := range nouns {
 			ws := strings.Fields(noun)
 			for _, w := range ws {
-				log.Println(w)
 				if w == "is" {
 					nounAndOr = "."
 					break
@@ -148,7 +141,6 @@ func buildSummary(keywords []WordT) string {
 		for _, adj := range adjs {
 			ws := strings.Fields(adj)
 			for _, w := range ws {
-				log.Println(w)
 				if w == "is" {
 					adjAndOr = "."
 					break
@@ -174,8 +166,6 @@ func combineKeywordsIntoRanges(keywords []WordT) []WordT {
 				i--
 			}
 			buf = &keywords[i]
-		} else {
-			log.Println("BUF: " + buf.Word)
 		}
 		buf.Word = strings.TrimRight(buf.Word, ".,;:'\"?!")
 		ranges = append(ranges, *buf)

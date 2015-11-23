@@ -5,7 +5,7 @@
 		"yelp": "*",
 		"mechanic": "*",
 		"meeting": "*",
-		"wish": "*",
-		"onboard": "*"
+		"onboard": "*",
+		"purchase": "*"
 	}
 }

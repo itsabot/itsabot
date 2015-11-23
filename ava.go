@@ -87,7 +87,7 @@ func startServer(port string) {
 	}
 	log.Println("booting local server")
 	bootRPCServer(port)
-	tc = sms.TwilioInit()
+	tc = sms.NewClient()
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()

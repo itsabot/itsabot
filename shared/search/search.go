@@ -3,7 +3,6 @@ package search
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
@@ -27,11 +26,11 @@ func NewClient() *ElasticClient {
 	return &ElasticClient{client}
 }
 
-func (ec *ElasticClient) FindProduct(query, typ string, count int) (
+func (ec *ElasticClient) FindProducts(query, typ string, count int) (
 	[]datatypes.Product, error) {
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
-			"term": map[string]string{"_all": query},
+			"match": map[string]string{"_all": query},
 		},
 	}
 	res, err := ec.Search("products", typ, nil, q)
@@ -41,11 +40,24 @@ func (ec *ElasticClient) FindProduct(query, typ string, count int) (
 	if res.Hits.Total == 0 {
 		return []datatypes.Product{}, nil
 	}
-	/*
-		for _, hit := range res.Hits.Hits {
+	var products []datatypes.Product
+	for _, hit := range res.Hits.Hits {
+		var prod struct {
+			Name  string
+			Price uint64
 		}
-	*/
-	return []datatypes.Product{}, errors.New("FindProduct not implemented")
+		err = json.Unmarshal([]byte(*hit.Source), &prod)
+		if err != nil {
+			return products, err
+		}
+		product := datatypes.Product{
+			ID:    hit.Id,
+			Name:  prod.Name,
+			Price: prod.Price,
+		}
+		products = append(products, product)
+	}
+	return products, nil
 }
 
 func (ec *ElasticClient) FindProductKeywords(typ string) ([]Bucket, error) {
