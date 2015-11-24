@@ -1,4 +1,4 @@
-package datatypes
+package dt
 
 import (
 	"database/sql/driver"

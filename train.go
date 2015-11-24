@@ -30,7 +30,7 @@ type TrainingData struct {
 	MaxAssignments int
 }
 
-func supervisedTrain(in *datatypes.Input) error {
+func supervisedTrain(in *dt.Input) error {
 	trainID, err := saveTrainingSentence(in)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func supervisedTrain(in *datatypes.Input) error {
 	return nil
 }
 
-func aidedTrain(in *datatypes.Input, trainID int) error {
+func aidedTrain(in *dt.Input, trainID int) error {
 	if err := loadMT(); err != nil {
 		return err
 	}

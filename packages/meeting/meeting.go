@@ -36,7 +36,7 @@ func main() {
 		log.Fatalln("connecting to db", err)
 	}
 	flag.Parse()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: []string{"schedule"},
 		Objects:  []string{"meeting"},
 	}
@@ -50,8 +50,8 @@ func main() {
 	}
 }
 
-func (p *Meeting) Run(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Meeting) Run(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	timeString := m.Input.StructuredInput.Times.String()
 	times, err := timeparse.Parse(timeString)
@@ -80,8 +80,8 @@ func (p *Meeting) Run(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func (p *Meeting) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Meeting) FollowUp(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	if err := m.GetLastResponse(db); err != nil {
 		return err
 	}
@@ -138,18 +138,18 @@ func (p *Meeting) FollowUp(m *datatypes.Message,
 }
 
 // Others handles communication with others, many of whom may not be users.
-func (p *Meeting) Outside(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Meeting) Outside(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	return nil
 }
 
 // Repeat transactions like meeting follow-ups.
-func (p *Meeting) Repeat(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Meeting) Repeat(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	return nil
 }
 
-func stateIncomplete(state *MeetingState, resp *datatypes.Response) bool {
+func stateIncomplete(state *MeetingState, resp *dt.Resp) bool {
 	if len(state.Times) == 0 {
 		resp.Sentence = "What time would you like to have the meeting?"
 		return true

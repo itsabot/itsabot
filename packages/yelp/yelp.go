@@ -53,7 +53,7 @@ func main() {
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
 	db = connectDB()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: []string{
 			"find",
 			"where",
@@ -74,7 +74,7 @@ func main() {
 	}
 }
 
-func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
+func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	// NOTE optional: get state before this package was run, enabling
 	// chaining. For instance, allow passing context from a FourSquare
 	// result into this. See the opening lines of FollowUp() for an example
@@ -132,8 +132,8 @@ func (t *Yelp) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
 }
 
 // FollowUp handles dialog question/answers and additional user queries
-func (t *Yelp) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (t *Yelp) FollowUp(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	// Retrieve the conversation's context
 	if err := m.GetLastResponse(db); err != nil {
 		log.Println("err getting last response")
@@ -215,25 +215,25 @@ func (t *Yelp) FollowUp(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func getRating(r *datatypes.Response, offset int) string {
+func getRating(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return fmt.Sprintf("%.1f", firstBusiness["Rating"].(float64))
 }
 
-func getURL(r *datatypes.Response, offset int) string {
+func getURL(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return firstBusiness["mobile_url"].(string)
 }
 
-func getPhone(r *datatypes.Response, offset int) string {
+func getPhone(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return firstBusiness["display_phone"].(string)
 }
 
-func getAddress(r *datatypes.Response, offset int) string {
+func getAddress(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	location := firstBusiness["Location"].(map[string]interface{})
@@ -277,7 +277,7 @@ func connectDB() *sqlx.DB {
 	return db
 }
 
-func (t *Yelp) searchYelp(resp *datatypes.Response) error {
+func (t *Yelp) searchYelp(resp *dt.Resp) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
 	offset := resp.State["offset"].(float64)

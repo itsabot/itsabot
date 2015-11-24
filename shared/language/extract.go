@@ -53,10 +53,10 @@ func ExtractYesNo(s string) *bool {
 	return nil
 }
 
-func ExtractAddress(s string) (*datatypes.Address, error) {
+func ExtractAddress(s string) (*dt.Address, error) {
 	addr, err := address.Parse(s)
 	if err != nil {
-		return &datatypes.Address{}, err
+		return &dt.Address{}, err
 	}
 	type addr2S struct {
 		XMLName  xml.Name `xml:"Address"`
@@ -92,19 +92,19 @@ func ExtractAddress(s string) (*datatypes.Address, error) {
 	}
 	xmlAddr, err := xml.Marshal(addrS)
 	if err != nil {
-		return &datatypes.Address{}, err
+		return &dt.Address{}, err
 	}
 	log.Println(string(xmlAddr))
 	u := "https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML="
 	u += url.QueryEscape(string(xmlAddr))
 	response, err := http.Get(u)
 	if err != nil {
-		return &datatypes.Address{}, err
+		return &dt.Address{}, err
 	}
 	defer response.Body.Close()
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return &datatypes.Address{}, err
+		return &dt.Address{}, err
 	}
 	resp := struct {
 		XMLName    xml.Name `xml:"AddressValidateResponse"`
@@ -115,9 +115,9 @@ func ExtractAddress(s string) (*datatypes.Address, error) {
 		Address:    addr2Stmp,
 	}
 	if err = xml.Unmarshal(contents, &resp); err != nil {
-		return &datatypes.Address{}, err
+		return &dt.Address{}, err
 	}
-	a := datatypes.Address{
+	a := dt.Address{
 		Name:  resp.Address.FirmName,
 		Line1: resp.Address.Address2,
 		Line2: resp.Address.Address1,

@@ -154,7 +154,7 @@ func processText(c *echo.Context) (string, error) {
 		log.Println("classifying sentence ", err)
 	}
 	uid, fid, fidT := validateParams(c)
-	in := &datatypes.Input{
+	in := &dt.Input{
 		Sentence:          cmd,
 		StructuredInput:   si,
 		UserID:            uid,
@@ -169,7 +169,7 @@ func processText(c *echo.Context) (string, error) {
 		log.Println("getUser: ", err)
 		return "", err
 	}
-	m := &datatypes.Message{User: u, Input: in}
+	m := &dt.Msg{User: u, Input: in}
 	m, ctxAdded, err := addContext(m)
 	if err != nil {
 		log.Println("addContext: ", err)

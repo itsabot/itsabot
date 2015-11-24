@@ -18,7 +18,7 @@ type Onboard string
 
 func main() {
 	flag.Parse()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: []string{"onboard"},
 	}
 	p, err := pkg.NewPackage("onboard", *port, trigger)
@@ -31,8 +31,8 @@ func main() {
 	}
 }
 
-func (t *Onboard) Run(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (t *Onboard) Run(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
@@ -43,8 +43,8 @@ func (t *Onboard) Run(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func (t *Onboard) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (t *Onboard) FollowUp(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (t *Onboard) FollowUp(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func getURL(m *datatypes.Message) (string, error) {
+func getURL(m *dt.Msg) (string, error) {
 	fid := m.Input.FlexID
 	fidT := m.Input.FlexIDType
 	v := url.Values{

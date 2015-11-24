@@ -1,4 +1,4 @@
-package datatypes
+package dt
 
 type Address struct {
 	Name           string

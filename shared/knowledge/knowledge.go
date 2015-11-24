@@ -16,9 +16,9 @@ var ErrNoLocation = errors.New("no previous location")
 
 // GetLocation returns the last known location of a user. If the location isn't
 // recent, ask the user to confirm.
-func GetLocation(db *sqlx.DB, u *datatypes.User) (*datatypes.Location, string,
+func GetLocation(db *sqlx.DB, u *dt.User) (*dt.Location, string,
 	error) {
-	var loc *datatypes.Location
+	var loc *dt.Location
 	if u.LocationID == 0 {
 		return loc, language.QuestionLocation(""), nil
 	}

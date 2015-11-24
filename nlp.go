@@ -150,19 +150,19 @@ func trainClassifier(c *bayesian.Classifier, s string) error {
 
 // classify builds a StructuredInput from a sentence. The bool specifies whether
 // additional training is needed for that sentence.
-func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput,
+func classify(c *bayesian.Classifier, s string) (*dt.StructuredInput,
 	string, bool, error) {
-	si := &datatypes.StructuredInput{}
+	si := &dt.StructuredInput{}
 	if len(s) == 0 {
 		return si, "", false, ErrSentenceTooShort
 	}
 	ws := strings.Fields(s)
-	var wc []datatypes.WordClass
+	var wc []dt.WordClass
 	var needsTraining bool
 	var annotation string
 	for i := range ws {
 		var err error
-		var tmp datatypes.WordClass
+		var tmp dt.WordClass
 		tmp, needsTraining, err = classifyTrigram(c, s, ws, i)
 		if err != nil {
 			return si, "", false, err
@@ -183,19 +183,19 @@ func classify(c *bayesian.Classifier, s string) (*datatypes.StructuredInput,
 
 func bayesIntToSymbol(c int) (string, error) {
 	switch c {
-	case datatypes.CommandI:
+	case dt.CommandI:
 		return "C", nil
-	case datatypes.ActorI:
+	case dt.ActorI:
 		return "A", nil
-	case datatypes.ObjectI:
+	case dt.ObjectI:
 		return "O", nil
-	case datatypes.TimeI:
+	case dt.TimeI:
 		return "T", nil
-	case datatypes.PlaceI:
+	case dt.PlaceI:
 		return "P", nil
-	case datatypes.NoneI:
+	case dt.NoneI:
 		return "N", nil
-	case datatypes.UnsureI:
+	case dt.UnsureI:
 		return "?", nil
 	default:
 		return "", errors.New("unrecognized class (converting to symbol)")
@@ -204,13 +204,13 @@ func bayesIntToSymbol(c int) (string, error) {
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
 // they refer. TODO refactor
-func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
+func addContext(m *dt.Msg) (*dt.Msg, bool, error) {
 	ctxAdded := false
 	for _, w := range m.Input.StructuredInput.Pronouns() {
 		var ctx string
 		var err error
-		switch datatypes.Pronouns[w] {
-		case datatypes.ObjectI:
+		switch dt.Pronouns[w] {
+		case dt.ObjectI:
 			ctx, err = getContextObject(m.User,
 				m.Input.StructuredInput,
 				"objects")
@@ -227,7 +227,7 @@ func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 				m.Input.StructuredInput.Objects[i] = ctx
 				ctxAdded = true
 			}
-		case datatypes.ActorI:
+		case dt.ActorI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"actors")
 			if err != nil {
@@ -243,7 +243,7 @@ func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 				m.Input.StructuredInput.Actors[i] = ctx
 				ctxAdded = true
 			}
-		case datatypes.TimeI:
+		case dt.TimeI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"times")
 			if err != nil {
@@ -259,7 +259,7 @@ func addContext(m *datatypes.Message) (*datatypes.Message, bool, error) {
 				m.Input.StructuredInput.Times[i] = ctx
 				ctxAdded = true
 			}
-		case datatypes.PlaceI:
+		case dt.PlaceI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"places")
 			if err != nil {
@@ -317,10 +317,10 @@ func extractEntity(w string) (string, bayesian.Class, error) {
 // confidence level. The bool returned specified whether additional training is
 // needed.
 func classifyTrigram(c *bayesian.Classifier, s string, ws []string, i int) (
-	datatypes.WordClass, bool, error) {
+	dt.WordClass, bool, error) {
 	// TODO: Given the last 2 words of a sentence, construct the trigram
 	// including prior words.
-	var wc datatypes.WordClass
+	var wc dt.WordClass
 	l := len(ws)
 	word1, _, err := extractEntity(ws[i])
 	if err != nil {
@@ -357,10 +357,10 @@ func classifyTrigram(c *bayesian.Classifier, s string, ws []string, i int) (
 	}
 	m = max(probs)
 	if m <= 0.7 {
-		log.Println(word1, " || ", datatypes.String[likely+1], " || ", m)
+		log.Println(word1, " || ", dt.String[likely+1], " || ", m)
 		needsTraining = true
 	}
-	return datatypes.WordClass{word1, likely + 1}, needsTraining, nil
+	return dt.WordClass{word1, likely + 1}, needsTraining, nil
 }
 
 func max(slice []float64) float64 {

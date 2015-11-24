@@ -53,7 +53,7 @@ func main() {
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
 	db = connectDB()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: language.Join(
 			language.Recommend(),
 			language.Broken(),
@@ -74,8 +74,8 @@ func main() {
 	}
 }
 
-func (p *Mechanic) Run(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Mechanic) Run(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	resp.State = map[string]interface{}{
 		"query":      "",
@@ -135,8 +135,8 @@ func (p *Mechanic) Run(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func (p *Mechanic) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Mechanic) FollowUp(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	// Retrieve the conversation's context
 	if err := m.GetLastResponse(db); err != nil {
 		log.Println("err getting last response")
@@ -270,25 +270,25 @@ func (p *Mechanic) FollowUp(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func getRating(r *datatypes.Response, offset int) string {
+func getRating(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return fmt.Sprintf("%.1f", firstBusiness["Rating"].(float64))
 }
 
-func getURL(r *datatypes.Response, offset int) string {
+func getURL(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return firstBusiness["mobile_url"].(string)
 }
 
-func getPhone(r *datatypes.Response, offset int) string {
+func getPhone(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	return firstBusiness["display_phone"].(string)
 }
 
-func getAddress(r *datatypes.Response, offset int) string {
+func getAddress(r *dt.Resp, offset int) string {
 	businesses := r.State["businesses"].([]interface{})
 	firstBusiness := businesses[offset].(map[string]interface{})
 	location := firstBusiness["Location"].(map[string]interface{})
@@ -332,7 +332,7 @@ func connectDB() *sqlx.DB {
 	return db
 }
 
-func (p *Mechanic) searchYelp(resp *datatypes.Response) error {
+func (p *Mechanic) searchYelp(resp *dt.Resp) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
 	pref := resp.State["preference"].(string)

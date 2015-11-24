@@ -27,7 +27,7 @@ func NewClient() *ElasticClient {
 }
 
 func (ec *ElasticClient) FindProducts(query, typ string, count int) (
-	[]datatypes.Product, error) {
+	[]dt.Product, error) {
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]string{"_all": query},
@@ -35,14 +35,14 @@ func (ec *ElasticClient) FindProducts(query, typ string, count int) (
 	}
 	res, err := ec.Search("products", typ, nil, q)
 	if err != nil {
-		return []datatypes.Product{}, err
+		return []dt.Product{}, err
 	}
 	if res.Hits.Total == 0 {
-		return []datatypes.Product{}, nil
+		return []dt.Product{}, nil
 	}
-	var products []datatypes.Product
+	var products []dt.Product
 	for _, hit := range res.Hits.Hits {
-		var prod datatypes.Product
+		var prod dt.Product
 		err = json.Unmarshal([]byte(*hit.Source), &prod)
 		if err != nil {
 			return products, err

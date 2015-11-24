@@ -28,7 +28,7 @@ var tc *twilio.Client
 
 // resp enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
-var resp *datatypes.Response
+var resp *dt.Resp
 
 const (
 	StateNone float64 = iota
@@ -51,7 +51,7 @@ func main() {
 	}
 	ec = search.NewClient()
 	tc = sms.NewClient()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: language.Purchase(),
 		Objects:  language.Alcohol(),
 	}
@@ -65,17 +65,16 @@ func main() {
 	}
 }
 
-func (t *Purchase) Run(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	resp = m.NewResponse()
 	resp.State = map[string]interface{}{
-		"state":            StateNone,             // maintains state
-		"query":            "",                    // search query
-		"budget":           "",                    // suggested price
-		"recommendations":  []datatypes.Product{}, // search results
-		"offset":           uint(0),               // index in search
-		"shippingAddress":  &datatypes.Address{},
-		"productsSelected": []datatypes.Product{},
+		"state":            StateNone,      // maintains state
+		"query":            "",             // search query
+		"budget":           "",             // suggested price
+		"recommendations":  []dt.Product{}, // search results
+		"offset":           uint(0),        // index in search
+		"shippingAddress":  &dt.Address{},
+		"productsSelected": []dt.Product{},
 	}
 	si := m.Input.StructuredInput
 	query := ""
@@ -93,8 +92,7 @@ func (t *Purchase) Run(m *datatypes.Message,
 	return t.FollowUp(m, respMsg)
 }
 
-func (t *Purchase) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	if resp == nil {
 		if err := m.GetLastResponse(db); err != nil {
 			return err
@@ -117,8 +115,7 @@ func (t *Purchase) FollowUp(m *datatypes.Message,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func updateState(m *datatypes.Message, resp *datatypes.Response,
-	respMsg *datatypes.ResponseMsg) error {
+func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	switch resp.State["state"].(float64) {
 	case StatePreferences:
 		// TODO ensure Ava remembers past answers for preferences
@@ -143,27 +140,13 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 		// skip to StateRecommendations
 		return updateState(m, resp, respMsg)
 	case StateRecommendations:
-		query := resp.State["query"].(string)
-		if len(query) == 0 {
-			log.Println("err:",
-				"seeking recommendations without query")
-		}
-		log.Println("QUERY", query)
-		results, err := ec.FindProducts(query, "alcohol", 20)
+		err := setRecs(resp, respMsg)
 		if err != nil {
 			return err
 		}
-		if len(results) == 0 {
-			resp.Sentence = "I'm sorry. I couldn't find anything " +
-				"like that."
-			return pkg.SaveResponse(respMsg, resp)
-		}
-		// TODO - better recommendations
-		// results = sales.SortByRecommendation(results)
-		resp.State["recommendations"] = results
 		resp.State["state"] = StateProductSelection
 		log.Println("OFFSET =", resp.State["offset"])
-		if err = recommendProduct(resp); err != nil {
+		if err = recommendProduct(resp, respMsg); err != nil {
 			return err
 		}
 	case StateProductSelection:
@@ -181,7 +164,7 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 			return err
 		}
 		resp.State["productsSelected"] = append(
-			resp.State["productsSelected"].([]datatypes.Product),
+			resp.State["productsSelected"].([]dt.Product),
 			*selection)
 		resp.State["state"] = StateShippingAddress
 		// skip to StateShippingAddress
@@ -215,7 +198,7 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 	case StatePurchase:
 		// TODO ensure Ava follows up to ensure the
 		err := auth.Purchase(db, tc, auth.MethodZip, m,
-			resp.State["productsSelected"].([]datatypes.Product))
+			resp.State["productsSelected"].([]dt.Product))
 		if err != nil {
 			return err
 		}
@@ -225,23 +208,21 @@ func updateState(m *datatypes.Message, resp *datatypes.Response,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func currentSelection(state map[string]interface{}) (*datatypes.Product,
-	error) {
-	recs := state["recommendations"].([]datatypes.Product)
+func currentSelection(state map[string]interface{}) (*dt.Product, error) {
+	recs := state["recommendations"].([]dt.Product)
 	l := uint(len(recs))
 	if l == 0 {
-		return &datatypes.Product{}, errors.New("empty recommendations")
+		return &dt.Product{}, errors.New("empty recommendations")
 	}
 	offset := state["offset"].(uint)
 	if l <= offset {
 		err := errors.New("offset exceeds recommendation length")
-		return &datatypes.Product{}, err
+		return &dt.Product{}, err
 	}
 	return &recs[offset], nil
 }
 
-func handleKeywords(m *datatypes.Message, resp *datatypes.Response,
-	respMsg *datatypes.ResponseMsg) error {
+func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	words := strings.Fields(m.Input.Sentence)
 	for _, word := range words {
 		switch word {
@@ -250,7 +231,7 @@ func handleKeywords(m *datatypes.Message, resp *datatypes.Response,
 		case "price", "cost", "shipping", "how much":
 		case "similar", "else", "different":
 			resp.State["offset"] = resp.State["offset"].(uint) + 1
-			if err := recommendProduct(resp); err != nil {
+			if err := recommendProduct(resp, respMsg); err != nil {
 				return err
 			}
 		}
@@ -258,8 +239,19 @@ func handleKeywords(m *datatypes.Message, resp *datatypes.Response,
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func recommendProduct(resp *datatypes.Response) error {
-	results := resp.State["results"].([]datatypes.Product)
+func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
+	results, ok := resp.State["results"].([]dt.Product)
+	if !ok {
+		words := strings.Fields(resp.State["query"].(string))
+		if len(words) == 1 {
+			resp.Sentence = "I'm sorry. I couldn't find any wines like that."
+			resp.State["state"] = StateNone
+			return pkg.SaveResponse(respMsg, resp)
+		} else {
+			resp.State["query"] = "simple"
+			return recommendProduct(resp, respMsg)
+		}
+	}
 	product := results[resp.State["offset"].(uint)]
 	tmp := fmt.Sprintf("A %s for $%.2f. ", product.Name,
 		float64(product.Price)/100)
@@ -275,5 +267,21 @@ func recommendProduct(resp *datatypes.Response) error {
 	}
 	tmp += "Does that sound good?"
 	resp.Sentence = language.SuggestedProduct(tmp)
+	return nil
+}
+
+func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
+	results, err := ec.FindProducts(
+		resp.State["query"].(string), "alcohol", 20)
+	if err != nil {
+		return err
+	}
+	if len(results) == 0 {
+		resp.Sentence = "I'm sorry. I couldn't find anything like that."
+		return pkg.SaveResponse(respMsg, resp)
+	}
+	// TODO - better recommendations
+	// results = sales.SortByRecommendation(results)
+	resp.State["recommendations"] = results
 	return nil
 }

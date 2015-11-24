@@ -18,7 +18,7 @@ type Wish string
 
 func main() {
 	flag.Parse()
-	trigger := &datatypes.StructuredInput{
+	trigger := &dt.StructuredInput{
 		Commands: []string{"wish"},
 	}
 	db = connectDB()
@@ -32,7 +32,7 @@ func main() {
 	}
 }
 
-func (p *Wish) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
+func (p *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	q := `INSERT INTO wishes (userid, sentence) VALUES ($1, $2)`
 	_, err := db.Exec(q, m.User.ID, m.Input.Sentence)
@@ -55,8 +55,8 @@ func (p *Wish) Run(m *datatypes.Message, respMsg *datatypes.ResponseMsg) error {
 	return pkg.SaveResponse(respMsg, resp)
 }
 
-func (p *Wish) FollowUp(m *datatypes.Message,
-	respMsg *datatypes.ResponseMsg) error {
+func (p *Wish) FollowUp(m *dt.Msg,
+	respMsg *dt.RespMsg) error {
 	return pkg.SaveResponse(respMsg, m.NewResponse())
 }
 

@@ -13,7 +13,7 @@ var (
 	ErrMissingFlexIDType = errors.New("missing flexidtype")
 )
 
-func saveStructuredInput(m *datatypes.Message, rid int, pkg,
+func saveStructuredInput(m *dt.Msg, rid int, pkg,
 	route string) (int, error) {
 	q := `
 		INSERT INTO inputs (
@@ -45,7 +45,7 @@ func saveStructuredInput(m *datatypes.Message, rid int, pkg,
 	return id, nil
 }
 
-func saveTrainingSentence(in *datatypes.Input) (int, error) {
+func saveTrainingSentence(in *dt.Input) (int, error) {
 	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
 	var id int
 	row := db.QueryRowx(q, in.Sentence)
@@ -70,7 +70,7 @@ func updateTraining(trainID int, hitID string, maxAssignments uint) error {
 	return nil
 }
 
-func getUser(in *datatypes.Input) (*datatypes.User, error) {
+func getUser(in *dt.Input) (*dt.User, error) {
 	if in.UserID == 0 {
 		q := `SELECT userid
 		      FROM userflexids
@@ -88,7 +88,7 @@ func getUser(in *datatypes.Input) (*datatypes.User, error) {
 	q := `SELECT id, name, email, lastauthenticated
 	      FROM users
 	      WHERE id=$1`
-	u := datatypes.User{}
+	u := dt.User{}
 	if err := db.Get(&u, q, in.UserID); err != nil {
 		return nil, err
 	}
@@ -104,15 +104,15 @@ func getInputAnnotation(id int) (string, error) {
 	return annotation, nil
 }
 
-func getLastInputFromUser(u *datatypes.User) (*datatypes.StructuredInput,
+func getLastInputFromUser(u *dt.User) (*dt.StructuredInput,
 	error) {
-	return &(datatypes.StructuredInput{}), nil
+	return &(dt.StructuredInput{}), nil
 }
 
-func getContextObject(u *datatypes.User, si *datatypes.StructuredInput,
+func getContextObject(u *dt.User, si *dt.StructuredInput,
 	datatype string) (string, error) {
 	log.Println("db: getting object context")
-	var tmp *datatypes.StringSlice
+	var tmp *dt.StringSlice
 	if u == nil {
 		return "", ErrMissingUser
 	}

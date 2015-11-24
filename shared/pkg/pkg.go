@@ -24,7 +24,7 @@ type PkgWrapper struct {
 // ServerAddress will default to localhost if left blank.
 type Pkg struct {
 	Config  PkgConfig
-	Trigger *datatypes.StructuredInput
+	Trigger *dt.StructuredInput
 }
 
 type PkgConfig struct {
@@ -44,13 +44,13 @@ var (
 	ErrMissingTrigger     = errors.New("missing package trigger")
 )
 
-func NewPackage(name string, port int, trigger *datatypes.StructuredInput) (
+func NewPackage(name string, port int, trigger *dt.StructuredInput) (
 	*Pkg, error) {
 	return NewPackageWithServer(name, "", port, trigger)
 }
 
 func NewPackageWithServer(name, serverAddr string, port int,
-	trigger *datatypes.StructuredInput) (*Pkg, error) {
+	trigger *dt.StructuredInput) (*Pkg, error) {
 	if len(name) == 0 {
 		return &Pkg{}, ErrMissingPackageName
 	}
@@ -112,7 +112,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 // easy to transfer the data from the package back to Ava for saving, the
 // packages will be responsible for saving their own responses. This is not
 // ideal, but it'll work for now.
-func SaveResponse(respMsg *datatypes.ResponseMsg, r *datatypes.Response) error {
+func SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 	q := `
 		INSERT INTO responses (userid, inputid, sentence, route, state)
 		VALUES ($1, $2, $3, $4, $5)

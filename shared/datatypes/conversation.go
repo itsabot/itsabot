@@ -1,4 +1,4 @@
-package datatypes
+package dt
 
 import (
 	"database/sql/driver"
@@ -12,20 +12,20 @@ import (
 
 type jsonState json.RawMessage
 
-type Message struct {
+type Msg struct {
 	User         *User
 	Input        *Input
-	LastResponse *Response
+	LastResponse *Resp
 	Route        string
 }
 
 // ResponseMsg is used to pass results from packages to Ava
-type ResponseMsg struct {
+type RespMsg struct {
 	ResponseID int
 	Sentence   string
 }
 
-type Response struct {
+type Resp struct {
 	ID         int
 	UserID     int
 	InputID    int
@@ -82,7 +82,7 @@ func NewInput(si *StructuredInput, uid int, fid string, fidT int) *Input {
 	return &in
 }
 
-func (m *Message) GetLastResponse(db *sqlx.DB) error {
+func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	q := `
 		SELECT state, route, sentence, userid
 		FROM responses
@@ -103,7 +103,7 @@ func (m *Message) GetLastResponse(db *sqlx.DB) error {
 		log.Println("structscan row ", err)
 		return err
 	}
-	m.LastResponse = &Response{
+	m.LastResponse = &Resp{
 		Route:    tmp.Route,
 		Sentence: tmp.Sentence,
 		UserID:   tmp.UserID,
@@ -115,12 +115,12 @@ func (m *Message) GetLastResponse(db *sqlx.DB) error {
 	return nil
 }
 
-func (m *Message) NewResponse() *Response {
+func (m *Msg) NewResponse() *Resp {
 	var uid int
 	if m.User != nil {
 		uid = m.User.ID
 	}
-	res := &Response{
+	res := &Resp{
 		UserID:  uid,
 		InputID: m.Input.ID,
 		Route:   m.Route,

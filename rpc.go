@@ -44,7 +44,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	return nil
 }
 
-func getPkg(m *datatypes.Message) (*pkg.PkgWrapper, string, bool, error) {
+func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	var p *pkg.PkgWrapper
 	if m.User == nil {
 		p = regPkgs["onboard"]
@@ -107,9 +107,9 @@ Loop:
 	}
 }
 
-func callPkg(m *datatypes.Message, ctxAdded bool) (*datatypes.ResponseMsg,
+func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg,
 	string, string, error) {
-	reply := &datatypes.ResponseMsg{}
+	reply := &dt.RespMsg{}
 	pw, route, lastRoute, err := getPkg(m)
 	if err != nil {
 		var pname string

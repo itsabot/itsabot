@@ -1,4 +1,4 @@
-package datatypes
+package dt
 
 // Product represents a product result returned from ElasticSearch. Note that
 // because it's an ElasticSearch result, it has a string ID.

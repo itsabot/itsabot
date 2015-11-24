@@ -90,7 +90,7 @@ var states = map[string]string{
 	"wyoming":        "WY",
 }
 
-func Parse(s string) (*datatypes.Address, error) {
+func Parse(s string) (*dt.Address, error) {
 	s = regexAddress.FindString(s)
 	if len(s) == 0 {
 		log.Println("missing")
@@ -108,7 +108,7 @@ func Parse(s string) (*datatypes.Address, error) {
 	tmp2 := regexState.FindStringIndex(s)
 	if tmp2 == nil && tmp == nil {
 		log.Println("no state found AND no zip found")
-		return &datatypes.Address{}, ErrInvalidAddress
+		return &dt.Address{}, ErrInvalidAddress
 	}
 	var city, state string
 	if tmp2 != nil {
@@ -122,7 +122,7 @@ func Parse(s string) (*datatypes.Address, error) {
 		tmp = regexCity.FindStringIndex(s)
 		if tmp == nil {
 			log.Println("no city found")
-			return &datatypes.Address{}, ErrInvalidAddress
+			return &dt.Address{}, ErrInvalidAddress
 		}
 		city = s[tmp[0]:tmp[1]]
 		s = s[:tmp[0]]
@@ -146,10 +146,10 @@ func Parse(s string) (*datatypes.Address, error) {
 	if tmp == nil {
 		log.Println(s)
 		log.Println("no street found")
-		return &datatypes.Address{}, ErrInvalidAddress
+		return &dt.Address{}, ErrInvalidAddress
 	}
 	street := s[tmp[0]:tmp[1]]
-	return &datatypes.Address{
+	return &dt.Address{
 		Line1:   strings.Trim(street, " \n,"),
 		Line2:   strings.Trim(apartment, " \n,"),
 		City:    strings.Trim(city, " \n,"),

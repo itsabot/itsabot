@@ -304,7 +304,7 @@ func handlerAPIProfile(c *echo.Context) error {
 	var user struct {
 		Name   string
 		Email  string
-		Phones []datatypes.Phone
+		Phones []dt.Phone
 		Cards  []struct {
 			Id             int
 			CardholderName string

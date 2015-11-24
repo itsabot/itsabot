@@ -19,7 +19,7 @@ const (
 	// MethodCVV will require the CVV (3-4 digit security code) for a credit
 	// card on file. If the user has no credit cards on file, the user will
 	// be asked for one.
-	MethodCVV datatypes.Method = iota + 1
+	MethodCVV dt.Method = iota + 1
 
 	// MethodZip requires the zip code associated with a credit card on
 	// file. Just like MethodCVV, the user will be asked for a credit card
@@ -51,8 +51,8 @@ const (
 // recently authenticated. Note that you'll never have to call Authenticate in a
 // Purchase flow. In order to drive a customer purchase, call Purchase directly,
 // which will also authenticate the user.
-func Authenticate(db *sqlx.DB, tc *twilio.Client, m datatypes.Method,
-	msg *datatypes.Message) (bool, error) {
+func Authenticate(db *sqlx.DB, tc *twilio.Client, m dt.Method,
+	msg *dt.Msg) (bool, error) {
 	// check last authentication date and method
 	authenticated, err := msg.User.IsAuthenticated(m)
 	if err != nil {
@@ -98,8 +98,8 @@ func Authenticate(db *sqlx.DB, tc *twilio.Client, m datatypes.Method,
 }
 
 // Purchase will authenticate the user and then charge a card.
-func Purchase(db *sqlx.DB, tc *twilio.Client, m datatypes.Method,
-	msg *datatypes.Message, p []datatypes.Product) error {
+func Purchase(db *sqlx.DB, tc *twilio.Client, m dt.Method,
+	msg *dt.Msg, p []dt.Product) error {
 	authenticated, err := Authenticate(db, tc, m, msg)
 	if err != nil {
 		return err
