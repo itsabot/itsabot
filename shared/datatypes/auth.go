@@ -11,6 +11,7 @@ type Method int
 type Authorization struct {
 	ID           int
 	UserID       int
+	Attempts     int
 	AuthMethod   Method
 	CreatedAt    *time.Time
 	AuthorizedAt *time.Time

@@ -12,10 +12,10 @@ var yes map[string]bool = map[string]bool{
 	"yea":          true,
 	"yeah":         true,
 	"yup":          true,
+	"yesh":         true,
 	"sure":         true,
 	"that's right": true,
 	"thats right":  true,
-	"think so":     true,
 	"affirmative":  true,
 }
 

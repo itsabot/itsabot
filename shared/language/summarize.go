@@ -122,7 +122,7 @@ func buildSummary(keywords []WordT) string {
 		}
 		for i := 0; i <= len(nouns)-1; i++ {
 			// TODO design more robust maxLength control
-			if totalNounLen > 80 {
+			if totalNounLen > 60 {
 				rem, nouns = nouns[len(nouns)-1], nouns[:len(nouns)-1]
 				totalNounLen -= len(rem)
 			}
@@ -140,7 +140,7 @@ func buildSummary(keywords []WordT) string {
 	} else {
 		summary = "It's "
 		for i := 0; i <= len(adjs)-1; i++ {
-			if totalAdjLen > 80 {
+			if totalAdjLen > 60 {
 				rem, adjs = adjs[len(adjs)-1], adjs[:len(adjs)-1]
 				totalAdjLen -= len(rem)
 			}

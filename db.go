@@ -48,12 +48,10 @@ func saveStructuredInput(m *dt.Msg, rid int, pkg,
 func saveTrainingSentence(in *dt.Input) (int, error) {
 	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
 	var id int
-	row := db.QueryRowx(q, in.Sentence)
-	if err := row.Scan(&id); err != nil {
+	if err := db.QueryRowx(q, in.Sentence).Scan(&id); err != nil {
 		return 0, err
 	}
 	q = `UPDATE inputs SET trainingid=$1 WHERE id=$2`
-	log.Println("updating input", id, in.ID)
 	_, err := db.Exec(q, id, in.ID)
 	if err != nil {
 		return 0, err
@@ -85,7 +83,7 @@ func getUser(in *dt.Input) (*dt.User, error) {
 	} else if len(in.FlexID) > 0 && in.FlexIDType == 0 {
 		return nil, ErrMissingFlexIDType
 	}
-	q := `SELECT id, name, email, lastauthenticated
+	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
 	      FROM users
 	      WHERE id=$1`
 	u := dt.User{}

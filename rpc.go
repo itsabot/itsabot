@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/rpc"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
@@ -13,7 +15,16 @@ import (
 
 type Ava int
 
-var regPkgs map[string]*pkg.PkgWrapper = map[string]*pkg.PkgWrapper{}
+type pkgMap struct {
+	pkgs  map[string]*pkg.PkgWrapper
+	mutex *sync.Mutex
+}
+
+var regPkgs = pkgMap{
+	pkgs:  make(map[string]*pkg.PkgWrapper),
+	mutex: &sync.Mutex{},
+}
+
 var client *rpc.Client
 
 // RegisterPackage enables Ava to notify packages when specific StructuredInput
@@ -32,14 +43,14 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 		c = strings.ToLower(c)
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + "_" + o)
-			if regPkgs[s] != nil {
+			if regPkgs.Get(s) != nil {
 				log.Println(
 					"warn: duplicate package or trigger",
 					p.Config.Name, s)
 			}
-			regPkgs[s] = &pkg.PkgWrapper{P: p, RPCClient: cl}
+			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: cl})
 		}
-		regPkgs[c] = &pkg.PkgWrapper{P: p, RPCClient: cl}
+		regPkgs.Set(c, &pkg.PkgWrapper{P: p, RPCClient: cl})
 	}
 	return nil
 }
@@ -47,7 +58,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	var p *pkg.PkgWrapper
 	if m.User == nil {
-		p = regPkgs["onboard"]
+		p = regPkgs.Get("onboard")
 		if p != nil {
 			return p, "onboard", false, nil
 		} else {
@@ -64,18 +75,18 @@ Loop:
 		for _, o := range si.Objects {
 			o = strings.Split(o, "'")[0]
 			route = strings.ToLower(c + "_" + o)
-			p = regPkgs[route]
+			p = regPkgs.Get(route)
 			log.Println("searching for " + strings.ToLower(c+"_"+o))
 			if p != nil {
 				shortRoute = ""
 				break Loop
 			}
-			p = regPkgs[o]
+			p = regPkgs.Get(o)
 			if p != nil {
 				shortRoute = o
 			}
 		}
-		p = regPkgs[c]
+		p = regPkgs.Get(c)
 		if p != nil {
 			shortRoute = c
 		}
@@ -93,7 +104,7 @@ Loop:
 			return p, route, false, ErrMissingPackage
 		}
 		route = m.LastResponse.Route
-		p = regPkgs[route]
+		p = regPkgs.Get(route)
 		if p == nil {
 			return p, route, true, ErrMissingPackage
 		}
@@ -133,4 +144,20 @@ func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg,
 		return reply, pw.P.Config.Name, route, err
 	}
 	return reply, pw.P.Config.Name, route, nil
+}
+
+func (pm pkgMap) Get(k string) *pkg.PkgWrapper {
+	var pw *pkg.PkgWrapper
+	pm.mutex.Lock()
+	pw = pm.pkgs[k]
+	pm.mutex.Unlock()
+	runtime.Gosched()
+	return pw
+}
+
+func (pm pkgMap) Set(k string, v *pkg.PkgWrapper) {
+	pm.mutex.Lock()
+	pm.pkgs[k] = v
+	pm.mutex.Unlock()
+	runtime.Gosched()
 }

@@ -179,7 +179,13 @@ func processText(c *echo.Context) (string, error) {
 		return "", err
 	}
 	if len(ret.Sentence) == 0 {
-		ret.Sentence = language.Confused()
+		inAuth, err := checkActiveAuthorization(m)
+		if err != nil {
+			return "", err
+		}
+		if !inAuth {
+			ret.Sentence = language.Confused()
+		}
 	}
 	in.StructuredInput = si
 	id, err := saveStructuredInput(m, ret.ResponseID, pname, route)

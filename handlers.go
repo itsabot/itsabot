@@ -17,6 +17,7 @@ import (
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/satori/go.uuid"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/card"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
 	"github.com/avabot/ava/shared/datatypes"
@@ -162,9 +163,8 @@ func handlerMain(c *echo.Context) error {
 
 func handlerAPILoginSubmit(c *echo.Context) error {
 	var u struct {
-		Id               int
-		Password         []byte
-		StripeCustomerId string
+		Id       int
+		Password []byte
 	}
 	var req struct {
 		Email    string
@@ -173,7 +173,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return jsonError(err)
 	}
-	q := `SELECT id, password, stripecustomerid FROM users WHERE email=$1`
+	q := `SELECT id, password FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		return jsonError(ErrInvalidUserPass)
@@ -193,10 +193,8 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	var resp struct {
 		Id           int
 		SessionToken string
-		CustomerId   string
 	}
 	resp.Id = u.Id
-	resp.CustomerId = u.StripeCustomerId
 	tmp := uuid.NewV4().Bytes()
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	// TODO save session token
@@ -363,7 +361,7 @@ func handlerAPIProfile(c *echo.Context) error {
 
 func handlerAPICardSubmit(c *echo.Context) error {
 	var req struct {
-		StripeID       string
+		StripeToken    string
 		CardholderName string
 		Last4          string
 		Brand          string
@@ -374,20 +372,33 @@ func handlerAPICardSubmit(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return jsonError(err)
 	}
-	var card struct{ ID int }
-	q := `
+	var userStripeID string
+	q := `SELECT stripecustomerid FROM users WHERE id=$1`
+	if err := db.Get(&userStripeID, q, req.UserID); err != nil {
+		return err
+	}
+	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
+	cd, err := card.New(&stripe.CardParams{
+		Customer: userStripeID,
+		Token:    req.StripeToken,
+	})
+	if err != nil {
+		return err
+	}
+	var crd struct{ ID int }
+	q = `
 		INSERT INTO cards
 		(userid, last4, cardholdername, expmonth, expyear, brand,
 			stripeid)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id`
 	row := db.QueryRowx(q, req.UserID, req.Last4, req.CardholderName,
-		req.ExpMonth, req.ExpYear, req.Brand, req.StripeID)
-	err := row.Scan(&card.ID)
+		req.ExpMonth, req.ExpYear, req.Brand, cd.ID)
+	err = row.Scan(&crd.ID)
 	if err != nil {
 		return jsonError(err)
 	}
-	if err = c.JSON(http.StatusOK, card); err != nil {
+	if err = c.JSON(http.StatusOK, crd); err != nil {
 		return jsonError(err)
 	}
 	return nil

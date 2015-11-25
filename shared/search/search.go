@@ -3,6 +3,7 @@ package search
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
@@ -26,18 +27,35 @@ func NewClient() *ElasticClient {
 	return &ElasticClient{client}
 }
 
-func (ec *ElasticClient) FindProducts(query, typ string, count int) (
-	[]dt.Product, error) {
+func (ec *ElasticClient) FindProducts(query, typ string, budget uint64,
+	count int) ([]dt.Product, error) {
+	// JSON is the worst querying language ever
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
-			"match": map[string]string{"_all": query},
+			"bool": map[string]interface{}{
+				"should": []interface{}{
+					map[string]interface{}{
+						"range": map[string]interface{}{
+							"Price": map[string]interface{}{
+								"gte": budget - uint64(float64(budget)*0.2),
+								"lte": budget + uint64(float64(budget)*0.2),
+							},
+						},
+					},
+					map[string]interface{}{
+						"match": map[string]string{"_all": query},
+					},
+				},
+			},
 		},
 	}
+	log.Println("SEARCHING", typ, "FOR", query, "lte", budget+uint64(float64(budget)*0.2))
 	res, err := ec.Search("products", typ, nil, q)
 	if err != nil {
 		return []dt.Product{}, err
 	}
 	if res.Hits.Total == 0 {
+		log.Println("NO RESULTS")
 		return []dt.Product{}, nil
 	}
 	var products []dt.Product

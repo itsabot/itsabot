@@ -289,6 +289,9 @@ func addContext(m *dt.Msg) (*dt.Msg, bool, error) {
 // add "is" back into the sentence.
 func extractEntity(w string) (string, bayesian.Class, error) {
 	w = strings.TrimRight(w, ").,;?!:")
+	if len(w) <= 1 {
+		return w, "", nil
+	}
 	if w[0] != '_' {
 		return w, "", nil
 	}

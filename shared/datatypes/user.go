@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -100,4 +101,29 @@ func (u *User) SaveAddress(db *sqlx.DB, addr *Address) error {
 	_, err := db.Exec(q, u.ID, addr.Name, addr.Line1, addr.Line2,
 		addr.City, addr.State, addr.Country, addr.Zip)
 	return err
+}
+
+// GetAddress standardizes the name of addresses for faster searching and
+// consistent responses.
+func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
+	addr := &Address{}
+	var name string
+	for _, w := range strings.Fields(text) {
+		switch strings.ToLower(w) {
+		case "home", "place", "apartment", "flat", "house", "condo":
+			name = "home"
+		case "work", "office", "biz", "business":
+			name = "office"
+		}
+	}
+	if len(name) == 0 {
+		return addr, errors.New("no address found: " + text)
+	}
+	q := `
+		SELECT line1, line2, city, state, country, zip
+		WHERE userid=$1 AND name=$2 AND cardid=0`
+	if err := db.Get(addr, q, u.ID, name); err != nil {
+		return addr, err
+	}
+	return addr, nil
 }

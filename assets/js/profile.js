@@ -15,7 +15,7 @@ var Profile = {
 		return m.request({
 			method: "PUT",
 			url: "/api/profile.json",
-			data: { UserID: uid }
+			data: { UserID: parseInt(uid, 10) }
 		});
 	}
 };
@@ -40,7 +40,8 @@ Profile.controller = function() {
 	}, function(err) {
 		console.error(err);
 	});
-	Profile.sendView(userId);
+	// TODO implement for authentications
+	// Profile.sendView(userId);
 };
 
 Profile.view = function(controller) {

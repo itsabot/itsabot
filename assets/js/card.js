@@ -18,7 +18,7 @@ var Card = function(data) {
 			_this.brand(resp.card.brand);
 			var data = {
 				UserID: parseInt(cookie.getItem("id")),
-				StripeID: resp.card.id,
+				StripeToken: resp.id,
 				CardholderName: resp.card.name,
 				ExpMonth: resp.card.exp_month,
 				ExpYear: resp.card.exp_year,
@@ -42,7 +42,6 @@ var Card = function(data) {
 	var saveStripe = function() {
 		var deferred = m.deferred();
 		Stripe.card.createToken({
-			customer: cookie.getItem("customer_id"),
 			number: _this.number(),
 			cvc: _this.cvc(),
 			exp: _this.expiry(),

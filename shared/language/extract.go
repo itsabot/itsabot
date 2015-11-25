@@ -1,6 +1,7 @@
 package language
 
 import (
+	"database/sql"
 	"encoding/xml"
 	"io/ioutil"
 	"log"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/helpers/address"
 )
@@ -38,25 +40,39 @@ func ExtractCurrency(s string) (uint64, *string, error) {
 	return val, &tmp, nil
 }
 
-func ExtractYesNo(s string) *bool {
-	ss := strings.Fields(s)
+func ExtractYesNo(s string) *sql.NullBool {
+	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
+		w = strings.TrimRight(w, " .,;:!?'\"")
+		log.Printf("WORD FOR YES/NO EXTRACTION: %q\n", w)
 		if yes[w] {
-			tru := true
-			return &tru
+			return &sql.NullBool{
+				Bool:  true,
+				Valid: true,
+			}
 		}
 		if no[w] {
-			fls := false
-			return &fls
+			return &sql.NullBool{
+				Bool:  false,
+				Valid: true,
+			}
 		}
 	}
-	return nil
+	return &sql.NullBool{
+		Bool:  false,
+		Valid: false,
+	}
 }
 
-func ExtractAddress(s string) (*dt.Address, error) {
+func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, error) {
 	addr, err := address.Parse(s)
 	if err != nil {
-		return &dt.Address{}, err
+		// check DB for historical information associated with that user
+		addr, err := u.GetAddress(db, s)
+		if err != nil {
+			return &dt.Address{}, err
+		}
+		return addr, nil
 	}
 	type addr2S struct {
 		XMLName  xml.Name `xml:"Address"`
@@ -95,9 +111,9 @@ func ExtractAddress(s string) (*dt.Address, error) {
 		return &dt.Address{}, err
 	}
 	log.Println(string(xmlAddr))
-	u := "https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML="
-	u += url.QueryEscape(string(xmlAddr))
-	response, err := http.Get(u)
+	ul := "https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML="
+	ul += url.QueryEscape(string(xmlAddr))
+	response, err := http.Get(ul)
 	if err != nil {
 		return &dt.Address{}, err
 	}

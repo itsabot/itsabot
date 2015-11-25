@@ -1,0 +1,9 @@
+CREATE TABLE purchases (
+	id SERIAL,
+	authorizationid INTEGER NOT NULL,
+	userid INTEGER NOT NULL,
+	total INTEGER NOT NULL,
+	shipaddressid INTEGER,
+	createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	PRIMARY KEY (id)
+);

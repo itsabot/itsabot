@@ -14,6 +14,6 @@ func NewClient() *twilio.Client {
 
 func SendMessage(tc *twilio.Client, to, msg string) error {
 	params := twilio.MessageParams{Body: msg}
-	_, _, err := tc.Messages.Send("+14242971568", to, params)
+	_, _, err := tc.Messages.Send("+14153002024", to, params)
 	return err
 }

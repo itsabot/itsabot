@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -10,6 +11,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/mail"
 	"github.com/avabot/ava/shared/sms"
 )
 
@@ -41,18 +43,18 @@ const (
 	MethodWebLogin
 )
 
-// Authenticate ensures you're speaking to the correct user. Select the LOWEST
+// RequestAuth ensures you're speaking to the correct user. Select the LOWEST
 // level of authentication you'll allow based on a tolerance for fraud weighed
 // against the convenience of the user experience. Methods are organized in
 // least-secure to most-secure order. Therefore, MethodCVV will allow any
 // authentication method, whereas MethodZip will only allow MethodZip and above.
 // Ava will IMPROVE the quality of the authentication automatically whenever
 // possible, selecting the highest authentication method for which the user has
-// recently authenticated. Note that you'll never have to call Authenticate in a
+// recently authenticated. Note that you'll never have to call RequestAuth in a
 // Purchase flow. In order to drive a customer purchase, call Purchase directly,
 // which will also authenticate the user.
-func Authenticate(db *sqlx.DB, tc *twilio.Client, m dt.Method,
-	msg *dt.Msg) (bool, error) {
+func RequestAuth(db *sqlx.DB, tc *twilio.Client, m dt.Method, msg *dt.Msg) (
+	bool, error) {
 	// check last authentication date and method
 	authenticated, err := msg.User.IsAuthenticated(m)
 	if err != nil {
@@ -76,13 +78,20 @@ func Authenticate(db *sqlx.DB, tc *twilio.Client, m dt.Method,
 		}
 		t = "Please log in to prove it's you: https://www.avabot.com/?/login"
 	}
-	q := `INSERT INTO authorizations (authmethod) VALUES ($1) RETURNING id`
-	var aid int
-	if err = db.QueryRowx(q, m).Scan(&aid); err != nil {
+	tx, err := db.Beginx()
+	if err != nil {
 		return false, err
 	}
-	q = `UPDATE users SET authorizationid=$1 WHERE userid=$2`
-	if _, err = db.Exec(q, aid, msg.User.ID); err != nil {
+	q := `INSERT INTO authorizations (authmethod) VALUES ($1) RETURNING id`
+	var aid int
+	if err = tx.QueryRowx(q, m).Scan(&aid); err != nil {
+		return false, err
+	}
+	q = `UPDATE users SET authorizationid=$1 WHERE id=$2`
+	if _, err = tx.Exec(q, aid, msg.User.ID); err != nil {
+		return false, err
+	}
+	if err = tx.Commit(); err != nil {
 		return false, err
 	}
 	if msg.Input.FlexIDType == 2 {
@@ -98,37 +107,30 @@ func Authenticate(db *sqlx.DB, tc *twilio.Client, m dt.Method,
 }
 
 // Purchase will authenticate the user and then charge a card.
-func Purchase(db *sqlx.DB, tc *twilio.Client, m dt.Method,
-	msg *dt.Msg, p []dt.Product) error {
-	authenticated, err := Authenticate(db, tc, m, msg)
-	if err != nil {
-		return err
-	}
-	if !authenticated {
-		// TODO figure out this flow
-		return nil
-	}
-	var desc string
-	var price uint64
-	if len(p) == 0 {
-		return errors.New("no products to purchase")
-	} else if len(p) == 1 {
-		desc = fmt.Sprintf("Purchase of %s", p[0].Name)
-	} else {
-		desc = fmt.Sprintf("Purchase of %d products", len(p))
-		for _, prod := range p {
-			price += prod.Price
+func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
+	msg *dt.Msg, prds []dt.Product, price uint64) error {
+	if os.Getenv("AVA_ENV") == "production" {
+		authenticated, err := RequestAuth(db, tc, m, msg)
+		if err != nil {
+			return err
+		}
+		if !authenticated {
+			return nil
 		}
 	}
+	desc := fmt.Sprintf("Purchase for %.2f", price)
+	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	chargeParams := &stripe.ChargeParams{
 		Amount:   price,
 		Currency: "usd",
 		Desc:     desc,
+		Customer: msg.User.StripeCustomerID,
 	}
-	if err = chargeParams.SetSource(msg.User.StripeCustomerID); err != nil {
+	if _, err := charge.New(chargeParams); err != nil {
 		return err
 	}
-	if _, err = charge.New(chargeParams); err != nil {
+	err := sg.SendPurchaseConfirmation(prds, price, msg.User)
+	if err != nil {
 		return err
 	}
 	return nil
