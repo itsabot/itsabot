@@ -21,10 +21,13 @@ type PkgWrapper struct {
 
 // Pkg holds config options for any Ava package. Name must be globally unique
 // Port takes the format of ":1234". Note that the colon is significant.
-// ServerAddress will default to localhost if left blank.
+// ServerAddress will default to localhost if left blank. RPCClient is distinct
+// from that in the PkgWrapper (which cannot be passed easily over RPC). This
+// RPCClient is used to communicate internally from a Task back to the Package.
 type Pkg struct {
-	Config  PkgConfig
-	Trigger *dt.StructuredInput
+	Config    PkgConfig
+	Trigger   *dt.StructuredInput
+	RPCClient *rpc.Client // NOTE this is generated within the pkg itself
 }
 
 type PkgConfig struct {
@@ -103,6 +106,20 @@ func (p *Pkg) Register(pkgT interface{}) error {
 		}
 		go rpc.ServeConn(conn)
 	}
+	return nil
+}
+
+func (p *Pkg) InitRPCClient() error {
+	pt := p.Config.Port + 1
+	log.Println("registering package with listen port", pt)
+	port := ":" + strconv.Itoa(pt)
+	addr := p.Config.ServerAddress + port
+	cl, err := rpc.Dial("tcp", addr)
+	if err != nil {
+		log.Println("BUG HERE")
+		return err
+	}
+	p.RPCClient = cl
 	return nil
 }
 

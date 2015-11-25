@@ -118,8 +118,7 @@ Loop:
 	}
 }
 
-func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg,
-	string, string, error) {
+func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg, string, string, error) {
 	reply := &dt.RespMsg{}
 	pw, route, lastRoute, err := getPkg(m)
 	if err != nil {

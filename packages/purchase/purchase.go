@@ -21,6 +21,7 @@ import (
 	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/search"
 	"github.com/avabot/ava/shared/sms"
+	"github.com/avabot/ava/shared/task"
 )
 
 type Purchase string
@@ -31,6 +32,7 @@ var db *sqlx.DB
 var ec *search.ElasticClient
 var tc *twilio.Client
 var sg *mail.Client
+var tsk *task.Task
 
 // resp enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
@@ -128,17 +130,22 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 		// if so, reset state to allow for other purchases
 		return t.Run(m, respMsg)
 	}
-	// TODO allow the user to direct the conversation, e.g. say "something
-	// more expensive" and have Ava respond appropriately
-
-	log.Println("CURRENT STATE", getState())
-
+	// allow the user to direct the conversation, e.g. say "something more
+	// expensive" and have Ava respond appropriately
+	if getState() >= StateRecommendations {
+		if err := handleKeywords(m, resp, respMsg); err != nil {
+			return err
+		}
+		return pkg.SaveResponse(respMsg, resp)
+	}
 	// if purchase has not been made, move user through the package's states
-	err := updateState(m, resp, respMsg)
-	if err != nil {
+	if err := updateState(m, resp, respMsg); err != nil {
 		return err
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	if tsk == nil {
+		return pkg.SaveResponse(respMsg, resp)
+	}
+	return nil
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
@@ -223,19 +230,21 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
 		resp.State["state"] = StateShippingAddress
-		resp.Sentence = "Great! Where would you like it shipped?"
+		fallthrough
 	case StateShippingAddress:
-		// TODO add memory of shipping addresses
-		addr, err := language.ExtractAddress(db, m.Input.Sentence)
+		// tasks are multi-step processes often useful for several
+		// packages
+		var err error
+		var addr *dt.Address
+		tsk, err = task.New(db, u, resp, respMsg, pkg.PkgConfig.Name)
+		done, err := tsk.RequestAddress(addr)
 		if err != nil {
 			return err
 		}
-		if addr == nil {
+		if !done {
 			return nil
 		}
-		if err := m.User.SaveAddress(db, addr); err != nil {
-			return err
-		}
+		// addr is now guaranteed to be populated
 		if !statesShipping[addr.State] {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}
@@ -299,16 +308,42 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 
 func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	words := strings.Fields(m.Input.Sentence)
+	modifier := 1
 	for _, word := range words {
 		switch word {
 		case "detail", "details", "description", "more about", "review",
 			"rating", "rated":
-		case "price", "cost", "shipping", "how much":
+			resp.Sentence = "Every wine I recommend is at the top of its craft."
+			return nil
+		case "price", "cost", "shipping", "how much", "total":
+			prices := getPrices()
+			itemCost := prices[0] - prices[1] - prices[2]
+			s := fmt.Sprintf("The items cost %.2f, ", itemCost)
+			s += fmt.Sprintf("shipping is %.2f and ", prices[1])
+			if prices[2] == 0.0 {
+				s += fmt.Sprintf("tax is %.2f, ", prices[2])
+			}
+			s += fmt.Sprintf("totaling %.2f.", prices[0])
+			resp.Sentence = s
 		case "similar", "else", "different":
 			resp.State["offset"] = getOffset() + 1
 			if err := recommendProduct(resp, respMsg); err != nil {
 				return err
 			}
+		case "expensive", "event", "nice", "nicer":
+			// perfect example of a need for stemming
+			budg := getBudget()
+			if budg >= 10000 {
+				resp.State["budget"] = budg + (10000 * modifier)
+			} else if budg >= 5000 {
+				resp.State["budget"] = budg + (5000 * modifier)
+			} else {
+				resp.State["budget"] = budg + (2500 * modifier)
+			}
+		case "more", "special":
+			modifier = 1
+		case "less":
+			modifier = -1
 		}
 	}
 	return nil
