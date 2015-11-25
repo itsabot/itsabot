@@ -108,7 +108,7 @@ func RequestAuth(db *sqlx.DB, tc *twilio.Client, m dt.Method, msg *dt.Msg) (
 
 // Purchase will authenticate the user and then charge a card.
 func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
-	msg *dt.Msg, prds []dt.Product, price uint64) error {
+	msg *dt.Msg, prds []dt.Product, prices uint64) error {
 	if os.Getenv("AVA_ENV") == "production" {
 		authenticated, err := RequestAuth(db, tc, m, msg)
 		if err != nil {
@@ -118,6 +118,9 @@ func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
 			return nil
 		}
 	}
+	totalPrice := prices[0]
+	tax := prices[1]
+	shipping := prices[2]
 	desc := fmt.Sprintf("Purchase for %.2f", price)
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	chargeParams := &stripe.ChargeParams{
@@ -129,7 +132,8 @@ func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
 	if _, err := charge.New(chargeParams); err != nil {
 		return err
 	}
-	err := sg.SendPurchaseConfirmation(prds, price, msg.User)
+	err := sg.SendPurchaseConfirmation(prds, totalPrice, tax, shipping,
+		msg.User)
 	if err != nil {
 		return err
 	}

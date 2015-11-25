@@ -16,7 +16,7 @@ type Client struct {
 
 // TODO add shipping information and purchase identifier (UUID)
 func (sg *Client) SendPurchaseConfirmation(products []dt.Product, price uint64,
-	u *dt.User) error {
+	shippingInCents uint64, taxInCents uint64, u *dt.User) error {
 	delivery := time.Now().Add(7 * 24 * time.Hour)
 	delS := delivery.Format("Monday Jan 2, 2006")
 	subj := "Order confirmation"
@@ -30,12 +30,16 @@ func (sg *Client) SendPurchaseConfirmation(products []dt.Product, price uint64,
 		text += fmt.Sprintf("<li>$%.2f - %s</li>", p, product.Name)
 		productTotal += p
 	}
-	diff := float64(price)/100 - productTotal
 	text += "</ul><table>"
-	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>", productTotal)
-	text += fmt.Sprintf("<tr><td>Shipping: </td><td>$%.2f</td></tr>", diff)
+	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>",
+		productTotal)
+	text += fmt.Sprintf("<tr><td>Shipping: </td><td>$%.2f</td></tr>",
+		shippingInCents)
+	text += fmt.Sprintf("<tr><td>Tax: </td><td>$%.2f</td></tr>",
+		taxInCents)
 	text += "<tr><td>My fee: </td><td>$0.00 (always)</td></tr>"
-	text += fmt.Sprintf("<b><tr><td>Total: </td><td>$%.2f</td></tr></b>", float64(price)/100)
+	text += fmt.Sprintf("<tr><td><b>Total: </b></td><td><b>$%.2f</b></td></tr>",
+		float64(price)/100)
 	text += "</table>"
 	text += fmt.Sprintf("<p>Expected delivery before %s</p>", delS)
 	text += "<p>Glad I could help! :)</p><p>- Ava</p>"

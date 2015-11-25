@@ -97,6 +97,8 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		"shippingAddress":  &dt.Address{},
 		"productsSelected": []dt.Product{},
 		"totalPrice":       uint64(0),
+		"taxInCents":       uint64(0),
+		"shippingInCents":  uint64(0),
 	}
 	si := m.Input.StructuredInput
 	query := ""
@@ -240,20 +242,21 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["shippingAddress"] = addr
 		resp.State["state"] = StatePurchase
 		price := getRecommendations()[getOffset()].Price
-		// add shipping
-		price += 1290 + uint64(len(getSelectedProducts())*100)
+		// calculate shipping. note that this is vendor specific
+		shippingInCents := 1290 + uint64((len(getSelectedProducts())-1)*120)
+		price += shippingInCents
 		// add tax
 		tax := statesTax[addr.State]
-		fullPrice := float64(price)
 		if tax > 0.0 {
-			fullPrice = price * (1.0 + tax)
+			tax *= price
 		}
-		taxInCents := int64(-1 * price)
 		// ensure fractional cents are rounded up. technique stolen from
 		// JavaScript. no need for math.CopySign() since it's unsigned
-		price = uint64(fullPrice + 0.5)
-		taxInCents = taxInCents + price
+		taxInCents := uint64(tax + 0.5)
+		price += taxInCents
 		resp.State["totalPrice"] = price
+		resp.State["taxInCents"] = taxInCents
+		resp.State["shippingInCents"] = shippingInCents
 		tmp := fmt.Sprintf("$%.2f including shipping and tax. ",
 			float64(price)/100)
 		tmp += "Should I place the order?"
@@ -270,7 +273,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// ensure Ava follows up to ensure the delivery occured, get
 		// feedback, etc.
 		err := auth.Purchase(db, tc, sg, auth.MethodZip, m,
-			getSelectedProducts(), getTotalPrice())
+			getSelectedProducts(), getPrices())
 		if err != nil {
 			return err
 		}
@@ -416,12 +419,19 @@ func getState() float64 {
 	return resp.State["state"].(float64)
 }
 
-func getTotalPrice() uint64 {
-	switch resp.State["totalPrice"].(type) {
-	case uint64:
-		return resp.State["totalPrice"].(uint64)
-	case float64:
-		return uint64(resp.State["totalPrice"].(float64))
+func getPrices() [3]uint64 {
+	keys := [3]string{"totalPrice", "taxInCents", "shippingInCents"}
+	vals := [3]uint64{}
+	for _, key := range keys {
+		switch resp.State[key].(type) {
+		case uint64:
+			vals = append(vals, resp.State[key].(uint64))
+		case float64:
+			vals = append(uint64(resp.State[key].(float64)))
+		default:
+			typ := reflect.TypeOf(resp.State[key])
+			log.Printf("warn: invalid type %s for %s\n", typ, key)
+		}
 	}
-	return uint64(0)
+	return vals
 }
