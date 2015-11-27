@@ -21,13 +21,10 @@ type PkgWrapper struct {
 
 // Pkg holds config options for any Ava package. Name must be globally unique
 // Port takes the format of ":1234". Note that the colon is significant.
-// ServerAddress will default to localhost if left blank. RPCClient is distinct
-// from that in the PkgWrapper (which cannot be passed easily over RPC). This
-// RPCClient is used to communicate internally from a Task back to the Package.
+// ServerAddress will default to localhost if left blank.
 type Pkg struct {
-	Config    PkgConfig
-	Trigger   *dt.StructuredInput
-	RPCClient *rpc.Client // NOTE this is generated within the pkg itself
+	Config  PkgConfig
+	Trigger *dt.StructuredInput
 }
 
 type PkgConfig struct {
@@ -109,20 +106,6 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	return nil
 }
 
-func (p *Pkg) InitRPCClient() error {
-	pt := p.Config.Port + 1
-	log.Println("registering package with listen port", pt)
-	port := ":" + strconv.Itoa(pt)
-	addr := p.Config.ServerAddress + port
-	cl, err := rpc.Dial("tcp", addr)
-	if err != nil {
-		log.Println("BUG HERE")
-		return err
-	}
-	p.RPCClient = cl
-	return nil
-}
-
 // SaveResponse is handled in shared/pkg because rpc gob encoding doesn't work
 // well with arbitrary interface{} types. Since a Response had a nested
 // map[string]interface{} type, jsonrpc wouldn't work either. Since it's not
@@ -138,7 +121,7 @@ func SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 	if err != nil {
 		return err
 	}
-	var rid int
+	var rid uint64
 	err = db.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, state).
 		Scan(&rid)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
-	"github.com/avabot/ava/shared/search"
+	"github.com/avabot/ava/shared/datatypes"
 )
 
 var regexArticle = regexp.MustCompile(`^(a|an|the|A|An|The)\s`)
@@ -48,7 +48,7 @@ func (a ByIndex) StringSlice() []string {
 func Summarize(text, keywordSource string) (string, error) {
 	// TODO catch negative connations in a clause, so the summary does not
 	// include or emphasize them.
-	ec := search.NewClient()
+	ec := dt.NewSearchClient()
 	log.Println("TEXT", text)
 	q := map[string]interface{}{
 		"query": map[string]interface{}{

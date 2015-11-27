@@ -6,12 +6,9 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/mail"
 	"github.com/avabot/ava/shared/sms"
 )
 
@@ -53,10 +50,9 @@ const (
 // recently authenticated. Note that you'll never have to call RequestAuth in a
 // Purchase flow. In order to drive a customer purchase, call Purchase directly,
 // which will also authenticate the user.
-func RequestAuth(db *sqlx.DB, tc *twilio.Client, m dt.Method, msg *dt.Msg) (
-	bool, error) {
+func RequestAuth(c *dt.Ctx, m dt.Method) (bool, error) {
 	// check last authentication date and method
-	authenticated, err := msg.User.IsAuthenticated(m)
+	authenticated, err := c.Msg.User.IsAuthenticated(m)
 	if err != nil {
 		return false, err
 	}
@@ -73,12 +69,12 @@ func RequestAuth(db *sqlx.DB, tc *twilio.Client, m dt.Method, msg *dt.Msg) (
 	case MethodWebCache:
 		t = "Please prove you're logged in: https://www.avabot.com/?/profile"
 	case MethodWebLogin:
-		if err := msg.User.DeleteSessions(db); err != nil {
+		if err := c.Msg.User.DeleteSessions(c.DB); err != nil {
 			return false, err
 		}
 		t = "Please log in to prove it's you: https://www.avabot.com/?/login"
 	}
-	tx, err := db.Beginx()
+	tx, err := c.DB.Beginx()
 	if err != nil {
 		return false, err
 	}
@@ -88,29 +84,29 @@ func RequestAuth(db *sqlx.DB, tc *twilio.Client, m dt.Method, msg *dt.Msg) (
 		return false, err
 	}
 	q = `UPDATE users SET authorizationid=$1 WHERE id=$2`
-	if _, err = tx.Exec(q, aid, msg.User.ID); err != nil {
+	if _, err = tx.Exec(q, aid, c.Msg.User.ID); err != nil {
 		return false, err
 	}
 	if err = tx.Commit(); err != nil {
 		return false, err
 	}
-	if msg.Input.FlexIDType == 2 {
-		if err = sms.SendMessage(tc, msg.Input.FlexID, t); err != nil {
+	if c.Msg.Input.FlexIDType == 2 {
+		err = sms.SendMessage(c.TC, c.Msg.Input.FlexID, t)
+		if err != nil {
 			return false, err
 		}
 	} else {
 		errMsg := fmt.Sprintf("unhandled flexidtype: %d",
-			msg.Input.FlexIDType)
+			c.Msg.Input.FlexIDType)
 		return false, errors.New(errMsg)
 	}
 	return false, nil
 }
 
 // Purchase will authenticate the user and then charge a card.
-func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
-	msg *dt.Msg, prds []dt.Product, prices uint64) error {
+func Purchase(c *dt.Ctx, m dt.Method, prds []dt.Product, p *dt.Purchase) error {
 	if os.Getenv("AVA_ENV") == "production" {
-		authenticated, err := RequestAuth(db, tc, m, msg)
+		authenticated, err := RequestAuth(c, m)
 		if err != nil {
 			return err
 		}
@@ -118,23 +114,24 @@ func Purchase(db *sqlx.DB, tc *twilio.Client, sg *mail.Client, m dt.Method,
 			return nil
 		}
 	}
-	totalPrice := prices[0]
-	tax := prices[1]
-	shipping := prices[2]
-	desc := fmt.Sprintf("Purchase for %.2f", price)
+	desc := fmt.Sprintf("Purchase for %.2f", float64(p.Total)/100)
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	chargeParams := &stripe.ChargeParams{
-		Amount:   price,
+		Amount:   p.Total,
 		Currency: "usd",
 		Desc:     desc,
-		Customer: msg.User.StripeCustomerID,
+		Customer: c.Msg.User.StripeCustomerID,
 	}
 	if _, err := charge.New(chargeParams); err != nil {
 		return err
 	}
-	err := sg.SendPurchaseConfirmation(prds, totalPrice, tax, shipping,
-		msg.User)
-	if err != nil {
+	if err := c.SG.SendVendorRequest(prds, p); err != nil {
+		return err
+	}
+	if err := c.SG.SendPurchaseConfirmation(prds, p); err != nil {
+		return err
+	}
+	if err := p.UpdateEmailsSent(); err != nil {
 		return err
 	}
 	return nil

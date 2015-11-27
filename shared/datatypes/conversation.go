@@ -21,15 +21,15 @@ type Msg struct {
 
 // ResponseMsg is used to pass results from packages to Ava
 type RespMsg struct {
-	ResponseID int
+	ResponseID uint64
 	Sentence   string
 }
 
 type Resp struct {
-	ID         int
-	UserID     int
-	InputID    int
-	FeedbackID int
+	ID         uint64
+	UserID     uint64
+	InputID    uint64
+	FeedbackID uint64
 	Sentence   string
 	Route      string
 	State      map[string]interface{}
@@ -37,7 +37,7 @@ type Resp struct {
 }
 
 type Feedback struct {
-	Id        int
+	Id        uint64
 	Sentence  string
 	Sentiment int
 	CreatedAt time.Time
@@ -50,13 +50,13 @@ const (
 )
 
 type Input struct {
-	ID                int
-	UserID            int
+	ID                uint64
+	UserID            uint64
 	FlexID            string
 	FlexIDType        int
 	Sentence          string
 	SentenceAnnotated string
-	ResponseID        int
+	ResponseID        uint64
 	StructuredInput   *StructuredInput
 }
 
@@ -72,7 +72,7 @@ func (j *jsonState) Value() (driver.Value, error) {
 	return j, nil
 }
 
-func NewInput(si *StructuredInput, uid int, fid string, fidT int) *Input {
+func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
 	in := Input{
 		StructuredInput: si,
 		UserID:          uid,
@@ -97,7 +97,7 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 		State    []byte
 		Route    string
 		Sentence string
-		UserID   int
+		UserID   uint64
 	}
 	if err := row.StructScan(&tmp); err != nil {
 		log.Println("structscan row ", err)
@@ -116,7 +116,7 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 }
 
 func (m *Msg) NewResponse() *Resp {
-	var uid int
+	var uid uint64
 	if m.User != nil {
 		uid = m.User.ID
 	}

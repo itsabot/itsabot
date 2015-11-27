@@ -2,6 +2,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
@@ -11,16 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/auth"
-	"github.com/avabot/ava/shared/database"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/mail"
 	"github.com/avabot/ava/shared/pkg"
-	"github.com/avabot/ava/shared/search"
-	"github.com/avabot/ava/shared/sms"
 	"github.com/avabot/ava/shared/task"
 )
 
@@ -28,11 +23,7 @@ type Purchase string
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var p *pkg.Pkg
-var db *sqlx.DB
-var ec *search.ElasticClient
-var tc *twilio.Client
-var sg *mail.Client
-var tsk *task.Task
+var ctx *dt.Ctx
 
 // resp enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
@@ -67,13 +58,10 @@ func main() {
 	flag.Parse()
 	rand.Seed(time.Now().UnixNano())
 	var err error
-	db, err = database.ConnectDB()
+	ctx, err = dt.NewContext()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	ec = search.NewClient()
-	tc = sms.NewClient()
-	sg = mail.NewClient()
 	trigger := &dt.StructuredInput{
 		Commands: language.Purchase(),
 		Objects:  language.Alcohol(),
@@ -89,6 +77,7 @@ func main() {
 }
 
 func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+	ctx.Msg = m
 	resp = m.NewResponse()
 	resp.State = map[string]interface{}{
 		"state":            StateNone,      // maintains state
@@ -108,7 +97,6 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		query += o + " "
 	}
 	// request longer query to get more interesting search results
-	log.Println(query)
 	if len(query) < 10 {
 		resp.Sentence = "What do you look for in a wine?"
 		resp.State["state"] = StatePreferences
@@ -119,8 +107,9 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 }
 
 func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+	ctx.Msg = m
 	if resp == nil {
-		if err := m.GetLastResponse(db); err != nil {
+		if err := m.GetLastResponse(ctx.DB); err != nil {
 			return err
 		}
 		resp = m.LastResponse
@@ -136,16 +125,12 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 		if err := handleKeywords(m, resp, respMsg); err != nil {
 			return err
 		}
-		return pkg.SaveResponse(respMsg, resp)
 	}
 	// if purchase has not been made, move user through the package's states
 	if err := updateState(m, resp, respMsg); err != nil {
 		return err
 	}
-	if tsk == nil {
-		return pkg.SaveResponse(respMsg, resp)
-	}
-	return nil
+	return pkg.SaveResponse(respMsg, resp)
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
@@ -198,7 +183,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	case StateRecommendationsAlterQuery:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
-			return handleKeywords(m, resp, respMsg)
+			return nil
 		}
 		if yes.Bool {
 			resp.State["query"] = "wine"
@@ -215,9 +200,8 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
-			log.Println("HERE")
 			resp.Sentence = "I'm not sure I understand you. Should we order the wine?"
-			return handleKeywords(m, resp, respMsg)
+			return nil
 		}
 		if !yes.Bool {
 			resp.State["offset"] = getOffset() + 1
@@ -232,37 +216,44 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["state"] = StateShippingAddress
 		fallthrough
 	case StateShippingAddress:
-		// tasks are multi-step processes often useful for several
+		// tasks are multi-step processes often useful across several
 		// packages
-		var err error
 		var addr *dt.Address
-		tsk, err = task.New(db, u, resp, respMsg, pkg.PkgConfig.Name)
-		done, err := tsk.RequestAddress(addr)
+		tsk, err := task.New(ctx.DB, m, resp, respMsg)
+		if err != nil {
+			return err
+		}
+		done, err := tsk.RequestAddress(&addr)
 		if err != nil {
 			return err
 		}
 		if !done {
 			return nil
 		}
-		// addr is now guaranteed to be populated
+		log.Printf("HERE: %+v\n")
 		if !statesShipping[addr.State] {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}
+		log.Println("HERE 1")
 		resp.State["shippingAddress"] = addr
 		resp.State["state"] = StatePurchase
-		price := getRecommendations()[getOffset()].Price
+		selection, err := currentSelection(resp.State)
+		if err != nil {
+			return err
+		}
+		price := selection.Price
 		// calculate shipping. note that this is vendor specific
 		shippingInCents := 1290 + uint64((len(getSelectedProducts())-1)*120)
-		price += shippingInCents
 		// add tax
 		tax := statesTax[addr.State]
 		if tax > 0.0 {
-			tax *= price
+			tax *= float64(price)
 		}
 		// ensure fractional cents are rounded up. technique stolen from
 		// JavaScript. no need for math.CopySign() since it's unsigned
 		taxInCents := uint64(tax + 0.5)
 		price += taxInCents
+		price += shippingInCents
 		resp.State["totalPrice"] = price
 		resp.State["taxInCents"] = taxInCents
 		resp.State["shippingInCents"] = shippingInCents
@@ -276,13 +267,45 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return nil
 		}
 		if !yes.Bool {
-			return handleKeywords(m, resp, respMsg)
+			return nil
 		}
 		// TODO
 		// ensure Ava follows up to ensure the delivery occured, get
 		// feedback, etc.
-		err := auth.Purchase(db, tc, sg, auth.MethodZip, m,
-			getSelectedProducts(), getPrices())
+		purchase := dt.NewPurchase(ctx.DB)
+		purchase.UserID = m.User.ID
+		purchase.User = m.User
+		purchase.VendorID = getSelectedProducts()[0].VendorID
+		purchase.ShippingAddress = getShippingAddress()
+		purchase.ShippingAddressID = sql.NullInt64{
+			Int64: int64(purchase.ShippingAddress.ID),
+			Valid: true,
+		}
+		for _, p := range getSelectedProducts() {
+			purchase.Products = append(purchase.Products, p.Name)
+		}
+		prices := getPrices()
+		purchase.Tax = prices[1]
+		purchase.Shipping = prices[2]
+		purchase.Total = prices[0]
+		purchase.AvaFee = uint64(float64(prices[0]) * 0.05 * 100)
+		purchase.CreditCardFee = uint64(
+			(float64(prices[0])*0.029 + 0.3) * 100)
+		purchase.TransferFee =
+			uint64((float64(purchase.Total-
+				purchase.AvaFee-
+				purchase.CreditCardFee) * 0.005) * 100)
+		purchase.VendorPayout = purchase.Total -
+			purchase.AvaFee -
+			purchase.CreditCardFee -
+			purchase.TransferFee
+		t := time.Now().Add(7 * 24 * time.Hour)
+		purchase.DeliveryExpectedAt = &t
+		if err := purchase.Init(); err != nil {
+			return err
+		}
+		err := auth.Purchase(ctx, auth.MethodZip, getSelectedProducts(),
+			purchase)
 		if err != nil {
 			return err
 		}
@@ -333,13 +356,18 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		case "expensive", "event", "nice", "nicer":
 			// perfect example of a need for stemming
 			budg := getBudget()
+			var tmp int
 			if budg >= 10000 {
-				resp.State["budget"] = budg + (10000 * modifier)
+				tmp = int(budg) + (10000 * modifier)
 			} else if budg >= 5000 {
-				resp.State["budget"] = budg + (5000 * modifier)
+				tmp = int(budg) + (5000 * modifier)
 			} else {
-				resp.State["budget"] = budg + (2500 * modifier)
+				tmp = int(budg) + (2500 * modifier)
 			}
+			if tmp <= 0 {
+				tmp = 0
+			}
+			resp.State["budget"] = uint64(tmp)
 		case "more", "special":
 			modifier = 1
 		case "less":
@@ -389,7 +417,8 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 }
 
 func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
-	results, err := ec.FindProducts(getQuery(), "alcohol", getBudget(), 20)
+	results, err := ctx.EC.FindProducts(getQuery(), "alcohol", getBudget(),
+		20)
 	if err != nil {
 		return err
 	}
@@ -434,6 +463,14 @@ func getBudget() uint64 {
 	return uint64(0)
 }
 
+func getShippingAddress() *dt.Address {
+	addr, ok := resp.State["shippingAddress"].(*dt.Address)
+	if !ok {
+		return nil
+	}
+	return addr
+}
+
 func getSelectedProducts() []dt.Product {
 	products, ok := resp.State["productsSelected"].([]dt.Product)
 	if !ok {
@@ -454,15 +491,18 @@ func getState() float64 {
 	return resp.State["state"].(float64)
 }
 
-func getPrices() [3]uint64 {
-	keys := [3]string{"totalPrice", "taxInCents", "shippingInCents"}
-	vals := [3]uint64{}
-	for _, key := range keys {
+// getPrices requires a slice of length 3, as it's used directly in
+// auth.Purchase
+func getPrices() []uint64 {
+	keys := []string{"totalPrice", "taxInCents", "shippingInCents"}
+	vals := []uint64{}
+	for i := 0; i < len(keys); i++ {
+		key := keys[i]
 		switch resp.State[key].(type) {
 		case uint64:
 			vals = append(vals, resp.State[key].(uint64))
 		case float64:
-			vals = append(uint64(resp.State[key].(float64)))
+			vals = append(vals, uint64(resp.State[key].(float64)))
 		default:
 			typ := reflect.TypeOf(resp.State[key])
 			log.Printf("warn: invalid type %s for %s\n", typ, key)

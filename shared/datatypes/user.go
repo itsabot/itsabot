@@ -13,7 +13,7 @@ import (
 )
 
 type User struct {
-	ID                       int
+	ID                       uint64
 	Name                     string
 	Email                    string
 	LocationID               int
@@ -21,6 +21,16 @@ type User struct {
 	AuthorizationID          sql.NullInt64
 	LastAuthenticated        *time.Time
 	LastAuthenticationMethod Method
+}
+
+// GetName satisfies the Contactable interface
+func (u *User) GetName() string {
+	return u.Name
+}
+
+// GetEmail satisfies the Contactable interface
+func (u *User) GetEmail() string {
+	return u.Email
 }
 
 func (u *User) IsAuthenticated(m Method) (bool, error) {
@@ -93,14 +103,15 @@ func (u *User) DeleteSessions(db *sqlx.DB) error {
 	return nil
 }
 
-func (u *User) SaveAddress(db *sqlx.DB, addr *Address) error {
+func (u *User) SaveAddress(db *sqlx.DB, addr *Address) (uint64, error) {
 	q := `
 		INSERT INTO addresses
 		(userid, cardid, name, line1, line2, city, state, country, zip)
-		VALUES ($1, 0, $2, $3, $4, $5, $6, $7, $8)`
-	_, err := db.Exec(q, u.ID, addr.Name, addr.Line1, addr.Line2,
-		addr.City, addr.State, addr.Country, addr.Zip)
-	return err
+		VALUES ($1, 0, $2, $3, $4, $5, $6, 'USA', $7) RETURNING id`
+	var id uint64
+	err := db.QueryRowx(q, u.ID, addr.Name, addr.Line1, addr.Line2,
+		addr.City, addr.State, addr.Zip).Scan(&id)
+	return id, err
 }
 
 // GetAddress standardizes the name of addresses for faster searching and
@@ -108,8 +119,8 @@ func (u *User) SaveAddress(db *sqlx.DB, addr *Address) error {
 func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 	addr := &Address{}
 	var name string
-	for _, w := range strings.Fields(text) {
-		switch strings.ToLower(w) {
+	for _, w := range strings.Fields(strings.ToLower(text)) {
+		switch w {
 		case "home", "place", "apartment", "flat", "house", "condo":
 			name = "home"
 		case "work", "office", "biz", "business":
@@ -117,13 +128,32 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 		}
 	}
 	if len(name) == 0 {
-		return addr, errors.New("no address found: " + text)
+		return nil, errors.New("no address found: " + text)
 	}
 	q := `
-		SELECT line1, line2, city, state, country, zip
+		SELECT name, line1, line2, city, state, country, zip
+		FROM addresses
 		WHERE userid=$1 AND name=$2 AND cardid=0`
 	if err := db.Get(addr, q, u.ID, name); err != nil {
-		return addr, err
+		log.Println("GET returned no address for", name)
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (u *User) UpdateAddressName(db *sqlx.DB, id uint64, name string) (*Address,
+	error) {
+	q := `UPDATE addresses SET name=$1 WHERE id=$2`
+	if _, err := db.Exec(q, name, id); err != nil {
+		return nil, err
+	}
+	q = `
+		SELECT name, line1, line2, city, state, country, zip
+		FROM addresses
+		WHERE id=$1`
+	addr := &Address{}
+	if err := db.Get(addr, q, id); err != nil {
+		return nil, err
 	}
 	return addr, nil
 }

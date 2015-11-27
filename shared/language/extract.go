@@ -44,7 +44,6 @@ func ExtractYesNo(s string) *sql.NullBool {
 	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
 		w = strings.TrimRight(w, " .,;:!?'\"")
-		log.Printf("WORD FOR YES/NO EXTRACTION: %q\n", w)
 		if yes[w] {
 			return &sql.NullBool{
 				Bool:  true,
@@ -64,15 +63,17 @@ func ExtractYesNo(s string) *sql.NullBool {
 	}
 }
 
-func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, error) {
+func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
+	error) {
 	addr, err := address.Parse(s)
 	if err != nil {
 		// check DB for historical information associated with that user
+		log.Println("fetching historical address")
 		addr, err := u.GetAddress(db, s)
 		if err != nil {
-			return &dt.Address{}, err
+			return nil, false, err
 		}
-		return addr, nil
+		return addr, true, nil
 	}
 	type addr2S struct {
 		XMLName  xml.Name `xml:"Address"`
@@ -108,19 +109,19 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, error) {
 	}
 	xmlAddr, err := xml.Marshal(addrS)
 	if err != nil {
-		return &dt.Address{}, err
+		return nil, false, err
 	}
 	log.Println(string(xmlAddr))
 	ul := "https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML="
 	ul += url.QueryEscape(string(xmlAddr))
 	response, err := http.Get(ul)
 	if err != nil {
-		return &dt.Address{}, err
+		return nil, false, err
 	}
 	defer response.Body.Close()
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return &dt.Address{}, err
+		return nil, false, err
 	}
 	resp := struct {
 		XMLName    xml.Name `xml:"AddressValidateResponse"`
@@ -131,7 +132,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, error) {
 		Address:    addr2Stmp,
 	}
 	if err = xml.Unmarshal(contents, &resp); err != nil {
-		return &dt.Address{}, err
+		return nil, false, err
 	}
 	a := dt.Address{
 		Name:  resp.Address.FirmName,
@@ -145,5 +146,5 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, error) {
 	} else {
 		a.Zip = resp.Address.Zip5
 	}
-	return &a, nil
+	return &a, false, nil
 }

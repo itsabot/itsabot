@@ -202,43 +202,48 @@ func processText(c *echo.Context) (string, error) {
 	return ret.Sentence, nil
 }
 
-func validateParams(c *echo.Context) (int, string, int) {
-	var uid, fidT int
+func validateParams(c *echo.Context) (uint64, string, int) {
+	var uid uint64
+	var fidT int
 	var fid string
 	var err error
-	var tmp interface{}
-	tmp = c.Get("uid")
-	if tmp != nil {
-		uid, err = strconv.Atoi(tmp.(string))
+	tmp, ok := c.Get("uid").(string)
+	if !ok {
+		tmp = ""
+	}
+	if len(tmp) > 0 {
+		uid, err = strconv.ParseUint(tmp, 10, 64)
 		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 			uid = 0
 		} else if err != nil {
 			log.Fatalln(err)
 		}
 	}
-	tmp = c.Get("flexid")
-	if tmp != nil {
-		fid = tmp.(string)
+	tmp, ok = c.Get("flexid").(string)
+	if !ok {
+		tmp = ""
+	}
+	if len(tmp) > 0 {
+		fid = tmp
 		if len(fid) == 0 {
 			log.Fatalln("flexid is blank")
 		}
 	}
-	tmp = c.Get("flexidtype")
-	if tmp != nil {
-		var ok bool
-		fidT, ok = tmp.(int)
-		if !ok {
-			fidT, err = strconv.Atoi(tmp.(string))
-			if err != nil && err.Error() ==
-				`strconv.ParseInt: parsing "": invalid syntax` {
-				fidT = 0
-			} else if err != nil {
-				log.Fatalln(err)
-			}
+	tmp, ok = c.Get("flexidtype").(string)
+	if !ok {
+		tmp = ""
+	}
+	if len(tmp) > 0 {
+		fidT, err = strconv.Atoi(tmp)
+		if err != nil && err.Error() ==
+			`strconv.ParseInt: parsing "": invalid syntax` {
+			fidT = 0
+		} else if err != nil {
+			log.Fatalln(err)
 		}
-		if fidT == 0 {
-			log.Fatalln("flexidtype cannot be 0")
-		}
+	}
+	if fidT == 0 {
+		log.Fatalln("flexidtype cannot be 0")
 	}
 	return uid, fid, fidT
 }

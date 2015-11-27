@@ -11,7 +11,6 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/pkg"
 )
 
 type Task struct {
@@ -23,78 +22,22 @@ type Task struct {
 	typ      string
 	resultID sql.NullInt64
 	db       *sqlx.DB
-	u        *dt.User
+	msg      *dt.Msg
 	resp     *dt.Resp
 	respMsg  *dt.RespMsg
-	pkg      *pkg.Pkg
 }
 
-func New(db *sqlx.DB, u *dt.User, resp *dt.Resp, respMsg *dt.RespMsg,
-	pkg *pkg.Pkg) (*Task, error) {
+func New(db *sqlx.DB, msg *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (*Task,
+	error) {
 	if resp.State == nil {
-		return &Task{}, errors.New("State nil in *dt.Resp")
-	}
-	if err := p.InitRPCClient(); err != nil {
-		return &Task{}, err
+		return &Task{}, errors.New("state nil in *dt.Resp")
 	}
 	return &Task{
 		db:      db,
-		u:       u,
-		pkg:     pkg,
+		msg:     msg,
 		resp:    resp,
 		respMsg: respMsg,
 	}, nil
-}
-
-func (t *Task) RequestAddress(dest *dt.Address) (bool, error) {
-	table := "addresses"
-	q := `
-		SELECT id, resultid
-		FROM tasks
-		WHERE userid=$1 AND resulttable='$2'
-		ORDER BY createdat ASC`
-	var tmp []struct {
-		ID       uint64
-		ResultID sql.NullInt64
-	}
-	err := t.db.Select(&tmp, q, t.u.ID, table)
-	if err == sql.ErrNoRows {
-		if err = t.save(table); err != nil {
-			// kick off the address request process
-			t.getAddress()
-			return false, err
-		}
-		return false, nil
-	}
-	if len(tmp) > 0 {
-		for i, taskIDs := range tmp {
-			if i == 0 {
-				continue
-			}
-			removeTask(taskIDs)
-		}
-	}
-	if err != nil {
-		return false, err
-	}
-	// not marshaled directly into *Task to keep id and resultID private
-	t.id = tmp[0].ID
-	t.resultID = tmp[0].ResultID
-	if !resID.Valid {
-		return false, nil
-	}
-	if err = t.u.GetAddress(dest, resID); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (t *Task) save(table string) error {
-	q := `
-		INSERT INTO tasks (userid, packagename, resulttable)
-		VALUES ($1, $2, $3, $4)`
-	_, err := t.db.Exec(q, t.u.ID, t.pkg, table)
-	return err
 }
 
 // Delete removes the task. It's available for packages to call it as well.
@@ -112,31 +55,41 @@ const (
 	addressStateGetName
 )
 
-func (t *Task) getAddress() error {
-	// TODO add memory of shipping addresses
+func (t *Task) RequestAddress(dest **dt.Address) (bool, error) {
 	t.typ = "Address"
 	switch t.getState() {
 	case addressStateNone:
 		t.resp.Sentence = "Where should I ship it?"
 		t.setState(addressStateAskUser)
 	case addressStateAskUser:
-		t.resp.Sentence = ""
-		addr, err := language.ExtractAddress(db, m.Input.Sentence)
+		addr, remembered, err := language.ExtractAddress(t.db,
+			t.msg.User, t.msg.Input.Sentence)
 		if err != nil {
-			return err
+			return false, err
 		}
-		if addr == nil {
-			return pkg.SaveResponse(t.respMsg, t.resp)
+		if addr == nil || addr.Line1 == "" || addr.City == "" ||
+			addr.State == "" {
+			t.resp.Sentence = "I'm sorry. I couldn't understand that address. Could you try typing it again more clearly?"
+			return false, nil
 		}
-		if err := t.u.SaveAddress(t.db, addr); err != nil {
-			return err
+		addr.Country = "USA"
+		var id uint64
+		if !remembered {
+			t.setState(addressStateGetName)
+			t.resp.Sentence = "Is that your home or office?"
+			id, err = t.msg.User.SaveAddress(t.db, addr)
+			if err != nil {
+				return false, err
+			}
+			t.setInterimID(id)
+			return false, nil
 		}
-		t.setState(addressStateGetName)
-		t.resp.Sentence = "Is that your home or office?"
+		*dest = addr
+		return true, nil
 	case addressStateGetName:
 		var location string
-		sent := strings.ToLower(m.Input.Sentence)
-		for _, w := range sent {
+		tmp := strings.Fields(strings.ToLower(t.msg.Input.Sentence))
+		for _, w := range tmp {
 			if w == "home" {
 				location = w
 				break
@@ -146,30 +99,40 @@ func (t *Task) getAddress() error {
 			}
 		}
 		if len(location) == 0 {
-			yes := language.ExtractYesNo(db, m.Input.Sentence)
+			yes := language.ExtractYesNo(t.msg.Input.Sentence)
 			if !yes.Bool && yes.Valid {
-				// send/record this response, then call the pkg
-				// again
-				t.resp.Sentence = "Got it."
-				pkg.SaveResponse(t.respMsg, t.resp)
-				// TODO find a way to communicate back to the
-				// pkg
-				// t.pkg.RPCClient
-				return nil
+				return true, nil
 			}
 		}
-		err := t.u.UpdateAddressName(t.db, getInterimID(), name)
+		addr, err := t.msg.User.UpdateAddressName(t.db,
+			t.getInterimID(), location)
 		if err != nil {
-			return err
+			return false, err
 		}
+		addr.Name = location
+		*dest = addr
+		return true, nil
 	default:
-		log.Println("warn: invalid state", state)
+		log.Println("warn: invalid state", t.getState())
 	}
-	return pkg.SaveResponse(t.respMsg, t.resp)
+	return false, nil
 }
 
 func (t *Task) getState() float64 {
-	return resp.State["__taskState"].(float64)
+	tmp := t.resp.State["__taskState"]
+	if tmp == nil {
+		return addressStateNone
+	}
+	return tmp.(float64)
+}
+
+func (t *Task) setState(s float64) {
+	t.resp.State["__taskState"] = s
+}
+
+func (t *Task) setInterimID(id uint64) {
+	key := fmt.Sprintf("__task%s_User%dID", t.typ, t.msg.User.ID)
+	t.resp.State[key] = id
 }
 
 // getInterimID is useful when you've saved an object, but haven't finished
@@ -181,15 +144,15 @@ func (t *Task) getInterimID() uint64 {
 	if len(t.typ) == 0 {
 		log.Println("warn: t.typ should be set but was \"\"")
 	}
-	key := fmt.Sprintf("__task%sID", t.typ)
-	switch resp.State[key].(type) {
+	key := fmt.Sprintf("__task%s_User%dID", t.typ, t.msg.User.ID)
+	switch t.resp.State[key].(type) {
 	case uint64:
-		return resp.State[key].(uint64)
+		return t.resp.State[key].(uint64)
 	case float64:
-		return uint64(resp.State[key].(float64))
+		return uint64(t.resp.State[key].(float64))
 	default:
 		log.Println("warn: couldn't get interim ID: invalid type",
-			reflect.TypeOf(resp.State[key]))
+			reflect.TypeOf(t.resp.State[key]))
 	}
 	return uint64(0)
 }

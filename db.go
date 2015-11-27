@@ -13,8 +13,8 @@ var (
 	ErrMissingFlexIDType = errors.New("missing flexidtype")
 )
 
-func saveStructuredInput(m *dt.Msg, rid int, pkg,
-	route string) (int, error) {
+func saveStructuredInput(m *dt.Msg, rid uint64, pkg, route string) (uint64,
+	error) {
 	q := `
 		INSERT INTO inputs (
 			userid,
@@ -38,7 +38,7 @@ func saveStructuredInput(m *dt.Msg, rid int, pkg,
 		q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence, in.SentenceAnnotated,
 		si.Commands, si.Objects, si.Actors, si.Times, si.Places, rid,
 		pkg, route)
-	var id int
+	var id uint64
 	if err := row.Scan(&id); err != nil {
 		return 0, err
 	}

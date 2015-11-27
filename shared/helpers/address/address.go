@@ -93,7 +93,7 @@ var states = map[string]string{
 func Parse(s string) (*dt.Address, error) {
 	s = regexAddress.FindString(s)
 	if len(s) == 0 {
-		log.Println("missing")
+		log.Println("missing address")
 		return nil, ErrInvalidAddress
 	}
 	log.Println("address", s)

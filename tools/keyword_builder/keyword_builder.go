@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/avabot/ava/shared/search"
+	"github.com/avabot/ava/shared/datatypes"
 )
 
 type keyword struct {
@@ -17,7 +17,7 @@ type keyword struct {
 }
 
 func main() {
-	client := search.NewClient()
+	client := dt.NewSearchClient()
 	indexExists, err := client.IndicesExists("keywords")
 	if err != nil {
 		log.Fatalln("err", "checking exists", err)

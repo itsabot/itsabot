@@ -1,0 +1,128 @@
+package dt
+
+import (
+	"errors"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/sendgrid/sendgrid-go"
+)
+
+type MailClient struct {
+	sgc *sendgrid.SGClient
+}
+
+// TODO add shipping information and purchase identifier (UUID)
+func (sg *MailClient) SendPurchaseConfirmation(products []Product,
+	p *Purchase) error {
+	if len(products) == 0 {
+		return errors.New("empty products slice in purchase confirmation")
+	}
+	if err := p.Init(); err != nil {
+		return err
+	}
+	subj := "Order confirmation"
+	text := "<html><body>"
+	text += fmt.Sprintf("<p>Hi %s:</p>", p.User.Name)
+	text += "<p>Here's a quick order summary for your records. You bought:</p>"
+	text += "<ul>"
+	for _, product := range products {
+		price := float64(product.Price) / 100
+		text += fmt.Sprintf("<li>$%.2f - %s</li>", price, product.Name)
+	}
+	text += "</ul><table>"
+	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>",
+		float64(p.Subtotal())/100)
+	text += fmt.Sprintf("<tr><td>Shipping: </td><td>$%.2f</td></tr>",
+		float64(p.Shipping)/100)
+	text += fmt.Sprintf("<tr><td>Tax: </td><td>$%.2f</td></tr>",
+		float64(p.Tax)/100)
+	text += "<tr><td>My fee: </td><td>$0.00</td></tr>"
+	text += fmt.Sprintf("<tr><td><b>Total: </b></td><td><b>$%.2f</b></td></tr>",
+		float64(p.Total)/100)
+	text += "</table>"
+	delivery := time.Now().Add(7 * 24 * time.Hour)
+	delS := delivery.Format("Monday Jan 2, 2006")
+	text += fmt.Sprintf("<p>Expected delivery before %s</p>", delS)
+	text += "<p>Glad I could help! :)</p><p>- Ava</p>"
+	text += "</body></html>"
+	return sg.Send(subj, text, p.User)
+}
+
+// TODO add shipping information and purchase identifier (UUID)
+func (sg *MailClient) SendVendorRequest(products []Product,
+	p *Purchase) error {
+	if len(products) == 0 {
+		return errors.New("empty products slice in vendor request")
+	}
+	if err := p.Init(); err != nil {
+		return err
+	}
+	var subj string
+	if os.Getenv("AVA_ENV") == "production" {
+		subj = "Order Request"
+	} else {
+		subj = "[TEST - PLEASE IGNORE] Order Request"
+		(*p.Vendor).ContactName = "Evan"
+		(*p.Vendor).ContactEmail = "egtann@gmail.com"
+	}
+	text := "<html><body>"
+	text += fmt.Sprintf("<p>Hi %s:</p>", p.Vendor.ContactName)
+	text += fmt.Sprintf("<p>%s just ordered the following:</p>",
+		p.User.Name)
+	text += "<ul>"
+	for _, product := range products {
+		price := float64(product.Price) / 100
+		text += fmt.Sprintf("<li>$%.2f - %s</li>", price, product.Name)
+	}
+	text += "</ul><table>"
+	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>",
+		float64(p.Subtotal())/100)
+	text += fmt.Sprintf("<tr><td>Shipping: </td><td>$%.2f</td></tr>",
+		float64(p.Shipping)/100)
+	text += fmt.Sprintf("<tr><td>Tax: </td><td>$%.2f</td></tr>",
+		float64(p.Tax)/100)
+	text += fmt.Sprintf("<tr><td>My fee: </td><td>$0.00</td></tr>",
+		float64(p.AvaFee)*0.05)
+	text += fmt.Sprintf("<tr><td><b>Total: </b></td><td><b>$%.2f</b></td></tr>",
+		float64(p.Total)/100)
+	text += "</table>"
+	text += fmt.Sprintf("<p>They're expecting delivery before %s</p>",
+		p.DeliveryExpectedAt.Format("Monday Jan 2, 2006"))
+	text += "<p>The order has been paid for in full and is ready to be shipped. "
+	text += fmt.Sprintf("You'll receive payment in the amount of $%.2f ",
+		float64(p.VendorPayout)/100)
+	text += "within 30 days, which includes tax and shipping, less Ava's "
+	text += "5% fee and credit card processing fees (2.9% + 30¢).</p>"
+	text += "<p>If you have any questions or concerns with this order, "
+	text += "please respond to this email.</p>"
+	text += "<p>Best,</p>"
+	text += "<p>- Ava</p>"
+	text += "</body></html>"
+	return sg.Send(subj, text, p.Vendor)
+}
+
+func (sg *MailClient) Send(subj, html string, c Contactable) error {
+	msg := sendgrid.NewMail()
+	msg.SetFrom("ava@avabot.com")
+	msg.SetFromName("Ava")
+	msg.AddTo(c.GetEmail())
+	msg.AddToName(c.GetName())
+	msg.SetSubject(subj)
+	msg.SetHTML(html)
+	if err := sg.sgc.Send(msg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewMailClient() *MailClient {
+	log.Println("sendgrid", os.Getenv("SENDGRID_KEY"))
+	return &MailClient{
+		sgc: sendgrid.NewSendGridClientWithApiKey(
+			os.Getenv("SENDGRID_KEY"),
+		),
+	}
+}

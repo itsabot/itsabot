@@ -1,5 +1,4 @@
-// Package search finds items from Ava's repository of knowledge.
-package search
+package dt
 
 import (
 	"encoding/json"
@@ -7,10 +6,9 @@ import (
 	"os"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
-	"github.com/avabot/ava/shared/datatypes"
 )
 
-type ElasticClient struct {
+type SearchClient struct {
 	*elastigo.Conn
 }
 
@@ -19,16 +17,16 @@ type Bucket struct {
 	DocCount uint `json:"doc_count"`
 }
 
-func NewClient() *ElasticClient {
+func NewSearchClient() *SearchClient {
 	client := elastigo.NewConn()
 	client.Username = os.Getenv("ELASTICSEARCH_USERNAME")
 	client.Password = os.Getenv("ELASTICSEARCH_PASSWORD")
 	client.Domain = os.Getenv("ELASTICSEARCH_DOMAIN")
-	return &ElasticClient{client}
+	return &SearchClient{client}
 }
 
-func (ec *ElasticClient) FindProducts(query, typ string, budget uint64,
-	count int) ([]dt.Product, error) {
+func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
+	count int) ([]Product, error) {
 	// JSON is the worst querying language ever
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -52,15 +50,15 @@ func (ec *ElasticClient) FindProducts(query, typ string, budget uint64,
 	log.Println("SEARCHING", typ, "FOR", query, "lte", budget+uint64(float64(budget)*0.2))
 	res, err := ec.Search("products", typ, nil, q)
 	if err != nil {
-		return []dt.Product{}, err
+		return []Product{}, err
 	}
 	if res.Hits.Total == 0 {
 		log.Println("NO RESULTS")
-		return []dt.Product{}, nil
+		return []Product{}, nil
 	}
-	var products []dt.Product
+	var products []Product
 	for _, hit := range res.Hits.Hits {
-		var prod dt.Product
+		var prod Product
 		err = json.Unmarshal([]byte(*hit.Source), &prod)
 		if err != nil {
 			return products, err
@@ -71,7 +69,7 @@ func (ec *ElasticClient) FindProducts(query, typ string, budget uint64,
 	return products, nil
 }
 
-func (ec *ElasticClient) FindProductKeywords(typ string) ([]Bucket, error) {
+func (ec *SearchClient) FindProductKeywords(typ string) ([]Bucket, error) {
 	q := map[string]interface{}{
 		"aggs": map[string]interface{}{
 			"keywords": map[string]interface{}{
