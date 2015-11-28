@@ -14,6 +14,8 @@ import (
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 
+var p *pkg.Pkg
+
 type Onboard string
 
 func main() {
@@ -21,7 +23,8 @@ func main() {
 	trigger := &dt.StructuredInput{
 		Commands: []string{"onboard"},
 	}
-	p, err := pkg.NewPackage("onboard", *port, trigger)
+	var err error
+	p, err = pkg.NewPackage("onboard", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -40,7 +43,7 @@ func (t *Onboard) Run(m *dt.Msg,
 	log.Println("M", m)
 	resp := m.NewResponse()
 	resp.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func (t *Onboard) FollowUp(m *dt.Msg,
@@ -51,7 +54,7 @@ func (t *Onboard) FollowUp(m *dt.Msg,
 	}
 	resp := m.NewResponse()
 	resp.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func getURL(m *dt.Msg) (string, error) {

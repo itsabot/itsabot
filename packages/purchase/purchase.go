@@ -99,7 +99,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	if len(query) < 10 {
 		resp.Sentence = "What do you look for in a wine?"
 		resp.State["state"] = StatePreferences
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 	// user provided us with a sufficiently detailed query, now search
 	return t.FollowUp(m, respMsg)
@@ -137,7 +137,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {

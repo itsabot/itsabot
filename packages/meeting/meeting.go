@@ -15,6 +15,7 @@ import (
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var db *sqlx.DB
+var p *pkg.Pkg
 
 type Meeting string
 
@@ -40,7 +41,7 @@ func main() {
 		Commands: []string{"schedule"},
 		Objects:  []string{"meeting"},
 	}
-	p, err := pkg.NewPackage("meeting", *port, trigger)
+	p, err = pkg.NewPackage("meeting", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -50,7 +51,7 @@ func main() {
 	}
 }
 
-func (p *Meeting) Run(m *dt.Msg,
+func (pt *Meeting) Run(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	timeString := m.Input.StructuredInput.Times.String()
@@ -74,13 +75,13 @@ func (p *Meeting) Run(m *dt.Msg,
 	}
 	resp.State = tmp.ToMap()
 	if stateIncomplete(tmp, resp) {
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 	resp.Sentence = "Sure, I'll meeting that for you."
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
-func (p *Meeting) FollowUp(m *dt.Msg,
+func (pt *Meeting) FollowUp(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	if err := m.GetLastResponse(db); err != nil {
 		return err
@@ -95,12 +96,12 @@ func (p *Meeting) FollowUp(m *dt.Msg,
 			return err
 		}
 		if len(times) == 0 {
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 		state.Times = times
 		if stateIncomplete(state, resp) {
 			resp.State = state.ToMap()
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 	}
 	if len(state.Actors) == 0 {
@@ -117,7 +118,7 @@ func (p *Meeting) FollowUp(m *dt.Msg,
 		resp.State["ActorsString"] = actorsString
 		if stateIncomplete(state, resp) {
 			resp.State = state.ToMap()
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 	}
 	if len(state.Places) == 0 {
@@ -129,22 +130,22 @@ func (p *Meeting) FollowUp(m *dt.Msg,
 		}
 		if stateIncomplete(state, resp) {
 			resp.State = state.ToMap()
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 	}
 	resp.Sentence = "Ok. I'll work with them to schedule it!"
 	// TODO set a marker that it requires outside communication, follow-up
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 // Others handles communication with others, many of whom may not be users.
-func (p *Meeting) Outside(m *dt.Msg,
+func (pt *Meeting) Outside(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	return nil
 }
 
 // Repeat transactions like meeting follow-ups.
-func (p *Meeting) Repeat(m *dt.Msg,
+func (pt *Meeting) Repeat(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	return nil
 }

@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -84,7 +85,7 @@ func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
 
 func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	q := `
-		SELECT state, route, sentence, userid
+		SELECT stateid, route, sentence, userid
 		FROM responses
 		WHERE userid=$1
 		ORDER BY createdat DESC`
@@ -94,13 +95,22 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	}
 	row := db.QueryRowx(q, m.User.ID)
 	var tmp struct {
-		State    []byte
 		Route    string
 		Sentence string
+		StateID  sql.NullInt64
 		UserID   uint64
 	}
 	if err := row.StructScan(&tmp); err != nil {
 		log.Println("structscan row ", err)
+		return err
+	}
+	if !tmp.StateID.Valid {
+		return errors.New("invalid stateid")
+	}
+	var state []byte
+	q = `SELECT state FROM states WHERE id=$1`
+	err := db.Get(&state, q, tmp.StateID)
+	if err != nil {
 		return err
 	}
 	m.LastResponse = &Resp{
@@ -108,7 +118,8 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 		Sentence: tmp.Sentence,
 		UserID:   tmp.UserID,
 	}
-	if err := json.Unmarshal(tmp.State, &m.LastResponse.State); err != nil {
+	err = json.Unmarshal(state, &m.LastResponse.State)
+	if err != nil {
 		log.Println("unmarshaling state", err)
 		return err
 	}

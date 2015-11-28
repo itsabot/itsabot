@@ -112,24 +112,54 @@ func (p *Pkg) Register(pkgT interface{}) error {
 // easy to transfer the data from the package back to Ava for saving, the
 // packages will be responsible for saving their own responses. This is not
 // ideal, but it'll work for now.
-func SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
-	q := `
-		INSERT INTO responses (userid, inputid, sentence, route, state)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id`
+func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 	state, err := json.Marshal(r.State)
 	if err != nil {
 		return err
 	}
-	var rid uint64
-	err = db.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, state).
-		Scan(&rid)
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	q := `SELECT COUNT(*) FROM states WHERE userid=$1 AND pkgname=$2`
+	var tmp uint64
+	if err = tx.Get(&tmp, q, r.UserID, p.Config.Name); err != nil {
+		return err
+	}
+	if tmp == 0 {
+		q = `
+			INSERT INTO states (userid, state, pkgname)
+			VALUES ($1, $2, $3) RETURNING id`
+		row := tx.QueryRowx(q, r.UserID, state, p.Config.Name)
+		if err = row.Scan(&tmp); err != nil {
+			return err
+		}
+	} else {
+		q = `
+			UPDATE states
+			SET state=$1, updatedat=CURRENT_TIMESTAMP 
+			WHERE userid=$2 AND pkgname=$3 RETURNING id`
+		err = tx.QueryRowx(q, state, r.UserID, p.Config.Name).Scan(&tmp)
+		if err != nil {
+			return err
+		}
+	}
+	q = `
+		INSERT INTO responses (userid, inputid, sentence, route,
+			stateid)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id`
+	err = tx.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, tmp).
+		Scan(&tmp)
 	if err != nil {
 		log.Println("ERR SAVING", err)
 		return err
 	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
 	log.Println("saved route", r.Route)
-	respMsg.ResponseID = rid
+	respMsg.ResponseID = tmp
 	respMsg.Sentence = r.Sentence
 	return nil
 }

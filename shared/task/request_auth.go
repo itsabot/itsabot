@@ -7,9 +7,9 @@ import (
 	"os"
 	"regexp"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/stripe/stripe-go"
-	"github.com/stripe/stripe-go/charge"
 )
 
 var regexNum = regexp.MustCompile(`\d+`)

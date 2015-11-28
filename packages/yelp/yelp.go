@@ -45,6 +45,7 @@ var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
 var db *sqlx.DB
+var p *pkg.Pkg
 
 func main() {
 	flag.Parse()
@@ -64,7 +65,8 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err := pkg.NewPackage("yelp", *port, trigger)
+	var err error
+	p, err = pkg.NewPackage("yelp", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -105,7 +107,7 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 				resp.State["location"] = loc.Name
 			}
 			resp.Sentence = question
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 		resp.State["location"] = loc.Name
 	}
@@ -121,14 +123,14 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 				resp.State["location"] = loc.Name
 			}
 			resp.Sentence = question
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 		resp.State["location"] = loc.Name
 	}
 	if err := t.searchYelp(resp); err != nil {
 		log.Println(err)
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 // FollowUp handles dialog question/answers and additional user queries
@@ -149,7 +151,7 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 		if err := t.searchYelp(resp); err != nil {
 			log.Println(err)
 		}
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// If no businesses are returned inform the user now
@@ -157,7 +159,7 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 	if resp.State["businesses"] != nil &&
 		len(resp.State["businesses"].([]interface{})) == 0 {
 		resp.Sentence = "I couldn't find anything like that"
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// Responses were returned, and the user has asked this package an
@@ -209,10 +211,10 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 			resp.Sentence = language.Welcome()
 		}
 		if len(resp.Sentence) > 0 {
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func getRating(r *dt.Resp, offset int) string {

@@ -44,6 +44,7 @@ var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
+var p *pkg.Pkg
 var db *sqlx.DB
 
 func main() {
@@ -64,7 +65,8 @@ func main() {
 			language.AutomotiveBrands(),
 		),
 	}
-	p, err := pkg.NewPackage("mechanic", *port, trigger)
+	var err error
+	p, err = pkg.NewPackage("mechanic", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -74,7 +76,7 @@ func main() {
 	}
 }
 
-func (p *Mechanic) Run(m *dt.Msg,
+func (pt *Mechanic) Run(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	resp.State = map[string]interface{}{
@@ -109,7 +111,7 @@ func (p *Mechanic) Run(m *dt.Msg,
 				resp.State["location"] = loc.Name
 			}
 			resp.Sentence = question
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 		resp.State["location"] = loc.Name
 	}
@@ -125,17 +127,17 @@ func (p *Mechanic) Run(m *dt.Msg,
 				resp.State["location"] = loc.Name
 			}
 			resp.Sentence = question
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 		resp.State["location"] = loc.Name
 	}
-	if err := p.searchYelp(resp); err != nil {
+	if err := pt.searchYelp(resp); err != nil {
 		log.Println(err)
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
-func (p *Mechanic) FollowUp(m *dt.Msg,
+func (pt *Mechanic) FollowUp(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	// Retrieve the conversation's context
 	if err := m.GetLastResponse(db); err != nil {
@@ -152,7 +154,7 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 			resp.Sentence = "Ok. I can help you. " +
 				"What kind of car do you drive?"
 		}
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// Check the automotive brand
@@ -172,7 +174,7 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 			resp.State["brand"] = brand
 			resp.Sentence = "Is your car still in warranty?"
 		}
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// Check warranty information
@@ -181,14 +183,14 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 		if language.Yes(warr) {
 			resp.State["warranty"] = "yes"
 			resp.State["preference"] = "dealer"
-			if err := p.searchYelp(resp); err != nil {
+			if err := pt.searchYelp(resp); err != nil {
 				log.Println(err)
 			}
 		} else if language.No(warr) {
 			resp.State["warranty"] = "no"
 			resp.Sentence = "Do you prefer the dealership or a recommended mechanic?"
 		}
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// Does the user prefer dealerships or mechanics?
@@ -204,11 +206,11 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 			}
 		}
 		if resp.State["preference"] != "" {
-			if err := p.searchYelp(resp); err != nil {
+			if err := pt.searchYelp(resp); err != nil {
 				log.Println(err)
 			}
 		}
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// If no businesses are returned inform the user now
@@ -216,7 +218,7 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 	if resp.State["businesses"] != nil &&
 		len(resp.State["businesses"].([]interface{})) == 0 {
 		resp.Sentence = "I couldn't find anything like that"
-		return pkg.SaveResponse(respMsg, resp)
+		return p.SaveResponse(respMsg, resp)
 	}
 
 	// Responses were returned, and the user has asked this package an
@@ -252,7 +254,7 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 			resp.Sentence = s
 		case "not", "else", "no", "anything", "something":
 			resp.State["offset"] = float64(offI + 1)
-			if err := p.searchYelp(resp); err != nil {
+			if err := pt.searchYelp(resp); err != nil {
 				log.Println(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
@@ -264,10 +266,10 @@ func (p *Mechanic) FollowUp(m *dt.Msg,
 			resp.Sentence = language.Welcome()
 		}
 		if len(resp.Sentence) > 0 {
-			return pkg.SaveResponse(respMsg, resp)
+			return p.SaveResponse(respMsg, resp)
 		}
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func getRating(r *dt.Resp, offset int) string {
@@ -332,7 +334,7 @@ func connectDB() *sqlx.DB {
 	return db
 }
 
-func (p *Mechanic) searchYelp(resp *dt.Resp) error {
+func (pt *Mechanic) searchYelp(resp *dt.Resp) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
 	pref := resp.State["preference"].(string)

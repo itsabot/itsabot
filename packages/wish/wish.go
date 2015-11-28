@@ -13,6 +13,7 @@ import (
 
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var db *sqlx.DB
+var p *pkg.Pkg
 
 type Wish string
 
@@ -22,7 +23,8 @@ func main() {
 		Commands: []string{"wish"},
 	}
 	db = connectDB()
-	p, err := pkg.NewPackage("wish", *port, trigger)
+	var err error
+	p, err = pkg.NewPackage("wish", *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -32,7 +34,7 @@ func main() {
 	}
 }
 
-func (p *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (pt *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	resp := m.NewResponse()
 	q := `INSERT INTO wishes (userid, sentence) VALUES ($1, $2)`
 	_, err := db.Exec(q, m.User.ID, m.Input.Sentence)
@@ -52,12 +54,12 @@ func (p *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	case 4:
 		resp.Sentence = "I wish I could do that now, too. Soon, I hope."
 	}
-	return pkg.SaveResponse(respMsg, resp)
+	return p.SaveResponse(respMsg, resp)
 }
 
-func (p *Wish) FollowUp(m *dt.Msg,
+func (pt *Wish) FollowUp(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
-	return pkg.SaveResponse(respMsg, m.NewResponse())
+	return p.SaveResponse(respMsg, m.NewResponse())
 }
 
 func connectDB() *sqlx.DB {
