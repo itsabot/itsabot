@@ -23,6 +23,10 @@ func (t *Task) RequestAddress(dest **dt.Address) (bool, error) {
 	case addressStateAskUser:
 		addr, remembered, err := language.ExtractAddress(t.ctx.DB,
 			t.ctx.Msg.User, t.ctx.Msg.Input.Sentence)
+		if err == dt.ErrNoAddress {
+			t.resp.Sentence = "I'm sorry. I don't have any record of that place. Where would you like it shipped?"
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}
@@ -34,15 +38,18 @@ func (t *Task) RequestAddress(dest **dt.Address) (bool, error) {
 		addr.Country = "USA"
 		var id uint64
 		if !remembered {
+			log.Println("address was new")
 			t.setState(addressStateGetName)
 			t.resp.Sentence = "Is that your home or office?"
 			id, err = t.ctx.Msg.User.SaveAddress(t.ctx.DB, addr)
 			if err != nil {
 				return false, err
 			}
+			log.Println("here... setting interim ID")
 			t.setInterimID(id)
 			return false, nil
 		}
+		log.Println("address was not new")
 		*dest = addr
 		return true, nil
 	case addressStateGetName:

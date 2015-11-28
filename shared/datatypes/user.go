@@ -23,6 +23,8 @@ type User struct {
 	LastAuthenticationMethod Method
 }
 
+var ErrNoAddress = errors.New("no address")
+
 // GetName satisfies the Contactable interface
 func (u *User) GetName() string {
 	return u.Name
@@ -128,13 +130,18 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 		}
 	}
 	if len(name) == 0 {
-		return nil, errors.New("no address found: " + text)
+		log.Println("no address found: " + text)
+		return nil, ErrNoAddress
 	}
 	q := `
 		SELECT name, line1, line2, city, state, country, zip
 		FROM addresses
 		WHERE userid=$1 AND name=$2 AND cardid=0`
-	if err := db.Get(addr, q, u.ID, name); err != nil {
+	err := db.Get(addr, q, u.ID, name)
+	if err == sql.ErrNoRows {
+		return nil, ErrNoAddress
+	}
+	if err != nil {
 		log.Println("GET returned no address for", name)
 		return nil, err
 	}

@@ -39,7 +39,6 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 		return err
 	}
 	for _, c := range p.Trigger.Commands {
-		c = strings.ToLower(c)
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + "_" + o)
 			if regPkgs.Get(s) != nil {
@@ -49,7 +48,6 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 			}
 			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: cl})
 		}
-		regPkgs.Set(c, &pkg.PkgWrapper{P: p, RPCClient: cl})
 	}
 	return nil
 }
@@ -112,7 +110,7 @@ Loop:
 		// encoding, removing the need to nil this out and then look it
 		// up again in the package
 		m.LastResponse = nil
-		return p, route, false, nil
+		return p, route, true, nil
 	} else {
 		return p, route, false, nil
 	}
@@ -122,6 +120,7 @@ func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg, string, string, error) {
 	reply := &dt.RespMsg{}
 	pw, route, lastRoute, err := getPkg(m)
 	if err != nil {
+		log.Println("err: getPkg", err)
 		var pname string
 		if pw != nil {
 			pname = pw.P.Config.Name

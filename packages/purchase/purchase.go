@@ -120,14 +120,22 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
+	var kw bool
 	if getState() >= StateRecommendations {
-		if err := handleKeywords(m, resp, respMsg); err != nil {
+		log.Println("handling keywords")
+		var err error
+		kw, err = handleKeywords(m, resp, respMsg)
+		if err != nil {
 			return err
 		}
 	}
-	// if purchase has not been made, move user through the package's states
-	if err := updateState(m, resp, respMsg); err != nil {
-		return err
+	if !kw {
+		// if purchase has not been made, move user through the
+		// package's states
+		log.Println("updating state", getState())
+		if err := updateState(m, resp, respMsg); err != nil {
+			return err
+		}
 	}
 	return pkg.SaveResponse(respMsg, resp)
 }
@@ -151,15 +159,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			log.Println("no budget found")
 			return nil
 		}
-		log.Println("set budget", val)
 		resp.State["budget"] = val
 		resp.State["state"] = StateRecommendations
 		fallthrough
 	case StateRecommendations:
+		log.Println("setting recs")
 		err := setRecs(resp, respMsg)
 		if err != nil {
+			log.Println("err setting recs")
 			return err
 		}
+		log.Println("recommending product")
 		if err = recommendProduct(resp, respMsg); err != nil {
 			return err
 		}
@@ -213,7 +223,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
 		resp.State["state"] = StateShippingAddress
-		fallthrough
+		return updateState(m, resp, respMsg)
 	case StateShippingAddress:
 		// tasks are multi-step processes often useful across several
 		// packages
@@ -229,13 +239,10 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if !done {
 			return nil
 		}
-		log.Printf("HERE: %+v\n")
 		if !statesShipping[addr.State] {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}
-		log.Println("HERE 1")
 		resp.State["shippingAddress"] = addr
-		resp.State["state"] = StatePurchase
 		selection, err := currentSelection(resp.State)
 		if err != nil {
 			return err
@@ -260,17 +267,19 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			float64(price)/100)
 		tmp += "Should I place the order?"
 		resp.Sentence = fmt.Sprintf("Ok. It comes to %s", tmp)
+		resp.State["state"] = StatePurchase
 	case StatePurchase:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
 			return nil
 		}
 		if !yes.Bool {
+			resp.Sentence = "Ok."
 			return nil
 		}
-		// TODO
-		// ensure Ava follows up to ensure the delivery occured, get
-		// feedback, etc.
+		// TODO ensure Ava follows up to ensure the delivery occured,
+		// get feedback, etc.
+		// TODO refactor this logic into NewPurchase()
 		purchase := dt.NewPurchase(ctx.DB)
 		purchase.UserID = m.User.ID
 		purchase.User = m.User
@@ -335,15 +344,25 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	return &recs[offset], nil
 }
 
-func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
+func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
+	error) {
 	words := strings.Fields(m.Input.Sentence)
 	modifier := 1
+	kwMatch := false
 	for _, word := range words {
 		switch word {
 		case "detail", "details", "description", "more about", "review",
 			"rating", "rated":
-			resp.Sentence = "Every wine I recommend is at the top of its craft."
-			return nil
+			r := rand.Intn(3)
+			switch r {
+			case 0:
+				resp.Sentence = "Every wine I recommend is at the top of its craft."
+			case 1:
+				resp.Sentence = "I only recommend the best."
+			case 2:
+				resp.Sentence = "This wine has been personally selected by leading wine experts."
+			}
+			kwMatch = true
 		case "price", "cost", "shipping", "how much", "total":
 			prices := getPrices()
 			itemCost := prices[0] - prices[1] - prices[2]
@@ -354,13 +373,19 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			}
 			s += fmt.Sprintf("totaling %.2f.", prices[0])
 			resp.Sentence = s
+			kwMatch = true
 		case "similar", "else", "different":
 			resp.State["offset"] = getOffset() + 1
+			log.Println("recommending product")
 			if err := recommendProduct(resp, respMsg); err != nil {
-				return err
+				return true, err
 			}
-		case "expensive", "event", "nice", "nicer":
+			kwMatch = true
+		case "expensive", "event", "nice", "nicer", "cheap", "cheaper":
 			// perfect example of a need for stemming
+			if word == "cheap" || word == "cheaper" {
+				modifier = -1
+			}
 			budg := getBudget()
 			var tmp int
 			if budg >= 10000 {
@@ -374,13 +399,14 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 				tmp = 0
 			}
 			resp.State["budget"] = uint64(tmp)
+			kwMatch = true
 		case "more", "special":
 			modifier = 1
 		case "less":
 			modifier = -1
 		}
 	}
-	return nil
+	return kwMatch, nil
 }
 
 func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
@@ -443,6 +469,8 @@ func getOffset() uint {
 	switch resp.State["offset"].(type) {
 	case uint:
 		return resp.State["offset"].(uint)
+	case int:
+		return uint(resp.State["offset"].(int))
 	case float64:
 		return uint(resp.State["offset"].(float64))
 	default:
@@ -480,6 +508,7 @@ func getShippingAddress() *dt.Address {
 func getSelectedProducts() []dt.Product {
 	products, ok := resp.State["productsSelected"].([]dt.Product)
 	if !ok {
+		log.Println("productsSelected not found")
 		return nil
 	}
 	return products

@@ -174,6 +174,7 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		log.Println("addContext: ", err)
 	}
+	log.Println("context added", ctxAdded)
 	ret, pname, route, err := callPkg(m, ctxAdded)
 	if err != nil && err != ErrMissingPackage {
 		return "", err
