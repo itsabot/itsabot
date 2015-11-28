@@ -8,6 +8,6 @@ CREATE TABLE addresses (
 	city VARCHAR(255) NOT NULL,
 	state VARCHAR(255) NOT NULL,
 	country VARCHAR(255) NOT NULL,
-	zip VARCHAR(20) NOT NULL,
+	zip VARCHAR(20) NOT NULL, -- full zip, either zip5+4 or international
 	PRIMARY KEY (id)
 );

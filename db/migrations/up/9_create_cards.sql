@@ -1,7 +1,7 @@
 CREATE TABLE cards (
 	id SERIAL,
 	userid INTEGER NOT NULL,
-	addressid INTEGER NOT NULL DEFAULT 0,
+	addressid INTEGER,
 	last4 VARCHAR(4) NOT NULL,
 	cardholdername VARCHAR(255) NOT NULL,
 	expmonth INTEGER NOT NULL,

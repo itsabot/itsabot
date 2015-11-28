@@ -40,8 +40,7 @@ Profile.controller = function() {
 	}, function(err) {
 		console.error(err);
 	});
-	// TODO implement for authentications
-	// Profile.sendView(userId);
+	Profile.sendView(userId);
 };
 
 Profile.view = function(controller) {

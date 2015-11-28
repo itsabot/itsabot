@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
@@ -38,6 +39,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/", handlerMain)
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
+	e.Put("/api/profile.json", handlerAPIProfileView)
 	e.Get("/api/sentence.json", handlerAPISentence)
 	e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
@@ -354,6 +356,35 @@ func handlerAPIProfile(c *echo.Context) error {
 		return jsonError(err)
 	}
 	if err = c.JSON(http.StatusOK, user); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIProfileView(c *echo.Context) error {
+	var err error
+	req := struct {
+		UserID uint64
+	}{}
+	if err = c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	q := `SELECT authorizationid FROM users WHERE id=$1`
+	var authID sql.NullInt64
+	if err = db.Get(&authID, q, req.UserID); err != nil {
+		return jsonError(err)
+	}
+	if !authID.Valid {
+		goto Response
+	}
+	q = `UPDATE authorizations SET authorizedat=$1 WHERE id=$2`
+	_, err = db.Exec(q, time.Now(), authID)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+Response:
+	err = c.JSON(http.StatusOK, nil)
+	if err != nil {
 		return jsonError(err)
 	}
 	return nil

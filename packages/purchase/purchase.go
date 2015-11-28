@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avabot/ava/shared/auth"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
@@ -219,7 +218,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// tasks are multi-step processes often useful across several
 		// packages
 		var addr *dt.Address
-		tsk, err := task.New(ctx.DB, m, resp, respMsg)
+		tsk, err := task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
 		}
@@ -304,10 +303,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err := purchase.Init(); err != nil {
 			return err
 		}
-		err := auth.Purchase(ctx, auth.MethodZip, getSelectedProducts(),
-			purchase)
+		tsk, err := task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
+		}
+		done, err := tsk.RequestPurchase(task.MethodZip,
+			getSelectedProducts(), purchase)
+		if err != nil {
+			return err
+		}
+		if !done {
+			return nil
 		}
 		resp.State["state"] = StateComplete
 		resp.Sentence = "Great! I've placed the order. You'll receive a confirmation by email."

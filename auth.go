@@ -1,16 +1,22 @@
 package main
 
-import "github.com/avabot/ava/shared/datatypes"
+import (
+	"database/sql"
+
+	"github.com/avabot/ava/shared/datatypes"
+)
 
 // checkActiveAuthorization determines if a message to Ava was fulfilling an
-// authorization request.
+// authorization request. RequestAuth nulls out the authorizationid once auth
+// has been completed.
 func checkActiveAuthorization(m *dt.Msg) (bool, error) {
-	q := `
-		SELECT COUNT(id) FROM authorizations
-		WHERE userid=$1 AND attempts=0 AND authorizedat=NULL`
-	var count uint64
-	if err := db.Select(&count, q, m.User.ID); err != nil {
+	q := `SELECT authorizationid FROM users WHERE id=$1`
+	var authID sql.NullInt64
+	if err := db.Get(&authID, q, m.User.ID); err != nil {
 		return false, err
 	}
-	return count > 0, nil
+	if !authID.Valid {
+		return false, nil
+	}
+	return true, nil
 }

@@ -36,7 +36,6 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	addr := p.Config.ServerAddress + port
 	cl, err := rpc.Dial("tcp", addr)
 	if err != nil {
-		log.Println("BUG HERE")
 		return err
 	}
 	for _, c := range p.Trigger.Commands {
@@ -106,6 +105,7 @@ Loop:
 		route = m.LastResponse.Route
 		p = regPkgs.Get(route)
 		if p == nil {
+			log.Println("HERE")
 			return p, route, true, ErrMissingPackage
 		}
 		// TODO pass LastResponse directly to packages via rpc gob
