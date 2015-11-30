@@ -32,17 +32,48 @@ type Purchase struct {
 	db *sqlx.DB
 }
 
-func NewPurchase(db *sqlx.DB) *Purchase {
-	return &Purchase{db: db}
+type PurchaseConfig struct {
+	*User
+	Prices          []uint64
+	VendorID        uint64
+	ShippingAddress *Address
+	Products        []Product
+}
+
+func NewPurchase(ctx *Ctx, pc *PurchaseConfig) *Purchase {
+	p := &Purchase{db: ctx.DB}
+	p.User = pc.User
+	p.ShippingAddress = pc.ShippingAddress
+	p.VendorID = pc.VendorID
+	for _, prod := range pc.Products {
+		p.Products = append(p.Products, prod.Name)
+	}
+	p.Total = pc.Prices[0]
+	p.Tax = pc.Prices[1]
+	p.Shipping = pc.Prices[2]
+	p.AvaFee = uint64(float64(p.Total) * 0.05 * 100)
+	p.CreditCardFee = uint64((float64(p.Total)*0.029 + 0.3) * 100)
+	p.TransferFee =
+		uint64((float64(p.Total-
+			p.AvaFee-
+			p.CreditCardFee) * 0.005) * 100)
+	p.VendorPayout = p.Total - p.AvaFee - p.CreditCardFee - p.TransferFee
+	t := time.Now().Add(7 * 24 * time.Hour)
+	p.DeliveryExpectedAt = &t
+	return p
 }
 
 func (p *Purchase) Init() error {
-	if p.User == nil || p.Vendor == nil {
+	if p.User == nil {
+		(*p).User = &User{}
 		q := `SELECT id, name, email FROM users WHERE id=$1`
 		if err := p.db.Get((*p).User, q, p.UserID); err != nil {
 			return err
 		}
-		q = `
+	}
+	if p.Vendor == nil {
+		(*p).Vendor = &Vendor{}
+		q := `
 			SELECT id, businessname, contactname, contactemail
 			FROM vendors
 			WHERE id=$1`
@@ -50,7 +81,8 @@ func (p *Purchase) Init() error {
 			return err
 		}
 	}
-	if p.ShippingAddressID.Valid && p.ShippingAddress == nil {
+	if p.ShippingAddress == nil {
+		(*p).ShippingAddress = &Address{}
 		q := `
 			SELECT id, businessname, contactname, contactemail
 			FROM vendors

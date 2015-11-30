@@ -2,7 +2,7 @@
 package main
 
 import (
-	"database/sql"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +16,7 @@ import (
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/task"
+	"github.com/renstrom/fuzzysearch/fuzzy"
 )
 
 type Purchase string
@@ -32,10 +33,12 @@ const (
 	StateNone float64 = iota
 	StatePreferences
 	StateBudget
-	StateRecommendations
+	StateSetRecommendations
 	StateRecommendationsAlterBudget
 	StateRecommendationsAlterQuery
+	StateMakeRecommendation
 	StateProductSelection
+	StateContinueShopping
 	StateShippingAddress
 	StatePurchase
 	StateComplete
@@ -97,7 +100,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	// request longer query to get more interesting search results
 	if len(query) < 10 {
-		resp.Sentence = "What do you look for in a wine?"
+		resp.Sentence = "Sure! What do you look for in a wine?"
 		resp.State["state"] = StatePreferences
 		return p.SaveResponse(respMsg, resp)
 	}
@@ -121,7 +124,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
 	var kw bool
-	if getState() >= StateRecommendations {
+	if getState() > StateSetRecommendations {
 		log.Println("handling keywords")
 		var err error
 		kw, err = handleKeywords(m, resp, respMsg)
@@ -160,19 +163,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return nil
 		}
 		resp.State["budget"] = val
-		resp.State["state"] = StateRecommendations
+		resp.State["state"] = StateSetRecommendations
 		fallthrough
-	case StateRecommendations:
+	case StateSetRecommendations:
 		log.Println("setting recs")
 		err := setRecs(resp, respMsg)
 		if err != nil {
 			log.Println("err setting recs")
 			return err
 		}
-		log.Println("recommending product")
-		if err = recommendProduct(resp, respMsg); err != nil {
-			return err
-		}
+		resp.State["state"] = StateMakeRecommendation
+		return updateState(m, resp, respMsg)
 	case StateRecommendationsAlterBudget:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
@@ -187,7 +188,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			}
 		}
 		resp.State["offset"] = 0
-		resp.State["state"] = StateRecommendations
+		resp.State["state"] = StateSetRecommendations
 		return updateState(m, resp, respMsg)
 	case StateRecommendationsAlterQuery:
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -203,8 +204,13 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "Ok. Let me know if there's anything else with which I can help you."
 		}
 		resp.State["offset"] = 0
-		resp.State["state"] = StateRecommendations
+		resp.State["state"] = StateSetRecommendations
 		return updateState(m, resp, respMsg)
+	case StateMakeRecommendation:
+		log.Println("recommending product")
+		if err := recommendProduct(resp, respMsg); err != nil {
+			return err
+		}
 	case StateProductSelection:
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -214,17 +220,41 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if !yes.Bool {
 			resp.State["offset"] = getOffset() + 1
-			return nil
+			log.Println("updating offset", getOffset())
+			resp.State["state"] = StateMakeRecommendation
+			return updateState(m, resp, respMsg)
 		}
 		selection, err := currentSelection(resp.State)
 		if err != nil {
 			return err
 		}
+		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
+		resp.State["state"] = StateContinueShopping
+	case StateContinueShopping:
+		yes := language.ExtractYesNo(m.Input.Sentence)
+		if !yes.Valid {
+			resp.Sentence = "I'm not sure I understand you. Should we look for more wines? At any time, let me know if you want to see your cart or checkout."
+			return nil
+		}
+		if yes.Bool {
+			resp.State["offset"] = getOffset() + 1
+			if err := recommendProduct(resp, respMsg); err != nil {
+				return err
+			}
+			resp.State["state"] = StateProductSelection
+			return nil
+		}
 		resp.State["state"] = StateShippingAddress
 		return updateState(m, resp, respMsg)
 	case StateShippingAddress:
+		prods := getSelectedProducts()
+		if len(prods) == 0 {
+			resp.Sentence = "You haven't picked any products. Should we keep looking?"
+			resp.State["state"] = StateContinueShopping
+			return nil
+		}
 		// tasks are multi-step processes often useful across several
 		// packages
 		var addr *dt.Address
@@ -232,7 +262,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		done, err := tsk.RequestAddress(&addr)
+		done, err := tsk.RequestAddress(&addr, len(prods))
 		if err != nil {
 			return err
 		}
@@ -243,13 +273,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}
 		resp.State["shippingAddress"] = addr
-		selection, err := currentSelection(resp.State)
-		if err != nil {
-			return err
+		price := uint64(0)
+		for _, prod := range prods {
+			price += prod.Price
 		}
-		price := selection.Price
 		// calculate shipping. note that this is vendor specific
-		shippingInCents := 1290 + uint64((len(getSelectedProducts())-1)*120)
+		shippingInCents := 1290 + uint64((len(prods)-1)*120)
 		// add tax
 		tax := statesTax[addr.State]
 		if tax > 0.0 {
@@ -279,45 +308,27 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		// TODO ensure Ava follows up to ensure the delivery occured,
 		// get feedback, etc.
-		// TODO refactor this logic into NewPurchase()
-		purchase := dt.NewPurchase(ctx.DB)
-		purchase.UserID = m.User.ID
-		purchase.User = m.User
-		purchase.VendorID = getSelectedProducts()[0].VendorID
-		purchase.ShippingAddress = getShippingAddress()
-		purchase.ShippingAddressID = sql.NullInt64{
-			Int64: int64(purchase.ShippingAddress.ID),
-			Valid: true,
-		}
-		for _, p := range getSelectedProducts() {
-			purchase.Products = append(purchase.Products, p.Name)
-		}
-		prices := getPrices()
-		purchase.Tax = prices[1]
-		purchase.Shipping = prices[2]
-		purchase.Total = prices[0]
-		purchase.AvaFee = uint64(float64(prices[0]) * 0.05 * 100)
-		purchase.CreditCardFee = uint64(
-			(float64(prices[0])*0.029 + 0.3) * 100)
-		purchase.TransferFee =
-			uint64((float64(purchase.Total-
-				purchase.AvaFee-
-				purchase.CreditCardFee) * 0.005) * 100)
-		purchase.VendorPayout = purchase.Total -
-			purchase.AvaFee -
-			purchase.CreditCardFee -
-			purchase.TransferFee
-		t := time.Now().Add(7 * 24 * time.Hour)
-		purchase.DeliveryExpectedAt = &t
+		prods := getSelectedProducts()
+		purchase := dt.NewPurchase(ctx, &dt.PurchaseConfig{
+			User:            m.User,
+			ShippingAddress: getShippingAddress(),
+			VendorID:        prods[0].VendorID,
+			Prices:          getPrices(),
+			Products:        prods,
+		})
+		log.Println("purchase created")
 		if err := purchase.Init(); err != nil {
 			return err
 		}
+		log.Println("purchase init")
 		tsk, err := task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
 		}
+		log.Println("task init")
 		done, err := tsk.RequestPurchase(task.MethodZip,
 			getSelectedProducts(), purchase)
+		log.Println("task fired. request purchase")
 		if err != nil {
 			return err
 		}
@@ -334,6 +345,11 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	recs := getRecommendations()
 	l := uint(len(recs))
 	if l == 0 {
+		log.Println("!!! empty recs !!!")
+		log.Println("query", getQuery())
+		log.Println("offset", getOffset())
+		log.Println("budget", getBudget())
+		log.Println("selectedProducts", len(getSelectedProducts()))
 		return &dt.Product{}, errors.New("empty recommendations")
 	}
 	offset := getOffset()
@@ -404,6 +420,57 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			modifier = 1
 		case "less":
 			modifier = -1
+		case "cart":
+			kwMatch = true
+			prods := getSelectedProducts()
+			var prodNames []string
+			for _, prod := range prods {
+				prodNames = append(prodNames, prod.Name)
+			}
+			if len(prods) == 0 {
+				resp.Sentence = "You haven't picked any wines, yet."
+			} else if len(prods) == 1 {
+				resp.Sentence = "You've picked a " +
+					prodNames[0] + "."
+			} else {
+				resp.Sentence = fmt.Sprintf(
+					"You've picked %d wines: ", len(prods))
+				resp.Sentence += language.SliceToString(
+					prodNames, "and") + "."
+			}
+			r := rand.Intn(2)
+			switch r {
+			case 0:
+				resp.Sentence += " Should we keep looking or checkout?"
+			case 1:
+				resp.Sentence += " Should we add some more or checkout?"
+			}
+			resp.State["state"] = StateContinueShopping
+		case "checkout", "check":
+			kwMatch = false // deliberately allow pass to updateState
+			resp.State["state"] = StateShippingAddress
+		case "remove", "rid", "drop":
+			kwMatch = true
+			prods := getSelectedProducts()
+			var prodNames []string
+			for _, prod := range prods {
+				prodNames = append(prodNames, prod.Name)
+			}
+			p := fuzzy.Find(m.Input.Sentence, prodNames)
+			if len(p) == 0 {
+				resp.Sentence = "I couldn't find a wine like that in your cart. "
+			} else {
+				resp.Sentence = fmt.Sprintf(
+					"Ok, I'll remove %s.", p[0])
+			}
+			r := rand.Intn(2)
+			switch r {
+			case 0:
+				resp.Sentence += " Is there something else I can help you find?"
+			case 1:
+				resp.Sentence += " Would you like to find another?"
+			}
+			resp.State["state"] = StateContinueShopping
 		}
 	}
 	return kwMatch, nil
@@ -442,7 +509,13 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 			tmp += summary + " "
 		}
 	}
-	tmp += "Does that sound good?"
+	r := rand.Intn(2)
+	switch r {
+	case 0:
+		tmp += "Does that sound good?"
+	case 1:
+		tmp += "Should I add it to your cart?"
+	}
 	resp.Sentence = language.SuggestedProduct(tmp)
 	resp.State["state"] = StateProductSelection
 	return nil
@@ -508,8 +581,19 @@ func getShippingAddress() *dt.Address {
 func getSelectedProducts() []dt.Product {
 	products, ok := resp.State["productsSelected"].([]dt.Product)
 	if !ok {
-		log.Println("productsSelected not found")
-		return nil
+		prodMap, ok := resp.State["productsSelected"].(interface{})
+		if !ok {
+			log.Println("productsSelected not found",
+				resp.State["productsSelected"])
+			return nil
+		}
+		byt, err := json.Marshal(prodMap)
+		if err != nil {
+			log.Println("err: marshaling products", err)
+		}
+		if err = json.Unmarshal(byt, &products); err != nil {
+			log.Println("err: unmarshaling products", err)
+		}
 	}
 	return products
 }
@@ -517,6 +601,19 @@ func getSelectedProducts() []dt.Product {
 func getRecommendations() []dt.Product {
 	products, ok := resp.State["recommendations"].([]dt.Product)
 	if !ok {
+		prodMap, ok := resp.State["recommendations"].(interface{})
+		if !ok {
+			log.Println("recommendations not found",
+				resp.State["recommendations"])
+			return nil
+		}
+		byt, err := json.Marshal(prodMap)
+		if err != nil {
+			log.Println("err: marshaling products", err)
+		}
+		if err = json.Unmarshal(byt, &products); err != nil {
+			log.Println("err: unmarshaling products", err)
+		}
 		return nil
 	}
 	return products

@@ -14,17 +14,23 @@ const (
 	addressStateGetName
 )
 
-func (t *Task) RequestAddress(dest **dt.Address) (bool, error) {
+func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {
 	t.typ = "Address"
+	var pro string
+	if prodCount == 1 {
+		pro = "it"
+	} else {
+		pro = "them"
+	}
 	switch t.getState() {
 	case addressStateNone:
-		t.resp.Sentence = "Where should I ship it?"
+		t.resp.Sentence = "Ok. Where should I ship " + pro + "?"
 		t.setState(addressStateAskUser)
 	case addressStateAskUser:
 		addr, remembered, err := language.ExtractAddress(t.ctx.DB,
 			t.ctx.Msg.User, t.ctx.Msg.Input.Sentence)
 		if err == dt.ErrNoAddress {
-			t.resp.Sentence = "I'm sorry. I don't have any record of that place. Where would you like it shipped?"
+			t.resp.Sentence = "I'm sorry. I don't have any record of that place. Where would you like " + pro + " shipped?"
 			return false, nil
 		}
 		if err != nil {
