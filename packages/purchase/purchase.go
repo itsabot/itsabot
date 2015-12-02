@@ -166,7 +166,10 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 	}
-	return p.SaveResponse(respMsg, resp)
+	if len(resp.Sentence) > 0 {
+		return p.SaveResponse(respMsg, resp)
+	}
+	return nil
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
@@ -283,7 +286,6 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more or checkout?"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
-		resp.State["state"] = StateContinueShopping
 	case StateContinueShopping:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
@@ -292,13 +294,10 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if yes.Bool {
 			resp.State["offset"] = getOffset() + 1
-			if err := recommendProduct(resp, respMsg); err != nil {
-				return err
-			}
-			resp.State["state"] = StateProductSelection
-			return nil
+			resp.State["state"] = StateMakeRecommendation
+		} else {
+			resp.State["state"] = StateShippingAddress
 		}
-		resp.State["state"] = StateShippingAddress
 		return updateState(m, resp, respMsg)
 	case StateShippingAddress:
 		prods := getSelectedProducts()
@@ -423,7 +422,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 	error) {
 	words := strings.Fields(strings.ToLower(m.Input.Sentence))
 	modifier := 1
-	kwMatch := false
 	for _, word := range words {
 		switch word {
 		case "detail", "details", "description", "more about", "review",
@@ -437,7 +435,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			case 2:
 				resp.Sentence = "This wine has been personally selected by leading wine experts."
 			}
-			kwMatch = true
 		case "price", "cost", "shipping", "how much", "total":
 			prices := getPrices()
 			itemCost := prices[0] - prices[1] - prices[2]
@@ -448,7 +445,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			}
 			s += fmt.Sprintf("totaling %.2f.", prices[0])
 			resp.Sentence = s
-			kwMatch = true
 		case "find", "search":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
@@ -456,14 +452,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			if err := recommendProduct(resp, respMsg); err != nil {
 				return true, err
 			}
-			kwMatch = true
 		case "similar", "else", "different", "looking", "look":
 			resp.State["offset"] = getOffset() + 1
 			resp.State["state"] = StateMakeRecommendation
-			if err := recommendProduct(resp, respMsg); err != nil {
-				return true, err
-			}
-			kwMatch = true
 		case "expensive", "event", "nice", "nicer", "cheap", "cheaper":
 			// perfect example of a need for stemming
 			if word == "cheap" || word == "cheaper" {
@@ -483,13 +474,11 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			}
 			resp.State["budget"] = uint64(tmp)
 			resp.State["state"] = StateSetRecommendations
-			kwMatch = false
 		case "more", "special":
 			modifier = 1
 		case "less":
 			modifier = -1
 		case "cart":
-			kwMatch = true
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
@@ -515,12 +504,10 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			case 1:
 				resp.Sentence += " Should we add some more or checkout?"
 			}
-			resp.State["state"] = StateMakeRecommendation
+			resp.State["state"] = StateContinueShopping
 		case "checkout", "check":
-			kwMatch = false // deliberately allow pass to updateState
 			resp.State["state"] = StateShippingAddress
 		case "remove", "rid", "drop":
-			kwMatch = true
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
@@ -560,7 +547,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.State["state"] = StateContinueShopping
 		}
 	}
-	return kwMatch, nil
+	return len(resp.Sentence) > 0, nil
 }
 
 func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
