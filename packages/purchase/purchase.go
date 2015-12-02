@@ -451,10 +451,10 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			prices := getPrices()
 			itemCost := float64(prices[0]-prices[1]-prices[2]) / 100
 			s := fmt.Sprintf("The items cost $%.2f, ", itemCost)
-			s += fmt.Sprintf("shipping is $%.2f and ",
+			s += fmt.Sprintf("shipping is $%.2f, ",
 				float64(prices[1])/100)
-			if prices[2] == 0.0 {
-				s += fmt.Sprintf("tax is $%.2f, ",
+			if prices[2] > 0.0 {
+				s += fmt.Sprintf(" and tax is $%.2f, ",
 					float64(prices[2])/100)
 			}
 			s += fmt.Sprintf("totaling $%.2f.",
