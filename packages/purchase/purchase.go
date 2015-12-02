@@ -531,16 +531,24 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				if len(w) <= 3 {
 					continue
 				}
-				matches = fuzzy.FindFold(w, prodNames)
-				if len(matches) > 0 {
-					break
+				tmp := fuzzy.FindFold(w, prodNames)
+				if len(tmp) > 0 {
+					matches = append(matches, tmp...)
 				}
 			}
 			if len(matches) == 0 {
 				resp.Sentence = "I couldn't find a wine like that in your cart."
-			} else {
+			} else if len(matches) == 1 {
 				resp.Sentence = fmt.Sprintf(
 					"Ok, I'll remove %s.", matches[0])
+				removeSelectedProduct(matches[0])
+			} else {
+				resp.Sentence = "Ok, I'll remove "
+				resp.Sentence += language.SliceToString(matches,
+					"and") + "."
+				for _, match := range matches {
+					removeSelectedProduct(match)
+				}
 			}
 			r := rand.Intn(2)
 			switch r {
@@ -688,6 +696,23 @@ func getSelectedProducts() []dt.Product {
 		}
 	}
 	return products
+}
+
+func removeSelectedProduct(name string) {
+	log.Println("removing", name, "from cart")
+	prods := getSelectedProducts()
+	var success bool
+	for i, prod := range prods {
+		if name == prod.Name {
+			resp.State["productsSelected"] = append(prods[:i],
+				prods[i+1:]...)
+			log.Println("removed", name)
+			success = true
+		}
+	}
+	if !success {
+		log.Println("failed to remove", name, "from", prods)
+	}
 }
 
 func getRecommendations() []dt.Product {
