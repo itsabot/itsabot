@@ -22,6 +22,7 @@ func main() {
 	flag.Parse()
 	trigger := &dt.StructuredInput{
 		Commands: []string{"onboard"},
+		Objects:  []string{"onboard"},
 	}
 	var err error
 	p, err = pkg.NewPackage("onboard", *port, trigger)

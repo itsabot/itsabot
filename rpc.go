@@ -55,12 +55,12 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	var p *pkg.PkgWrapper
 	if m.User == nil {
-		p = regPkgs.Get("onboard")
+		p = regPkgs.Get("onboard_onboard")
 		if p != nil {
-			return p, "onboard", false, nil
+			return p, "onboard_onboard", false, nil
 		} else {
 			log.Println("err: missing required onboard package")
-			return nil, "onboard", false, ErrMissingPackage
+			return nil, "onboard_onboard", false, ErrMissingPackage
 		}
 	}
 	var route string
