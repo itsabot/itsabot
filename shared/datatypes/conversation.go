@@ -84,15 +84,13 @@ func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
 }
 
 func (m *Msg) GetLastResponse(db *sqlx.DB) error {
-	q := `
-		SELECT stateid, route, sentence, userid
-		FROM responses
-		WHERE userid=$1
-		ORDER BY createdat DESC`
 	if m.User == nil {
-		// TODO move to shared errors
 		return errors.New("missing user")
 	}
+	q := `SELECT stateid, route, sentence, userid
+	      FROM responses
+	      WHERE userid=$1
+	      ORDER BY createdat DESC`
 	row := db.QueryRowx(q, m.User.ID)
 	var tmp struct {
 		Route    string
@@ -100,7 +98,12 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 		StateID  sql.NullInt64
 		UserID   uint64
 	}
-	if err := row.StructScan(&tmp); err != nil {
+	err := row.StructScan(&tmp)
+	if err == sql.ErrNoRows {
+		m.LastResponse = &Resp{}
+		return nil
+	}
+	if err != nil {
 		log.Println("structscan row ", err)
 		return err
 	}
@@ -109,8 +112,7 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	}
 	var state []byte
 	q = `SELECT state FROM states WHERE id=$1`
-	err := db.Get(&state, q, tmp.StateID)
-	if err != nil {
+	if err = db.Get(&state, q, tmp.StateID); err != nil {
 		return err
 	}
 	m.LastResponse = &Resp{
@@ -118,8 +120,7 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 		Sentence: tmp.Sentence,
 		UserID:   tmp.UserID,
 	}
-	err = json.Unmarshal(state, &m.LastResponse.State)
-	if err != nil {
+	if err = json.Unmarshal(state, &m.LastResponse.State); err != nil {
 		log.Println("unmarshaling state", err)
 		return err
 	}
