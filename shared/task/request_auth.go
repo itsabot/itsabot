@@ -4,12 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"regexp"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
 	"github.com/avabot/ava/shared/datatypes"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var regexNum = regexp.MustCompile(`\d+`)
@@ -18,6 +20,7 @@ var ErrInvalidAuth = errors.New("invalid auth")
 
 const (
 	authStateNone float64 = iota
+	authStateStart
 	authStateConfirm
 )
 
@@ -39,6 +42,8 @@ const (
 	MethodWebLogin
 )
 
+// TODO sub-task. RequestCard if no valid credit card matched.
+
 // RequestAuth ensures you're speaking to the correct user. Select the LOWEST
 // level of authentication you'll allow based on a tolerance for fraud weighed
 // against the convenience of the user experience. Methods are organized in
@@ -50,55 +55,88 @@ const (
 // Purchase flow. In order to drive a customer purchase, call Purchase directly,
 // which will also authenticate the user.
 func (t *Task) RequestAuth(m dt.Method) (bool, error) {
+	log.Println("REQUESTAUTH")
 	t.typ = "Auth"
+	log.Println("state", t.getState())
+	if t.getState() == authStateNone {
+		t.setState(authStateStart)
+	}
 	// check last authentication date and method
 	authenticated, err := t.ctx.Msg.User.IsAuthenticated(m)
 	if err != nil {
+		log.Println("err checking last authentication")
 		return false, err
 	}
 	if authenticated {
 		return true, nil
 	}
 	switch t.getState() {
-	case authStateNone:
+	case authStateStart:
+		t.setState(authStateConfirm)
 		return t.askUserForAuth(m)
 	case authStateConfirm:
 		switch m {
 		case MethodZip:
-			zip5 := regexNum.FindString(t.ctx.Msg.Input.Sentence)
+			zip5 := []byte(
+				regexNum.FindString(t.ctx.Msg.Input.Sentence))
 			if len(zip5) != 5 {
-				return false, errors.New("zip code not found")
+				return false, ErrInvalidAuth
 			}
-			q := `
-				SELECT COUNT(id) FROM addresses
-				WHERE userid=$1 AND cardid<>NULL AND zip5=$2`
-			var count uint64
-			err := t.ctx.DB.Select(&count, q, t.ctx.Msg.User.ID, zip5)
+			q := `SELECT zip5hash FROM cards WHERE userid=$1`
+			rows, err := t.ctx.DB.Queryx(q, t.ctx.Msg.User.ID)
 			if err != nil {
 				return false, err
 			}
-			if count > 0 {
-				q = `
-					SELECT authorizationid FROM users
-					WHERE id=$1`
-				var authID *sql.NullInt64
-				err = t.ctx.DB.Get(authID, q, t.ctx.Msg.User.ID)
-				if err == sql.ErrNoRows {
-					return false, ErrNoAuth
-				}
-				if err != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var zip5hash []byte
+				if err = rows.Scan(&zip5hash); err != nil {
 					return false, err
 				}
-				if !authID.Valid {
-					return false, ErrNoAuth
-				}
-				if err = t.setAuthorized(authID); err != nil {
+				err = bcrypt.CompareHashAndPassword(zip5hash,
+					zip5)
+				if err == bcrypt.ErrMismatchedHashAndPassword ||
+					err == bcrypt.ErrHashTooShort {
+					continue
+				} else if err != nil {
 					return false, err
+				} else {
+					q = `
+						SELECT authorizationid
+						FROM users
+						WHERE id=$1`
+					authID := &sql.NullInt64{}
+					err = t.ctx.DB.Get(authID, q,
+						t.ctx.Msg.User.ID)
+					if err == sql.ErrNoRows {
+						return false, ErrNoAuth
+					}
+					if err != nil {
+						return false, err
+					}
+					q = `
+						SELECT id FROM authorizations
+						WHERE id=$1 AND authmethod>=$2`
+					err = t.ctx.DB.Get(authID, q, *authID,
+						m)
+					if err == sql.ErrNoRows {
+						log.Println("no authorization")
+						return false, ErrInvalidAuth
+					}
+					if err != nil {
+						return false, err
+					}
+					if !authID.Valid {
+						return false, ErrNoAuth
+					}
+					err = t.setAuthorized(authID)
+					if err != nil {
+						return false, err
+					}
+					return true, nil
 				}
-				return true, nil
-			} else {
-				return false, ErrInvalidAuth
 			}
+			return false, ErrInvalidAuth
 		case MethodWebCache, MethodWebLogin:
 			q := `SELECT authorizationid FROM users WHERE id=$1`
 			var authID *sql.NullInt64
@@ -134,14 +172,12 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 // RequestPurchase will authenticate the user and then charge a card.
 func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
 	p *dt.Purchase) (bool, error) {
-	if os.Getenv("AVA_ENV") == "production" {
-		authenticated, err := t.RequestAuth(m)
-		if err != nil {
-			return false, err
-		}
-		if !authenticated {
-			return false, nil
-		}
+	authenticated, err := t.RequestAuth(m)
+	if err != nil {
+		return false, err
+	}
+	if !authenticated {
+		return false, nil
 	}
 	desc := fmt.Sprintf("Purchase for %.2f", float64(p.Total)/100)
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
@@ -169,14 +205,14 @@ func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	switch m {
 	case MethodZip:
-		t.resp.Sentence = "Please confirm your billing zip code"
+		t.resp.Sentence = "To do that, please confirm your billing zip code."
 	case MethodWebCache:
-		t.resp.Sentence = "Please prove you're logged in: https://www.avabot.com/?/profile"
+		t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.com/?/profile"
 	case MethodWebLogin:
 		if err := t.ctx.Msg.User.DeleteSessions(t.ctx.DB); err != nil {
 			return false, err
 		}
-		t.resp.Sentence = "Please log in to prove it's you: https://www.avabot.com/?/login"
+		t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.com/?/login"
 	}
 	tx, err := t.ctx.DB.Beginx()
 	if err != nil {

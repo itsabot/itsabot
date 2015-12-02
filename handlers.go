@@ -398,9 +398,14 @@ func handlerAPICardSubmit(c *echo.Context) error {
 		Brand          string
 		ExpMonth       int
 		ExpYear        int
+		AddressZip     string
 		UserID         int
 	}
 	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	hZip, err := bcrypt.GenerateFromPassword([]byte(req.AddressZip[:5]), 10)
+	if err != nil {
 		return jsonError(err)
 	}
 	var userStripeID string
@@ -420,11 +425,11 @@ func handlerAPICardSubmit(c *echo.Context) error {
 	q = `
 		INSERT INTO cards
 		(userid, last4, cardholdername, expmonth, expyear, brand,
-			stripeid)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+			stripeid, zip5hash)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id`
 	row := db.QueryRowx(q, req.UserID, req.Last4, req.CardholderName,
-		req.ExpMonth, req.ExpYear, req.Brand, cd.ID)
+		req.ExpMonth, req.ExpYear, req.Brand, cd.ID, hZip)
 	err = row.Scan(&crd.ID)
 	if err != nil {
 		return jsonError(err)

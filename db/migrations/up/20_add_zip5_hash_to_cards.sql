@@ -1,0 +1,1 @@
+ALTER TABLE cards ADD COLUMN zip5hash VARCHAR(255);

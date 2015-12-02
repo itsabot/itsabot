@@ -10,6 +10,8 @@ type Address struct {
 	City           string
 	State          string
 	Zip            string
+	Zip5           string
+	Zip4           string
 	Country        string
 	DisplayAddress string
 }

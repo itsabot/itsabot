@@ -110,6 +110,25 @@ Card.addView = function(controller) {
 								value: controller.card.cardholderName()
 							})
 						])
+					]),
+					m("div", {
+						id: "card-name",
+						class: "form-group"
+					}, [
+						m("label", {
+							class: "col-md-3 control-label"
+						}, "Billing zip"),
+						m("div", {
+							class: "col-md-9"
+						}, [
+							m("input", {
+								class: "form-control",
+								type: "text",
+								placeholder: "90210",
+								onchange: m.withAttr("value", controller.card.zip5),
+								value: controller.card.zip5()
+							})
+						])
 					])
 				]),
 				m("div", {

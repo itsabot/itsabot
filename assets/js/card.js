@@ -4,6 +4,7 @@ var Card = function(data) {
 	_this.id = m.prop(data.id || 0);
 	_this.cardholderName = m.prop(data.cardholderName || "");
 	_this.number = m.prop(data.number || "");
+	_this.zip5 = m.prop(data.zip5 || "");
 	_this.brand = m.prop("");
 	if (data.expMonth != null && data.expYear != null) {
 		_this.expiry = m.prop(data.expMonth + " / " + data.expYear);
@@ -23,7 +24,8 @@ var Card = function(data) {
 				ExpMonth: resp.card.exp_month,
 				ExpYear: resp.card.exp_year,
 				Brand: _this.brand(),
-				Last4: resp.card.last4
+				Last4: resp.card.last4,
+				AddressZip: _this.zip5()
 			};
 			m.request({
 				method: "POST",
@@ -45,7 +47,8 @@ var Card = function(data) {
 			number: _this.number(),
 			cvc: _this.cvc(),
 			exp: _this.expiry(),
-			name: _this.cardholderName()
+			name: _this.cardholderName(),
+			address_zip: _this.zip5()
 		}, function(status, response) {
 			if (response.error) {
 				return deferred.reject(new Error(response.error.message));

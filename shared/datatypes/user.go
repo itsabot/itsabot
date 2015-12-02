@@ -73,6 +73,7 @@ func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 	if err != nil {
 		return cards, err
 	}
+	defer rows.Close()
 	var card Card
 	for rows.Next() {
 		if err = rows.StructScan(&card); err != nil {

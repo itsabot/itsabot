@@ -34,10 +34,9 @@ func saveStructuredInput(m *dt.Msg, rid uint64, pkg, route string) (uint64,
 		RETURNING id`
 	in := m.Input
 	si := in.StructuredInput
-	row := db.QueryRowx(
-		q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence, in.SentenceAnnotated,
-		si.Commands, si.Objects, si.Actors, si.Times, si.Places, rid,
-		pkg, route)
+	row := db.QueryRowx(q, in.UserID, in.FlexID, in.FlexIDType, in.Sentence,
+		in.SentenceAnnotated, si.Commands, si.Objects, si.Actors,
+		si.Times, si.Places, rid, pkg, route)
 	var id uint64
 	if err := row.Scan(&id); err != nil {
 		return 0, err

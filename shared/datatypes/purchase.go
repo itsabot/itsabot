@@ -2,14 +2,14 @@ package dt
 
 import (
 	"database/sql"
+	"log"
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/satori/go.uuid"
 )
 
 type Purchase struct {
-	ID                 uuid.UUID
+	ID                 string `sql:"type:varchar(36);primary key"`
 	UserID             uint64
 	User               *User
 	VendorID           uint64
@@ -40,7 +40,7 @@ type PurchaseConfig struct {
 	Products        []Product
 }
 
-func NewPurchase(ctx *Ctx, pc *PurchaseConfig) *Purchase {
+func NewPurchase(ctx *Ctx, pc *PurchaseConfig) (*Purchase, error) {
 	p := &Purchase{db: ctx.DB}
 	p.User = pc.User
 	p.ShippingAddress = pc.ShippingAddress
@@ -51,24 +51,20 @@ func NewPurchase(ctx *Ctx, pc *PurchaseConfig) *Purchase {
 	p.Total = pc.Prices[0]
 	p.Tax = pc.Prices[1]
 	p.Shipping = pc.Prices[2]
-	p.AvaFee = uint64(float64(p.Total) * 0.05 * 100)
-	p.CreditCardFee = uint64((float64(p.Total)*0.029 + 0.3) * 100)
+	p.AvaFee = uint64(float64(p.Total)*0.05 + 0.5)
+	p.CreditCardFee = uint64((float64(p.Total)*0.029 + 0.3) + 0.5)
 	p.TransferFee =
 		uint64((float64(p.Total-
 			p.AvaFee-
-			p.CreditCardFee) * 0.005) * 100)
+			p.CreditCardFee) * 0.005) + 0.5)
 	p.VendorPayout = p.Total - p.AvaFee - p.CreditCardFee - p.TransferFee
 	t := time.Now().Add(7 * 24 * time.Hour)
 	p.DeliveryExpectedAt = &t
-	return p
-}
-
-func (p *Purchase) Init() error {
 	if p.User == nil {
 		(*p).User = &User{}
 		q := `SELECT id, name, email FROM users WHERE id=$1`
 		if err := p.db.Get((*p).User, q, p.UserID); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if p.Vendor == nil {
@@ -78,21 +74,39 @@ func (p *Purchase) Init() error {
 			FROM vendors
 			WHERE id=$1`
 		if err := p.db.Get((*p).Vendor, q, p.VendorID); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	if p.ShippingAddress == nil {
-		(*p).ShippingAddress = &Address{}
-		q := `
-			SELECT id, businessname, contactname, contactemail
-			FROM vendors
-			WHERE id=$1`
-		err := p.db.Get((*p).ShippingAddress, q, p.ShippingAddressID)
-		if err != nil {
-			return err
-		}
+	id, err := p.Create()
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	p.ID = id
+	return p, nil
+}
+
+func (p *Purchase) Create() (string, error) {
+	q := `
+		INSERT INTO purchases
+		(userid, vendorid, shippingaddressid, products, tax, shipping,
+		total, avafee, creditcardfee, transferfee, vendorpayout)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10)
+		RETURNING id`
+	log.Println("tax", p.Tax)
+	log.Println("shipping", p.Shipping)
+	log.Println("total", p.Total)
+	log.Println("avafee", p.AvaFee)
+	log.Println("creditcardfee", p.CreditCardFee)
+	log.Println("vendorpayout", p.VendorPayout)
+	var id string
+	err := p.db.QueryRowx(q, p.User.ID, p.Vendor.ID, p.ShippingAddressID,
+		StringSlice(p.Products), p.Tax, p.Shipping, p.Total, p.AvaFee,
+		p.CreditCardFee, p.VendorPayout).Scan(&id)
+	if err != nil {
+		log.Println("ERR HERE")
+		return "", err
+	}
+	return id, nil
 }
 
 func (p *Purchase) Subtotal() uint64 {

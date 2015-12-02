@@ -9,14 +9,16 @@ import (
 	"log"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/renstrom/fuzzysearch/fuzzy"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/pkg"
+	"github.com/avabot/ava/shared/prefs"
 	"github.com/avabot/ava/shared/task"
-	"github.com/renstrom/fuzzysearch/fuzzy"
 )
 
 type Purchase string
@@ -41,8 +43,11 @@ const (
 	StateContinueShopping
 	StateShippingAddress
 	StatePurchase
+	StateAuth
 	StateComplete
 )
+
+const pkgName string = "purchase"
 
 var statesShipping = map[string]bool{
 	"CA": true,
@@ -52,9 +57,8 @@ var statesTax = map[string]float64{
 	"CA": 0.0925,
 }
 
-// TODO add support for purchasing multiple, upselling and promotions. Then a
-// Task interface for follow ups and common multi-step information gathering,
-// e.g. getting and naming addresses
+// TODO add support for upselling and promotions. Then a Task interface for
+// follow ups
 
 func main() {
 	flag.Parse()
@@ -68,7 +72,7 @@ func main() {
 		Commands: language.Purchase(),
 		Objects:  language.Alcohol(),
 	}
-	p, err = pkg.NewPackage("purchase", *port, trigger)
+	p, err = pkg.NewPackage(pkgName, *port, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}
@@ -98,13 +102,35 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	for _, o := range si.Objects {
 		query += o + " "
 	}
-	// request longer query to get more interesting search results
-	if len(query) < 10 {
-		resp.Sentence = "Sure! What do you look for in a wine?"
+	tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
+		prefs.KeyTaste)
+	if err != nil {
+		return err
+	}
+	if len(tastePref) == 0 {
+		resp.State["query"] = query + " " + tastePref
 		resp.State["state"] = StatePreferences
+		resp.Sentence = "Sure. What do you usually look for in a wine?"
 		return p.SaveResponse(respMsg, resp)
 	}
-	// user provided us with a sufficiently detailed query, now search
+	resp.State["query"] = tastePref
+	budgetPref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
+		prefs.KeyBudget)
+	if err != nil {
+		return err
+	}
+	if len(budgetPref) > 0 {
+		resp.State["budget"], err = strconv.ParseUint(budgetPref, 10,
+			64)
+		if err != nil {
+			return err
+		}
+		resp.State["state"] = StateSetRecommendations
+		updateState(m, resp, respMsg)
+		return p.SaveResponse(respMsg, resp)
+	}
+	resp.State["state"] = StateBudget
+	resp.Sentence = "Sure. How much do you usually pay for a bottle?"
 	return t.FollowUp(m, respMsg)
 }
 
@@ -148,9 +174,19 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	case StatePreferences:
 		// TODO ensure Ava remembers past answers for preferences
 		// "I know you're going to love this"
-		resp.State["query"] = getQuery() + " " + m.Input.Sentence
-		resp.State["state"] = StateBudget
-		resp.Sentence = "Ok. How much do you usually pay for a bottle of wine?"
+		if getBudget() == 0 {
+			resp.State["query"] = getQuery() + " " + m.Input.Sentence
+			resp.State["state"] = StateBudget
+			resp.Sentence = "Ok. How much do you usually pay for a bottle of wine?"
+			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
+				prefs.KeyTaste, getQuery()); err != nil {
+				log.Println("err: saving budget pref")
+				return err
+			}
+		} else {
+			resp.State["state"] = StateSetRecommendations
+			return updateState(m, resp, respMsg)
+		}
 	case StateBudget:
 		// TODO ensure Ava remembers past answers for budget
 		val, budget, err := language.ExtractCurrency(m.Input.Sentence)
@@ -164,6 +200,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		resp.State["budget"] = val
 		resp.State["state"] = StateSetRecommendations
+		err = prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
+			strconv.FormatUint(getBudget(), 10))
+		if err != nil {
+			log.Println("err: saving budget pref")
+			return err
+		}
 		fallthrough
 	case StateSetRecommendations:
 		log.Println("setting recs")
@@ -189,6 +231,11 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		resp.State["offset"] = 0
 		resp.State["state"] = StateSetRecommendations
+		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
+			strconv.FormatUint(getBudget(), 10))
+		if err != nil {
+			return err
+		}
 		return updateState(m, resp, respMsg)
 	case StateRecommendationsAlterQuery:
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -205,6 +252,11 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		resp.State["offset"] = 0
 		resp.State["state"] = StateSetRecommendations
+		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
+			strconv.FormatUint(getBudget(), 10))
+		if err != nil {
+			return err
+		}
 		return updateState(m, resp, respMsg)
 	case StateMakeRecommendation:
 		log.Println("recommending product")
@@ -306,21 +358,22 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "Ok."
 			return nil
 		}
+		resp.State["state"] = StateAuth
+		return updateState(m, resp, respMsg)
+	case StateAuth:
 		// TODO ensure Ava follows up to ensure the delivery occured,
 		// get feedback, etc.
 		prods := getSelectedProducts()
-		purchase := dt.NewPurchase(ctx, &dt.PurchaseConfig{
+		purchase, err := dt.NewPurchase(ctx, &dt.PurchaseConfig{
 			User:            m.User,
 			ShippingAddress: getShippingAddress(),
 			VendorID:        prods[0].VendorID,
 			Prices:          getPrices(),
 			Products:        prods,
 		})
-		log.Println("purchase created")
-		if err := purchase.Init(); err != nil {
+		if err != nil {
 			return err
 		}
-		log.Println("purchase init")
 		tsk, err := task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
@@ -329,10 +382,16 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		done, err := tsk.RequestPurchase(task.MethodZip,
 			getSelectedProducts(), purchase)
 		log.Println("task fired. request purchase")
+		if err == task.ErrInvalidAuth {
+			resp.Sentence = "I'm sorry but that doesn't match what I have. You could try to add a new card here: https://avabot.com/?/cards/new"
+			return nil
+		}
 		if err != nil {
+			log.Println("err requesting purchase")
 			return err
 		}
 		if !done {
+			log.Println("purchase incomplete")
 			return nil
 		}
 		resp.State["state"] = StateComplete
@@ -390,9 +449,17 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			s += fmt.Sprintf("totaling %.2f.", prices[0])
 			resp.Sentence = s
 			kwMatch = true
+		case "look":
+			log.Println("HERE")
+			resp.State["offset"] = 0
+			resp.State["query"] = m.Input.Sentence
+			resp.State["state"] = StateMakeRecommendation
+			if err := recommendProduct(resp, respMsg); err != nil {
+				return true, err
+			}
+			kwMatch = true
 		case "similar", "else", "different":
 			resp.State["offset"] = getOffset() + 1
-			log.Println("recommending product")
 			if err := recommendProduct(resp, respMsg); err != nil {
 				return true, err
 			}

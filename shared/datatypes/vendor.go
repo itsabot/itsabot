@@ -2,9 +2,9 @@ package dt
 
 type Vendor struct {
 	ID           uint64
-	BusinessName string
-	ContactName  string
-	ContactEmail string
+	BusinessName string `sql:"businessname"`
+	ContactName  string `sql:"contactname"`
+	ContactEmail string `sql:"contactemail"`
 }
 
 // GetName satisfies the Contactable interface

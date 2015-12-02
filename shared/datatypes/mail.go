@@ -20,10 +20,7 @@ func (sg *MailClient) SendPurchaseConfirmation(products []Product,
 	if len(products) == 0 {
 		return errors.New("empty products slice in purchase confirmation")
 	}
-	if err := p.Init(); err != nil {
-		return err
-	}
-	subj := "Order confirmation"
+	subj := fmt.Sprintf("Order confirmation: #%s", p.ID)
 	text := "<html><body>"
 	text += fmt.Sprintf("<p>Hi %s:</p>", p.User.Name)
 	text += "<p>Here's a quick order summary for your records. You bought:</p>"
@@ -45,7 +42,8 @@ func (sg *MailClient) SendPurchaseConfirmation(products []Product,
 	text += "</table>"
 	delivery := time.Now().Add(7 * 24 * time.Hour)
 	delS := delivery.Format("Monday Jan 2, 2006")
-	text += fmt.Sprintf("<p>Expected delivery before %s</p>", delS)
+	text += fmt.Sprintf("<p>Expected delivery before %s. ", delS)
+	text += fmt.Sprintf("Your order confirmation number is %s.</p>", p.ID)
 	text += "<p>Glad I could help! :)</p><p>- Ava</p>"
 	text += "</body></html>"
 	return sg.Send(subj, text, p.User)
@@ -56,9 +54,6 @@ func (sg *MailClient) SendVendorRequest(products []Product,
 	p *Purchase) error {
 	if len(products) == 0 {
 		return errors.New("empty products slice in vendor request")
-	}
-	if err := p.Init(); err != nil {
-		return err
 	}
 	var subj string
 	if os.Getenv("AVA_ENV") == "production" {
@@ -84,18 +79,19 @@ func (sg *MailClient) SendVendorRequest(products []Product,
 		float64(p.Shipping)/100)
 	text += fmt.Sprintf("<tr><td>Tax: </td><td>$%.2f</td></tr>",
 		float64(p.Tax)/100)
-	text += fmt.Sprintf("<tr><td>My fee: </td><td>$0.00</td></tr>",
-		float64(p.AvaFee)*0.05)
-	text += fmt.Sprintf("<tr><td><b>Total: </b></td><td><b>$%.2f</b></td></tr>",
-		float64(p.Total)/100)
+	text += fmt.Sprintf("<tr><td>My fee: </td><td>($.2f)</td></tr>",
+		float64(p.AvaFee)/100)
+	text += fmt.Sprintf("<tr><td>Credit card fees: </td><td>($.2f)</td></tr>",
+		float64(p.CreditCardFee)/100)
+	text += fmt.Sprintf("<tr><td><b>Total you'll receive: </b></td><td><b>$%.2f</b></td></tr>",
+		float64(p.Total-p.AvaFee-p.CreditCardFee)/100)
 	text += "</table>"
-	text += fmt.Sprintf("<p>They're expecting delivery before %s</p>",
-		p.DeliveryExpectedAt.Format("Monday Jan 2, 2006"))
+	text += fmt.Sprintf("<p>%s is expecting delivery before %s</p>",
+		p.User.Name, p.DeliveryExpectedAt.Format("Monday Jan 2, 2006"))
 	text += "<p>The order has been paid for in full and is ready to be shipped. "
-	text += fmt.Sprintf("You'll receive payment in the amount of $%.2f ",
-		float64(p.VendorPayout)/100)
-	text += "within 30 days, which includes tax and shipping, less Ava's "
-	text += "5% fee and credit card processing fees (2.9% + 30¢).</p>"
+	text += "You'll receive payment within 30 days, which includes tax and "
+	text += "shipping, less Ava's 5% fee and credit card processing fees "
+	text += "(2.9% + 30¢).</p>"
 	text += "<p>If you have any questions or concerns with this order, "
 	text += "please respond to this email.</p>"
 	text += "<p>Best,</p>"

@@ -83,6 +83,11 @@
 			"Rev": "d519ca3a9c607c77ce27818bd11b0ee73ac41d10"
 		},
 		{
+			"ImportPath": "github.com/renstrom/fuzzysearch/fuzzy",
+			"Comment": "v1.0.0",
+			"Rev": "d4ca9dfccd55dc6b076f9880d49c35315922c1f4"
+		},
+		{
 			"ImportPath": "github.com/satori/go.uuid",
 			"Rev": "6b8e5b55d20d01ad47ecfe98e5171688397c61e9"
 		},

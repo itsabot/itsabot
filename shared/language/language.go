@@ -14,6 +14,8 @@ var yes map[string]bool = map[string]bool{
 	"yup":          true,
 	"yesh":         true,
 	"sure":         true,
+	"ok":           true,
+	"o.k.":         true,
 	"that's right": true,
 	"thats right":  true,
 	"affirmative":  true,

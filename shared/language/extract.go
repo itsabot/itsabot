@@ -83,6 +83,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Address2 string
 		City     string
 		State    string
+		Zip      string
 		Zip5     string
 		Zip4     string
 	}
@@ -92,6 +93,8 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Address2: addr.Line1,
 		City:     addr.City,
 		State:    addr.State,
+		Zip5:     addr.Zip5,
+		Zip4:     addr.Zip4,
 	}
 	if len(addr.Zip) > 0 {
 		addr2Stmp.Zip5 = addr.Zip[:5]
@@ -140,6 +143,8 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Line2: resp.Address.Address1,
 		City:  resp.Address.City,
 		State: resp.Address.State,
+		Zip5:  resp.Address.Zip5,
+		Zip4:  resp.Address.Zip4,
 	}
 	if len(resp.Address.Zip4) > 0 {
 		a.Zip = resp.Address.Zip5 + "-" + resp.Address.Zip4

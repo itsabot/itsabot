@@ -1,0 +1,1 @@
+ALTER TABLE cards DROP COLUMN zip5hash;
