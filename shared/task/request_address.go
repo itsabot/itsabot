@@ -34,6 +34,7 @@ func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {
 			return false, nil
 		}
 		if err != nil {
+			t.resp.Sentence = "I'm sorry, but something went wrong. Please try sending that to me again later."
 			return false, err
 		}
 		if addr == nil || addr.Line1 == "" || addr.City == "" ||

@@ -135,6 +135,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Address:    addr2Stmp,
 	}
 	if err = xml.Unmarshal(contents, &resp); err != nil {
+		log.Println("USPS response", string(contents))
 		return nil, false, err
 	}
 	a := dt.Address{
