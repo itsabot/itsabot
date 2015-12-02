@@ -154,6 +154,7 @@ func processText(c *echo.Context) (string, error) {
 		log.Println("classifying sentence ", err)
 	}
 	uid, fid, fidT := validateParams(c)
+	log.Println("uid", uid, "fid", fid, "fidT", fidT)
 	in := &dt.Input{
 		Sentence:          cmd,
 		StructuredInput:   si,
