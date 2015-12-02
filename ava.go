@@ -179,6 +179,7 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil && err != ErrMissingPackage {
 		return "", err
 	}
+	log.Println("sentence", ret.Sentence)
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
 	}
