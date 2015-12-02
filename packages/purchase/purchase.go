@@ -298,6 +298,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
+		resp.State["state"] = StateContinueShopping
 	case StateContinueShopping:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
