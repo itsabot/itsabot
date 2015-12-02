@@ -232,13 +232,11 @@ func validateParams(c *echo.Context) (uint64, string, int) {
 		fidT, err = strconv.Atoi(tmp)
 		if err != nil && err.Error() ==
 			`strconv.ParseInt: parsing "": invalid syntax` {
-			fidT = 0
+			// default to 2 (SMS)
+			fidT = 2
 		} else if err != nil {
 			log.Fatalln(err)
 		}
-	}
-	if fidT == 0 {
-		log.Fatalln("flexidtype cannot be 0")
 	}
 	return uid, fid, fidT
 }
