@@ -458,8 +458,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				return true, err
 			}
 			kwMatch = true
-		case "similar", "else", "different":
+		case "similar", "else", "different", "looking":
 			resp.State["offset"] = getOffset() + 1
+			resp.State["state"] = StateMakeRecommendation
 			if err := recommendProduct(resp, respMsg); err != nil {
 				return true, err
 			}
@@ -514,7 +515,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			case 1:
 				resp.Sentence += " Should we add some more or checkout?"
 			}
-			resp.State["state"] = StateContinueShopping
 		case "checkout", "check":
 			kwMatch = false // deliberately allow pass to updateState
 			resp.State["state"] = StateShippingAddress
