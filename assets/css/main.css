@@ -373,6 +373,11 @@ input.form-control {
 	font-style: italic;
 	color: #AAA;
 }
+@media (max-width: 528px) {
+	.hide-small {
+		display: none;
+	}
+}
 @media (max-width: 992px) {
 	.img-big {
 		display: none;

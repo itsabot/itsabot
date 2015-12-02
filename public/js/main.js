@@ -460,7 +460,7 @@ var Footer = {
 					class: "row"
 				}, [
 					m("div", {
-						class: "col-md-3 border-right"
+						class: "col-sm-3 border-right"
 					}, [
 						m("div", {
 							class: "big-name"
@@ -474,7 +474,7 @@ var Footer = {
 						m("div", "All rights reserved.")
 					]),
 					m("div", {
-						class: "col-md-2"
+						class: "col-sm-2 hide-small"
 					}, [
 						m("div", m("a", {
 							href: "/",
@@ -514,7 +514,7 @@ var Footer = {
 						])
 					]),
 					m("div", {
-						class: "col-md-7 de-emphasized"
+						class: "col-sm-7 de-emphasized hide-small"
 					}, [
 						m("div", [
 							m("a", {
@@ -562,7 +562,7 @@ header.view = function() {
 						src: "/public/images/logo.svg"
 					}),
 					m("span", {
-						class: "margin-top-xs"
+						class: "margin-top-xs hide-small"
 					}, m.trust(" &nbsp;Ava")),
 				])
 			]),
@@ -573,12 +573,17 @@ header.view = function() {
 					href: "/",
 					config: m.route
 				}, "Home"),
+				function() {
+					if (cookie.getItem("id") === null) {
+						return m("a", {
+							href: "/tour",
+							config: m.route
+						}, "Tour")
+					}
+				}(),
 				m("a", {
-					href: "/tour",
-					config: m.route
-				}, "Tour"),
-				m("a", {
-					href: "https://medium.com/ava-updates/latest"
+					href: "https://medium.com/ava-updates/latest",
+					class: "hide-small"
 				}, "Updates"),
 				function() {
 					if (cookie.getItem("id") !== null) {

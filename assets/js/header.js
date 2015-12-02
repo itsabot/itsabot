@@ -16,7 +16,7 @@ header.view = function() {
 						src: "/public/images/logo.svg"
 					}),
 					m("span", {
-						class: "margin-top-xs"
+						class: "margin-top-xs hide-small"
 					}, m.trust(" &nbsp;Ava")),
 				])
 			]),
@@ -27,12 +27,17 @@ header.view = function() {
 					href: "/",
 					config: m.route
 				}, "Home"),
+				function() {
+					if (cookie.getItem("id") === null) {
+						return m("a", {
+							href: "/tour",
+							config: m.route
+						}, "Tour")
+					}
+				}(),
 				m("a", {
-					href: "/tour",
-					config: m.route
-				}, "Tour"),
-				m("a", {
-					href: "https://medium.com/ava-updates/latest"
+					href: "https://medium.com/ava-updates/latest",
+					class: "hide-small"
 				}, "Updates"),
 				function() {
 					if (cookie.getItem("id") !== null) {
