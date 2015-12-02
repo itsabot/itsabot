@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"strconv"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/NickPresta/GoURLShortener"
 	"github.com/avabot/ava/shared/datatypes"
@@ -60,12 +59,10 @@ func (t *Onboard) FollowUp(m *dt.Msg,
 
 func getURL(m *dt.Msg) (string, error) {
 	fid := m.Input.FlexID
-	fidT := m.Input.FlexIDType
 	v := url.Values{
-		"flexid":     {fid},
-		"flexidtype": {strconv.Itoa(fidT)},
+		"fid": {fid},
 	}
-	u := os.Getenv("BASE_URL") + "signup?" + v.Encode()
+	u := os.Getenv("BASE_URL") + "?/signup?" + v.Encode()
 	u, err := goisgd.Shorten(u)
 	if err != nil {
 		return "", err
