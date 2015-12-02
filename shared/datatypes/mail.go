@@ -57,9 +57,9 @@ func (sg *MailClient) SendVendorRequest(products []Product,
 	}
 	var subj string
 	if os.Getenv("AVA_ENV") == "production" {
-		subj = "Order Request"
+		subj = fmt.Sprintf("Order Request: #%s", p.ID)
 	} else {
-		subj = "[TEST - PLEASE IGNORE] Order Request"
+		subj = fmt.Sprintf("[TEST - PLEASE IGNORE] Order Request: #%s", p.ID)
 		(*p.Vendor).ContactName = "Evan"
 		(*p.Vendor).ContactEmail = "egtann@gmail.com"
 	}
@@ -79,16 +79,16 @@ func (sg *MailClient) SendVendorRequest(products []Product,
 		float64(p.Shipping)/100)
 	text += fmt.Sprintf("<tr><td>Tax: </td><td>$%.2f</td></tr>",
 		float64(p.Tax)/100)
-	text += fmt.Sprintf("<tr><td>My fee: </td><td>($%.2f)</td></tr>",
+	text += fmt.Sprintf("<tr><td>Ava's fee: </td><td>($%.2f)</td></tr>",
 		float64(p.AvaFee)/100)
 	text += fmt.Sprintf("<tr><td>Credit card fees: </td><td>($%.2f)</td></tr>",
 		float64(p.CreditCardFee)/100)
 	text += fmt.Sprintf("<tr><td><b>Total you'll receive: </b></td><td><b>$%.2f</b></td></tr>",
 		float64(p.Total-p.AvaFee-p.CreditCardFee)/100)
 	text += "</table>"
-	text += fmt.Sprintf("<p>%s is expecting delivery before %s</p>",
+	text += fmt.Sprintf("<p>%s is expecting delivery before <b>%s</b>. ",
 		p.User.Name, p.DeliveryExpectedAt.Format("Monday Jan 2, 2006"))
-	text += "<p>The order has been paid for in full and is ready to be shipped.</p>"
+	text += "The order has been paid for in full and is ready to be shipped.</p>"
 	text += "<p>If you have any questions or concerns with this order, "
 	text += "please respond to this email.</p>"
 	text += "<p>Best,</p>"

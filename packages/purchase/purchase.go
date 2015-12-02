@@ -147,6 +147,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 		// if so, reset state to allow for other purchases
 		return t.Run(m, respMsg)
 	}
+	resp.Sentence = ""
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
 	var kw bool
@@ -166,13 +167,11 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 	}
-	if len(resp.Sentence) > 0 {
-		return p.SaveResponse(respMsg, resp)
-	}
-	return nil
+	return p.SaveResponse(respMsg, resp)
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
+	log.Println("state", getState())
 	switch getState() {
 	case StatePreferences:
 		// TODO ensure Ava remembers past answers for preferences
@@ -448,10 +447,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 		case "find", "search":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
-			resp.State["state"] = StateMakeRecommendation
-			if err := recommendProduct(resp, respMsg); err != nil {
-				return true, err
-			}
+			resp.State["state"] = StateSetRecommendations
 		case "similar", "else", "different", "looking", "look":
 			resp.State["offset"] = getOffset() + 1
 			resp.State["state"] = StateMakeRecommendation
@@ -506,6 +502,17 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			}
 			resp.State["state"] = StateContinueShopping
 		case "checkout", "check":
+			prods := getSelectedProducts()
+			if len(prods) == 1 {
+				tmp := fmt.Sprintf(
+					"Ok. Where should I ship your bottle of %s?",
+					prods[0].Name)
+				resp.Sentence = tmp
+			} else if len(prods) > 1 {
+				resp.Sentence = fmt.Sprintf(
+					"Ok. Where should I ship these %d bottles?",
+					len(prods))
+			}
 			resp.State["state"] = StateShippingAddress
 		case "remove", "rid", "drop":
 			prods := getSelectedProducts()
@@ -545,8 +552,11 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += " Would you like to find another?"
 			}
 			resp.State["state"] = StateContinueShopping
+		case "help", "command":
+			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
 		}
 	}
+	log.Println("SENTENCE", resp.Sentence)
 	return len(resp.Sentence) > 0, nil
 }
 

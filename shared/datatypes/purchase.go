@@ -3,6 +3,7 @@ package dt
 import (
 	"database/sql"
 	"log"
+	"math"
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -51,12 +52,13 @@ func NewPurchase(ctx *Ctx, pc *PurchaseConfig) (*Purchase, error) {
 	p.Total = pc.Prices[0]
 	p.Tax = pc.Prices[1]
 	p.Shipping = pc.Prices[2]
-	p.AvaFee = uint64(float64(p.Total)*0.05 + 0.5)
-	p.CreditCardFee = uint64((float64(p.Total)*0.029 + 0.3) + 0.5)
-	p.TransferFee =
-		uint64((float64(p.Total-
-			p.AvaFee-
-			p.CreditCardFee) * 0.005) + 0.5)
+	// always round up fees to ensure we aren't losing money on fractional
+	// cents
+	p.AvaFee = uint64(math.Ceil(float64(p.Total) * 0.05))
+	p.CreditCardFee = uint64(math.Ceil((float64(p.Total)*0.029 + 0.3)))
+	p.TransferFee = uint64(math.Ceil((float64(p.Total-
+		p.AvaFee-
+		p.CreditCardFee) * 0.005)))
 	p.VendorPayout = p.Total - p.AvaFee - p.CreditCardFee - p.TransferFee
 	t := time.Now().Add(7 * 24 * time.Hour)
 	p.DeliveryExpectedAt = &t
