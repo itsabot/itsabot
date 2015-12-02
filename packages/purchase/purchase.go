@@ -280,7 +280,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more? (you can tell me to checkout or see your cart at any time)"
+		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more or checkout?"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
 		resp.State["state"] = StateContinueShopping
@@ -449,8 +449,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			s += fmt.Sprintf("totaling %.2f.", prices[0])
 			resp.Sentence = s
 			kwMatch = true
-		case "look":
-			log.Println("HERE")
+		case "find", "search":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
 			resp.State["state"] = StateMakeRecommendation
@@ -458,7 +457,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				return true, err
 			}
 			kwMatch = true
-		case "similar", "else", "different", "looking":
+		case "similar", "else", "different", "looking", "look":
 			resp.State["offset"] = getOffset() + 1
 			resp.State["state"] = StateMakeRecommendation
 			if err := recommendProduct(resp, respMsg); err != nil {
@@ -516,6 +515,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			case 1:
 				resp.Sentence += " Should we add some more or checkout?"
 			}
+			resp.State["state"] = StateMakeRecommendation
 		case "checkout", "check":
 			kwMatch = false // deliberately allow pass to updateState
 			resp.State["state"] = StateShippingAddress
