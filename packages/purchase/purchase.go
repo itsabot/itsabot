@@ -280,7 +280,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
+		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more? (you can tell me to checkout or see your cart at any time)"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
 		resp.State["state"] = StateContinueShopping
@@ -492,7 +492,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
-				prodNames = append(prodNames, prod.Name)
+				name := fmt.Sprintf("%s (%s)", prod.Name,
+					float64(prod.Price)/100)
+				prodNames = append(prodNames, name)
 			}
 			if len(prods) == 0 {
 				resp.Sentence = "You haven't picked any wines, yet."
@@ -523,12 +525,21 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			for _, prod := range prods {
 				prodNames = append(prodNames, prod.Name)
 			}
-			p := fuzzy.Find(m.Input.Sentence, prodNames)
-			if len(p) == 0 {
-				resp.Sentence = "I couldn't find a wine like that in your cart. "
+			var matches []string
+			for _, w := range strings.Fields(m.Input.Sentence) {
+				if len(w) <= 3 {
+					continue
+				}
+				matches = fuzzy.FindFold(w, prodNames)
+				if len(matches) > 0 {
+					break
+				}
+			}
+			if len(matches) == 0 {
+				resp.Sentence = "I couldn't find a wine like that in your cart."
 			} else {
 				resp.Sentence = fmt.Sprintf(
-					"Ok, I'll remove %s.", p[0])
+					"Ok, I'll remove %s.", matches[0])
 			}
 			r := rand.Intn(2)
 			switch r {
@@ -579,9 +590,22 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	r := rand.Intn(2)
 	switch r {
 	case 0:
-		tmp += "Does that sound good?"
+		tmp += "Does that sound good"
 	case 1:
-		tmp += "Should I add it to your cart?"
+		tmp += "Should I add it to your cart"
+	}
+	if len(getSelectedProducts()) > 0 {
+		r = rand.Intn(3)
+		switch r {
+		case 0:
+			tmp += " as well?"
+		case 1:
+			tmp += " too?"
+		case 2:
+			tmp += " also?"
+		}
+	} else {
+		tmp += "?"
 	}
 	resp.Sentence = language.SuggestedProduct(tmp)
 	resp.State["state"] = StateProductSelection
