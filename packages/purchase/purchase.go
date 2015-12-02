@@ -421,7 +421,7 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 
 func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 	error) {
-	words := strings.Fields(m.Input.Sentence)
+	words := strings.Fields(strings.ToLower(m.Input.Sentence))
 	modifier := 1
 	kwMatch := false
 	for _, word := range words {
@@ -492,7 +492,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
-				name := fmt.Sprintf("%s (%s)", prod.Name,
+				name := fmt.Sprintf("%s ($%.2f)", prod.Name,
 					float64(prod.Price)/100)
 				prodNames = append(prodNames, name)
 			}
