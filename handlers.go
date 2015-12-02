@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -22,6 +23,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/sms"
 )
 
 func initRoutes(e *echo.Echo) {
@@ -289,6 +291,13 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	}
 	tmp := uuid.NewV4().Bytes()
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
+	if os.Getenv("AVA_ENV") == "production" {
+		msg := fmt.Sprintf("Nice to meet you, %s. ", req.Name)
+		msg += "Thanks for signing up. How can I help?"
+		if err = sms.SendMessage(tc, req.FID, msg); err != nil {
+			return jsonError(err)
+		}
+	}
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return jsonError(err)

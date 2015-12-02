@@ -42,7 +42,7 @@ func (t *Onboard) Run(m *dt.Msg,
 	}
 	log.Println("M", m)
 	resp := m.NewResponse()
-	resp.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
+	resp.Sentence = "Hi, I'm Ava, your new personal assistant. To get started, please sign up here: " + u
 	return p.SaveResponse(respMsg, resp)
 }
 
