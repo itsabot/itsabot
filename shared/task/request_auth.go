@@ -179,7 +179,7 @@ func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
 	if !authenticated {
 		return false, nil
 	}
-	desc := fmt.Sprintf("Purchase for %.2f", float64(p.Total)/100)
+	desc := fmt.Sprintf("Purchase for $%.2f", float64(p.Total)/100)
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	chargeParams := &stripe.ChargeParams{
 		Amount:   p.Total,

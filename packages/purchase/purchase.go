@@ -480,10 +480,11 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				tmp = int(budg) + (2500 * modifier)
 			}
 			if tmp <= 0 {
-				tmp = 0
+				tmp = 1000
 			}
 			resp.State["budget"] = uint64(tmp)
-			kwMatch = true
+			resp.State["state"] = StateSetRecommendations
+			kwMatch = false
 		case "more", "special":
 			modifier = 1
 		case "less":

@@ -38,7 +38,7 @@ func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {
 		}
 		if addr == nil || addr.Line1 == "" || addr.City == "" ||
 			addr.State == "" {
-			t.resp.Sentence = "I'm sorry. I couldn't understand that address. Could you try typing it again more clearly?"
+			t.resp.Sentence = "I'm sorry. I couldn't understand that address. Could you try typing it in this format? 1400 Evergreen Ave, Apt 200, Los Angeles, CA"
 			return false, nil
 		}
 		addr.Country = "USA"
