@@ -269,7 +269,6 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
-			resp.Sentence = "I'm not sure I understand you. Should we order the wine?"
 			return nil
 		}
 		if !yes.Bool {
@@ -282,13 +281,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more or checkout?"
+		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			*selection)
 	case StateContinueShopping:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
-			resp.Sentence = "I'm not sure I understand you. Should we look for more wines? At any time, let me know if you want to see your cart or checkout."
 			return nil
 		}
 		if yes.Bool {
@@ -556,7 +554,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
 		}
 	}
-	log.Println("SENTENCE", resp.Sentence)
 	return len(resp.Sentence) > 0, nil
 }
 
