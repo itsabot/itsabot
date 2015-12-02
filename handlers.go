@@ -292,7 +292,8 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	tmp := uuid.NewV4().Bytes()
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	if os.Getenv("AVA_ENV") == "production" {
-		msg := fmt.Sprintf("Nice to meet you, %s. ", req.Name)
+		fName := strings.Fields(req.Name)[0]
+		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
 		msg += "Thanks for signing up. How can I help?"
 		if err = sms.SendMessage(tc, req.FID, msg); err != nil {
 			return jsonError(err)
