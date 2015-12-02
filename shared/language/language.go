@@ -169,7 +169,7 @@ func SuggestedPlace(s string) string {
 }
 
 func SuggestedProduct(s string) string {
-	n := rand.Intn(5)
+	n := rand.Intn(6)
 	switch n {
 	case 0:
 		return "I found just the thing. " + s
@@ -181,6 +181,8 @@ func SuggestedProduct(s string) string {
 		return "This is a real treat. " + s
 	case 4:
 		return "This will amaze you. " + s
+	case 5:
+		return "I found just the thing for you. " + s
 	}
 	log.Println("suggestedProduct failed to return a response")
 	return ""

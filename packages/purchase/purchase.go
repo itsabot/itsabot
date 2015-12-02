@@ -731,7 +731,11 @@ func getRecommendations() []dt.Product {
 }
 
 func getState() float64 {
-	return resp.State["state"].(float64)
+	state, ok := resp.State["state"].(float64)
+	if !ok {
+		state = 0.0
+	}
+	return state
 }
 
 // getPrices requires a slice of length 3, as it's used directly in
