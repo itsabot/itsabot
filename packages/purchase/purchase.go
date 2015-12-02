@@ -270,6 +270,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
+			log.Println("StateProductSelection: yes invalid")
 			return nil
 		}
 		if !yes.Bool {
@@ -278,6 +279,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.State["state"] = StateMakeRecommendation
 			return updateState(m, resp, respMsg)
 		}
+		log.Println("StateProductSelection: yes valid and true")
 		selection, err := currentSelection(resp.State)
 		if err == ErrEmptyRecommendations {
 			resp.Sentence = "I couldn't find any wines like that. "
