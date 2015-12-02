@@ -83,7 +83,6 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Address2 string
 		City     string
 		State    string
-		Zip      string
 		Zip5     string
 		Zip4     string
 	}
