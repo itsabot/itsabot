@@ -449,13 +449,16 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			}
 		case "price", "cost", "shipping", "how much", "total":
 			prices := getPrices()
-			itemCost := prices[0] - prices[1] - prices[2]
-			s := fmt.Sprintf("The items cost %.2f, ", itemCost)
-			s += fmt.Sprintf("shipping is %.2f and ", prices[1])
+			itemCost := float64(prices[0]-prices[1]-prices[2]) / 100
+			s := fmt.Sprintf("The items cost $%.2f, ", itemCost)
+			s += fmt.Sprintf("shipping is $%.2f and ",
+				float64(prices[1])/100)
 			if prices[2] == 0.0 {
-				s += fmt.Sprintf("tax is %.2f, ", prices[2])
+				s += fmt.Sprintf("tax is $%.2f, ",
+					float64(prices[2])/100)
 			}
-			s += fmt.Sprintf("totaling %.2f.", prices[0])
+			s += fmt.Sprintf("totaling $%.2f.",
+				float64(prices[0])/100)
 			resp.Sentence = s
 		case "find", "search":
 			resp.State["offset"] = 0
@@ -506,13 +509,22 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += language.SliceToString(
 					prodNames, "and") + "."
 			}
+			var tmp string
 			r := rand.Intn(2)
 			switch r {
 			case 0:
-				resp.Sentence += " Should we keep looking or checkout?"
+				tmp = " Should we keep looking or checkout?"
 			case 1:
-				resp.Sentence += " Should we add some more or checkout?"
+				tmp = " Should we add some more or checkout?"
 			}
+			// 255 is the database varchar limit, but we should aim
+			// to be below 140 (sms)
+			if len(resp.Sentence) > 140-len(tmp) {
+				// 4 refers to the length of the ellipsis
+				resp.Sentence = resp.Sentence[0 : 140-len(tmp)-4]
+				resp.Sentence += "... "
+			}
+			resp.Sentence += tmp
 			resp.State["state"] = StateContinueShopping
 		case "checkout", "check":
 			prods := getSelectedProducts()

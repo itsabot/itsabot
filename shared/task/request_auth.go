@@ -75,6 +75,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 		t.setState(authStateConfirm)
 		return t.askUserForAuth(m)
 	case authStateConfirm:
+		log.Println("hit authStateConfirm for method", m)
 		switch m {
 		case MethodZip:
 			zip5 := []byte(
@@ -89,6 +90,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 			}
 			defer rows.Close()
 			for rows.Next() {
+				log.Println("hasCard is true")
 				var zip5hash []byte
 				if err = rows.Scan(&zip5hash); err != nil {
 					return false, err
@@ -203,6 +205,12 @@ func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
 }
 
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
+	_, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
+	if err == sql.ErrNoRows {
+		log.Println("user has no cards")
+		t.resp.Sentence = "I'll need you to add your card here: https://www.avabot.co/?/cards/new. Let me know when you're done!"
+		return false, nil
+	}
 	switch m {
 	case MethodZip:
 		t.resp.Sentence = "To do that, please confirm your billing zip code."
