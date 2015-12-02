@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	ErrMissingUser       = errors.New("missing user")
-	ErrMissingFlexIDType = errors.New("missing flexidtype")
+	ErrMissingUser   = errors.New("missing user")
+	ErrMissingFlexID = errors.New("missing flexid")
 )
 
 func saveStructuredInput(m *dt.Msg, rid uint64, pkg, route string) (uint64,
@@ -71,16 +71,16 @@ func getUser(in *dt.Input) (*dt.User, error) {
 	if in.UserID == 0 {
 		q := `SELECT userid
 		      FROM userflexids
-		      WHERE flexid=$1 AND flexidtype=$2
+		      WHERE flexid=$1 AND flexidtype=2
 		      ORDER BY createdat DESC`
-		err := db.Get(&in.UserID, q, in.FlexID, in.FlexIDType)
+		err := db.Get(&in.UserID, q, in.FlexID)
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		} else if err != nil {
 			return nil, err
 		}
-	} else if len(in.FlexID) > 0 && in.FlexIDType == 0 {
-		return nil, ErrMissingFlexIDType
+	} else if len(in.FlexID) == 0 {
+		return nil, ErrMissingFlexID
 	}
 	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
 	      FROM users
