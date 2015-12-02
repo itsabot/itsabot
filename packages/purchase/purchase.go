@@ -23,6 +23,7 @@ import (
 
 type Purchase string
 
+var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var p *pkg.Pkg
 var ctx *dt.Ctx
@@ -278,6 +279,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return updateState(m, resp, respMsg)
 		}
 		selection, err := currentSelection(resp.State)
+		if err == ErrEmptyRecommendations {
+			resp.Sentence = "I couldn't find any wines like that. "
+			if getBudget() < 5000 {
+				resp.Sentence += "Should we look among the more expensive bottles?"
+				resp.State["state"] = StateRecommendationsAlterBudget
+			} else {
+				resp.Sentence += "Should we expand your search to more wines?"
+				resp.State["state"] = StateRecommendationsAlterQuery
+			}
+			return updateState(m, resp, respMsg)
+		}
 		if err != nil {
 			return err
 		}
@@ -405,7 +417,7 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 		log.Println("offset", getOffset())
 		log.Println("budget", getBudget())
 		log.Println("selectedProducts", len(getSelectedProducts()))
-		return &dt.Product{}, errors.New("empty recommendations")
+		return &dt.Product{}, ErrEmptyRecommendations
 	}
 	offset := getOffset()
 	if l <= offset {
