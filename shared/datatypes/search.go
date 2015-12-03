@@ -35,8 +35,9 @@ func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
 					map[string]interface{}{
 						"range": map[string]interface{}{
 							"Price": map[string]interface{}{
-								"gte": budget - uint64(float64(budget)*0.2),
-								"lte": budget + uint64(float64(budget)*0.2),
+								"gte":   budget - uint64(float64(budget)*0.2),
+								"lte":   budget + uint64(float64(budget)*0.2),
+								"boost": 2.0,
 							},
 						},
 					},
