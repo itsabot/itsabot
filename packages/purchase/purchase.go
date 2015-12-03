@@ -617,9 +617,9 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	offset := getOffset()
 	product := recs[offset]
 	var size string
-	if len(product.Size) > 0 {
-		size = fmt.Sprintf(" (%s)",
-			strings.TrimSpace(strings.ToLower(product.Size)))
+	product.Size = strings.TrimSpace(strings.ToLower(product.Size))
+	if len(product.Size) > 0 && product.Size != "750ml" {
+		size = fmt.Sprintf(" (%s)", product.Size)
 	}
 	tmp := fmt.Sprintf("A %s%s for $%.2f. ", product.Name, size,
 		float64(product.Price)/100)
@@ -637,7 +637,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	switch r {
 	case 0:
 		tmp += "Does that sound good"
-	case 1:
+	case 2:
 		tmp += "Should I add it to your cart"
 	}
 	if len(getSelectedProducts()) > 0 {
