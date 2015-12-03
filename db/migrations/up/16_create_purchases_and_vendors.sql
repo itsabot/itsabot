@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE purchases (
-	id UUID DEFAULT uuid_generate_v4() NOT NULL,
+	id UUID DEFAULT uuid_generate_v4(),
 	userid INTEGER NOT NULL,
 	vendorid INTEGER NOT NULL,
 	shippingaddressid INTEGER,

@@ -101,24 +101,35 @@ func buildSummary(keywords []WordT) string {
 	var rem string
 	var addition string
 	if totalNounLen >= totalAdjLen {
-		n := rand.Intn(8)
+		n := rand.Intn(2)
 		switch n {
 		case 0:
-			summary = "It features "
+			summary = "hints of "
 		case 1:
-			summary = "It's characterized by "
+			summary = "notes of "
+		}
+		n = rand.Intn(10)
+		switch n {
+		case 0:
+			summary = "It features " + summary
+		case 1:
+			summary = "It's characterized by " + summary
 		case 2:
-			summary = "It's known for "
+			summary = "It's known for " + summary
 		case 3:
-			summary = "It's known for its "
+			summary = "It's known for its " + summary
 		case 4:
-			summary = "It's known for having "
+			summary = "It's known for having " + summary
 		case 5:
-			summary = "It has "
+			summary = "It has " + summary
 		case 6:
-			summary = "You'll experience "
+			summary = "You'll experience " + summary
 		case 7:
-			summary = "You'll sense "
+			summary = "You'll sense " + summary
+		case 8:
+			summary = "You'll enjoy " + summary
+		case 9:
+			summary = "You'll love its " + summary
 		}
 		for i := 0; i <= len(nouns)-1; i++ {
 			// TODO design more robust maxLength control

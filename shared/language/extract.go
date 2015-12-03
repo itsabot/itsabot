@@ -18,46 +18,48 @@ import (
 )
 
 var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
+var regexNum = regexp.MustCompile(`\d+`)
 
 // ExtractCurrency returns a pointer to a string to allow a user a simple check
 // to see if currency text was found. If the response is nil, no currency was
 // found. This API design also maintains consitency when we want to extract and
 // return a struct (which should be returned as a pointer).
-func ExtractCurrency(s string) (uint64, *string, error) {
-	found := regexCurrency.FindString(s)
-	if len(found) == 0 {
-		return 0, nil, nil
+func ExtractCurrency(s string) (sql.NullInt64, error) {
+	n := sql.NullInt64{
+		Int64: 0,
+		Valid: false,
 	}
-	tmp := strings.Replace(found, ".", "", 1)
-	if found == tmp {
-		// no decimal. add cents to the number
-		tmp += "00"
+	s = regexCurrency.FindString(s)
+	if len(s) == 0 {
+		return n, nil
 	}
-	val, err := strconv.ParseUint(tmp, 10, 64)
+	val, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return 0, &tmp, err
+		return n, err
 	}
-	return val, &tmp, nil
+	n.Int64 = int64(val * 100)
+	n.Valid = true
+	return n, nil
 }
 
-func ExtractYesNo(s string) *sql.NullBool {
+func ExtractYesNo(s string) sql.NullBool {
 	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
 		w = strings.TrimRight(w, " .,;:!?'\"")
 		if yes[w] {
-			return &sql.NullBool{
+			return sql.NullBool{
 				Bool:  true,
 				Valid: true,
 			}
 		}
 		if no[w] {
-			return &sql.NullBool{
+			return sql.NullBool{
 				Bool:  false,
 				Valid: true,
 			}
 		}
 	}
-	return &sql.NullBool{
+	return sql.NullBool{
 		Bool:  false,
 		Valid: false,
 	}
@@ -152,4 +154,22 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		a.Zip = resp.Address.Zip5
 	}
 	return &a, false, nil
+}
+
+func ExtractCount(s string) sql.NullInt64 {
+	n := sql.NullInt64{
+		Int64: 0,
+		Valid: false,
+	}
+	s = regexNum.FindString(s)
+	if len(s) == 0 {
+		return n
+	}
+	val, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return n
+	}
+	n.Int64 = int64(val)
+	n.Valid = true
+	return n
 }

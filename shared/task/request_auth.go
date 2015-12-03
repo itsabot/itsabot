@@ -172,7 +172,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 }
 
 // RequestPurchase will authenticate the user and then charge a card.
-func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
+func (t *Task) RequestPurchase(m dt.Method, prds []dt.ProductSel,
 	p *dt.Purchase) (bool, error) {
 	authenticated, err := t.RequestAuth(m)
 	if err != nil {
@@ -192,10 +192,10 @@ func (t *Task) RequestPurchase(m dt.Method, prds []dt.Product,
 	if _, err := charge.New(chargeParams); err != nil {
 		return false, err
 	}
-	if err := t.ctx.SG.SendVendorRequest(prds, p); err != nil {
+	if err := t.ctx.SG.SendVendorRequest(p); err != nil {
 		return false, err
 	}
-	if err := t.ctx.SG.SendPurchaseConfirmation(prds, p); err != nil {
+	if err := t.ctx.SG.SendPurchaseConfirmation(p); err != nil {
 		return false, err
 	}
 	if err := p.UpdateEmailsSent(); err != nil {

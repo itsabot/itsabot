@@ -54,10 +54,6 @@ var statesShipping = map[string]bool{
 	"CA": true,
 }
 
-var statesTax = map[string]float64{
-	"CA": 0.0925,
-}
-
 // TODO add support for upselling and promotions. Then a Task interface for
 // follow ups
 
@@ -87,16 +83,13 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	ctx.Msg = m
 	resp = m.NewResponse()
 	resp.State = map[string]interface{}{
-		"state":            StateNone,      // maintains state
-		"query":            "",             // search query
-		"budget":           "",             // suggested price
-		"recommendations":  []dt.Product{}, // search results
-		"offset":           uint(0),        // index in search
+		"state":            StateNone,        // maintains state
+		"query":            "",               // search query
+		"budget":           "",               // suggested price
+		"recommendations":  dt.ProductSels{}, // search results
+		"offset":           uint(0),          // index in search
 		"shippingAddress":  &dt.Address{},
-		"productsSelected": []dt.Product{},
-		"totalPrice":       uint64(0),
-		"taxInCents":       uint64(0),
-		"shippingInCents":  uint64(0),
+		"productsSelected": dt.ProductSels{},
 	}
 	si := m.Input.StructuredInput
 	query := ""
@@ -111,7 +104,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	if len(tastePref) == 0 {
 		resp.State["query"] = query + " " + tastePref
 		resp.State["state"] = StatePreferences
-		resp.Sentence = "Sure. What do you usually look for in a wine?"
+		resp.Sentence = "Sure. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
 		return p.SaveResponse(respMsg, resp)
 	}
 	resp.State["query"] = tastePref
@@ -192,16 +185,15 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 	case StateBudget:
 		// TODO ensure Ava remembers past answers for budget
-		val, budget, err := language.ExtractCurrency(m.Input.Sentence)
+		val, err := language.ExtractCurrency(m.Input.Sentence)
 		if err != nil {
 			log.Println("err extracting currency")
 			return err
 		}
-		if budget == nil {
-			log.Println("no budget found")
+		if !val.Valid {
 			return nil
 		}
-		resp.State["budget"] = val
+		resp.State["budget"] = val.Int64
 		resp.State["state"] = StateSetRecommendations
 		err = prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
@@ -280,6 +272,14 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return updateState(m, resp, respMsg)
 		}
 		log.Println("StateProductSelection: yes valid and true")
+		count := language.ExtractCount(m.Input.Sentence)
+		if count.Valid {
+			if count.Int64 == 0 {
+				// asked to order 0 wines. trigger confused
+				// reply
+				return nil
+			}
+		}
 		selection, err := currentSelection(resp.State)
 		if err == ErrEmptyRecommendations {
 			resp.Sentence = "I couldn't find any wines like that. "
@@ -295,9 +295,23 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
+		if !count.Valid || count.Int64 <= 1 {
+			count.Int64 = 1
+			resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
+		} else if uint(count.Int64) > selection.Stock {
+			resp.Sentence = "I'm sorry, but I don't have that many available. Should we do "
+			return nil
+		} else {
+			resp.Sentence = fmt.Sprintf(
+				"Ok, I'll add %d to your cart. Should we look for a few more?",
+				count.Int64)
+		}
+		prod := dt.ProductSel{
+			Product: selection,
+			Count:   uint(count.Int64),
+		}
 		resp.State["productsSelected"] = append(getSelectedProducts(),
-			*selection)
+			prod)
 		resp.State["state"] = StateContinueShopping
 	case StateContinueShopping:
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -339,27 +353,8 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}
 		resp.State["shippingAddress"] = addr
-		price := uint64(0)
-		for _, prod := range prods {
-			price += prod.Price
-		}
-		// calculate shipping. note that this is vendor specific
-		shippingInCents := 1290 + uint64((len(prods)-1)*120)
-		// add tax
-		tax := statesTax[addr.State]
-		if tax > 0.0 {
-			tax *= float64(price)
-		}
-		// ensure fractional cents are rounded up. technique stolen from
-		// JavaScript. no need for math.CopySign() since it's unsigned
-		taxInCents := uint64(tax + 0.5)
-		price += taxInCents
-		price += shippingInCents
-		resp.State["totalPrice"] = price
-		resp.State["taxInCents"] = taxInCents
-		resp.State["shippingInCents"] = shippingInCents
 		tmp := fmt.Sprintf("$%.2f including shipping and tax. ",
-			float64(price)/100)
+			float64(prods.Prices(addr)["total"])/100)
 		tmp += "Should I place the order?"
 		resp.Sentence = fmt.Sprintf("Ok. It comes to %s", tmp)
 		resp.State["state"] = StatePurchase
@@ -382,8 +377,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			User:            m.User,
 			ShippingAddress: getShippingAddress(),
 			VendorID:        prods[0].VendorID,
-			Prices:          getPrices(),
-			Products:        prods,
+			ProductSels:     prods,
 		})
 		if err != nil {
 			return err
@@ -423,12 +417,12 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 		log.Println("offset", getOffset())
 		log.Println("budget", getBudget())
 		log.Println("selectedProducts", len(getSelectedProducts()))
-		return &dt.Product{}, ErrEmptyRecommendations
+		return nil, ErrEmptyRecommendations
 	}
 	offset := getOffset()
 	if l <= offset {
 		err := errors.New("offset exceeds recommendation length")
-		return &dt.Product{}, err
+		return nil, err
 	}
 	return &recs[offset], nil
 }
@@ -451,19 +445,20 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence = "This wine has been personally selected by leading wine experts."
 			}
 		case "price", "cost", "shipping", "how much", "total":
-			prices := getPrices()
-			itemCost := float64(prices[0]-prices[1]-prices[2]) / 100
-			s := fmt.Sprintf("The items cost $%.2f, ", itemCost)
+			prices := getSelectedProducts().
+				Prices(getShippingAddress())
+			s := fmt.Sprintf("The items cost $%.2f, ",
+				float64(prices["products"])/100)
 			s += fmt.Sprintf("shipping is $%.2f, ",
-				float64(prices[1])/100)
-			if prices[2] > 0.0 {
+				float64(prices["shipping"])/100)
+			if prices["tax"] > 0.0 {
 				s += fmt.Sprintf("and tax is $%.2f, ",
-					float64(prices[2])/100)
+					float64(prices["tax"])/100)
 			}
 			s += fmt.Sprintf("totaling $%.2f.",
-				float64(prices[0])/100)
+				float64(prices["total"])/100)
 			resp.Sentence = s
-		case "find", "search":
+		case "find", "search", "show":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
 			resp.State["state"] = StateSetRecommendations
@@ -608,7 +603,11 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	}
 	log.Println("showing product")
 	product := recs[getOffset()]
-	tmp := fmt.Sprintf("A %s for $%.2f. ", product.Name,
+	var size string
+	if len(product.Size) > 0 {
+		size = fmt.Sprintf(" (%s)", strings.ToLower(product.Size))
+	}
+	tmp := fmt.Sprintf("A %s%s for $%.2f. ", product.Name, size,
 		float64(product.Price)/100)
 	if len(product.Reviews) > 0 {
 		summary, err := language.Summarize(
@@ -628,7 +627,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		tmp += "Should I add it to your cart"
 	}
 	if len(getSelectedProducts()) > 0 {
-		r = rand.Intn(3)
+		r = rand.Intn(6)
 		switch r {
 		case 0:
 			tmp += " as well?"
@@ -636,9 +635,25 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 			tmp += " too?"
 		case 2:
 			tmp += " also?"
+		case 3, 4, 5:
+			tmp += "?"
 		}
 	} else {
 		tmp += "?"
+	}
+	if product.Stock > 1 {
+		val := product.Stock
+		if val > 12 {
+			val = 12
+		}
+		r = rand.Intn(2)
+		switch r {
+		case 0:
+			tmp += fmt.Sprintf(" You can order up to %d of them.",
+				val)
+		case 1:
+			tmp += fmt.Sprintf(" You can get 1 to %d of them.", val)
+		}
 	}
 	resp.Sentence = language.SuggestedProduct(tmp)
 	resp.State["state"] = StateProductSelection
@@ -702,8 +717,8 @@ func getShippingAddress() *dt.Address {
 	return addr
 }
 
-func getSelectedProducts() []dt.Product {
-	products, ok := resp.State["productsSelected"].([]dt.Product)
+func getSelectedProducts() dt.ProductSels {
+	products, ok := resp.State["productsSelected"].([]dt.ProductSel)
 	if !ok {
 		prodMap, ok := resp.State["productsSelected"].(interface{})
 		if !ok {
@@ -766,24 +781,4 @@ func getState() float64 {
 		state = 0.0
 	}
 	return state
-}
-
-// getPrices requires a slice of length 3, as it's used directly in
-// auth.Purchase
-func getPrices() []uint64 {
-	keys := []string{"totalPrice", "taxInCents", "shippingInCents"}
-	vals := []uint64{}
-	for i := 0; i < len(keys); i++ {
-		key := keys[i]
-		switch resp.State[key].(type) {
-		case uint64:
-			vals = append(vals, resp.State[key].(uint64))
-		case float64:
-			vals = append(vals, uint64(resp.State[key].(float64)))
-		default:
-			typ := reflect.TypeOf(resp.State[key])
-			log.Printf("warn: invalid type %s for %s\n", typ, key)
-		}
-	}
-	return vals
 }

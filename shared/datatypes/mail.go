@@ -15,8 +15,8 @@ type MailClient struct {
 }
 
 // TODO add shipping information and purchase identifier (UUID)
-func (sg *MailClient) SendPurchaseConfirmation(products []Product,
-	p *Purchase) error {
+func (sg *MailClient) SendPurchaseConfirmation(p *Purchase) error {
+	products := p.ProductSels
 	if len(products) == 0 {
 		return errors.New("empty products slice in purchase confirmation")
 	}
@@ -27,7 +27,12 @@ func (sg *MailClient) SendPurchaseConfirmation(products []Product,
 	text += "<ul>"
 	for _, product := range products {
 		price := float64(product.Price) / 100
-		text += fmt.Sprintf("<li>$%.2f - %s</li>", price, product.Name)
+		var size string
+		if len(product.Size) > 0 {
+			size = fmt.Sprintf(" (%s)", product.Size)
+		}
+		text += fmt.Sprintf("<li>%d @ $%.2f - %s%s</li>", product.Count,
+			price, product.Name, size)
 	}
 	text += "</ul><table>"
 	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>",
@@ -50,9 +55,8 @@ func (sg *MailClient) SendPurchaseConfirmation(products []Product,
 }
 
 // TODO add shipping information and purchase identifier (UUID)
-func (sg *MailClient) SendVendorRequest(products []Product,
-	p *Purchase) error {
-	if len(products) == 0 {
+func (sg *MailClient) SendVendorRequest(p *Purchase) error {
+	if len(p.ProductSels) == 0 {
 		return errors.New("empty products slice in vendor request")
 	}
 	var subj string
@@ -68,9 +72,14 @@ func (sg *MailClient) SendVendorRequest(products []Product,
 	text += fmt.Sprintf("<p>%s just ordered the following:</p>",
 		p.User.Name)
 	text += "<ul>"
-	for _, product := range products {
+	for _, product := range p.ProductSels {
 		price := float64(product.Price) / 100
-		text += fmt.Sprintf("<li>$%.2f - %s</li>", price, product.Name)
+		var size string
+		if len(product.Size) > 0 {
+			size = fmt.Sprintf(" (%s)", product.Size)
+		}
+		text += fmt.Sprintf("<li>%d @ $%.2f - %s%s</li>", product.Count,
+			price, product.Name, size)
 	}
 	text += "</ul><table>"
 	text += fmt.Sprintf("<tr><td>Subtotal: </td><td>$%.2f</td></tr>",
