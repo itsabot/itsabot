@@ -392,7 +392,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		done, err := tsk.RequestPurchase(task.MethodZip,
 			getSelectedProducts(), purchase)
 		log.Println("task fired. request purchase")
-		if err == task.ErrInvalidAuth {
+		if len(resp.Sentence) == 0 || err == task.ErrInvalidAuth {
 			resp.Sentence = "I'm sorry but that doesn't match what I have. You could try to add a new card here: https://avabot.com/?/cards/new"
 			return nil
 		}
