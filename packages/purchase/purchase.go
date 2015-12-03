@@ -408,7 +408,8 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["state"] = StateComplete
 		resp.Sentence = "Great! I've placed the order. You'll receive a confirmation by email."
 	}
-	if state != StateAuth {
+	// check if the state changed away from StateAuth
+	if tsk != nil && state == StateAuth && getState() != StateAuth {
 		tsk.ResetState()
 	}
 	return nil
