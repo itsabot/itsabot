@@ -332,6 +332,9 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if !done {
 			return nil
 		}
+		if addr == nil {
+			return errors.New("addr is nil")
+		}
 		if !statesShipping[addr.State] {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
 		}

@@ -107,13 +107,14 @@ func (u *User) DeleteSessions(db *sqlx.DB) error {
 }
 
 func (u *User) SaveAddress(db *sqlx.DB, addr *Address) (uint64, error) {
-	q := `
-		INSERT INTO addresses
-		(userid, cardid, name, line1, line2, city, state, country, zip)
-		VALUES ($1, 0, $2, $3, $4, $5, $6, 'USA', $7) RETURNING id`
+	q := `INSERT INTO addresses
+	      (userid, cardid, name, line1, line2, city, state, country, zip,
+	          zip5, zip4)
+	      VALUES ($1, 0, $2, $3, $4, $5, $6, 'USA', $7, $8, $9)
+	      RETURNING id`
 	var id uint64
 	err := db.QueryRowx(q, u.ID, addr.Name, addr.Line1, addr.Line2,
-		addr.City, addr.State, addr.Zip).Scan(&id)
+		addr.City, addr.State, addr.Zip, addr.Zip5, addr.Zip4).Scan(&id)
 	return id, err
 }
 
