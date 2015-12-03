@@ -618,8 +618,8 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	product := recs[offset]
 	var size string
 	if len(product.Size) > 0 {
-		size = fmt.Sprintf(" (%s)", strings.Trim(
-			strings.ToLower(product.Size)))
+		size = fmt.Sprintf(" (%s)",
+			strings.TrimSpace(strings.ToLower(product.Size)))
 	}
 	tmp := fmt.Sprintf("A %s%s for $%.2f. ", product.Name, size,
 		float64(product.Price)/100)

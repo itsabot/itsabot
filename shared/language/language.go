@@ -170,32 +170,31 @@ func SuggestedPlace(s string) string {
 
 func SuggestedProduct(s string, num uint) string {
 	var n int
+	var val, flair string
 	if num > 0 {
 		n = rand.Intn(3)
 		switch n {
 		case 0, 1:
-			s = ", then. " + s
-		case 2:
-			s = ". " + s
+			flair = ", then"
+		case 2: // do nothing
 		}
 	}
 	n = rand.Intn(6)
 	switch n {
 	case 0:
-		return "I found just the thing" + s
+		val = "I found just the thing"
 	case 1:
-		return "This is the one for you" + s
+		val = "This is the one for you"
 	case 2:
-		return "You'll love this. " + s
+		val = "You'll love this"
 	case 3:
-		return "This is a real treat. " + s
+		val = "This is a real treat"
 	case 4:
-		return "This will amaze you. " + s
+		val = "This will amaze you"
 	case 5:
-		return "I found just the thing for you. " + s
+		val = "I found just the thing for you"
 	}
-	log.Println("suggestedProduct failed to return a response")
-	return ""
+	return val + flair + ". " + s
 }
 
 // TODO: Extend
