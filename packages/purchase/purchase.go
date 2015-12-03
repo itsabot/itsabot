@@ -135,13 +135,13 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 		resp = m.LastResponse
+		resp.Sentence = ""
 	}
 	// have we already made the purchase?
 	if getState() == StateComplete {
 		// if so, reset state to allow for other purchases
 		return t.Run(m, respMsg)
 	}
-	resp.Sentence = ""
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
 	var kw bool
