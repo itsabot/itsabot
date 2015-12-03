@@ -597,21 +597,15 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	recs := getRecommendations()
 	if len(recs) == 0 {
-		words := strings.Fields(getQuery())
-		if len(words) == 1 {
-			resp.Sentence = "I couldn't find any wines like that. "
-			if getBudget() < 5000 {
-				resp.Sentence += "Should we look among the more expensive bottles?"
-				resp.State["state"] = StateRecommendationsAlterBudget
-			} else {
-				resp.Sentence += "Should we expand your search to more wines?"
-				resp.State["state"] = StateRecommendationsAlterQuery
-			}
-			return nil
+		resp.Sentence = "I couldn't find any wines like that. "
+		if getBudget() < 5000 {
+			resp.Sentence += "Should we look among the more expensive bottles?"
+			resp.State["state"] = StateRecommendationsAlterBudget
 		} else {
-			resp.State["query"] = "simple"
-			return nil
+			resp.Sentence += "Should we expand your search to more wines?"
+			resp.State["state"] = StateRecommendationsAlterQuery
 		}
+		return nil
 	}
 	log.Println("showing product")
 	offset := getOffset()
