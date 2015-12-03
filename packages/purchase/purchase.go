@@ -462,6 +462,11 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
 			resp.State["state"] = StateSetRecommendations
+			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
+				prefs.KeyTaste, m.Input.Sentence)
+			if err != nil {
+				return false, err
+			}
 		case "similar", "else", "different", "looking", "look":
 			resp.State["offset"] = getOffset() + 1
 			resp.State["state"] = StateMakeRecommendation
@@ -473,17 +478,22 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			budg := getBudget()
 			var tmp int
 			if budg >= 10000 {
-				tmp = int(budg) + (10000 * modifier)
-			} else if budg >= 5000 {
 				tmp = int(budg) + (5000 * modifier)
-			} else {
+			} else if budg >= 5000 {
 				tmp = int(budg) + (2500 * modifier)
+			} else {
+				tmp = int(budg) + (1500 * modifier)
 			}
 			if tmp <= 0 {
 				tmp = 1000
 			}
 			resp.State["budget"] = uint64(tmp)
 			resp.State["state"] = StateSetRecommendations
+			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
+				prefs.KeyBudget, strconv.Itoa(tmp))
+			if err != nil {
+				return false, err
+			}
 		case "more", "special":
 			modifier = 1
 		case "less":
@@ -602,7 +612,8 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 	}
 	log.Println("showing product")
-	product := recs[getOffset()]
+	offset := getOffset()
+	product := recs[offset]
 	var size string
 	if len(product.Size) > 0 {
 		size = fmt.Sprintf(" (%s)", strings.ToLower(product.Size))
@@ -655,7 +666,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 			tmp += fmt.Sprintf(" You can get 1 to %d of them.", val)
 		}
 	}
-	resp.Sentence = language.SuggestedProduct(tmp)
+	resp.Sentence = language.SuggestedProduct(tmp, offset)
 	resp.State["state"] = StateProductSelection
 	return nil
 }

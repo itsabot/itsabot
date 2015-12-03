@@ -168,13 +168,22 @@ func SuggestedPlace(s string) string {
 	return ""
 }
 
-func SuggestedProduct(s string) string {
-	n := rand.Intn(6)
+func SuggestedProduct(s string, num uint) string {
+	var n int
+	if num > 0 {
+		n = rand.Intn(3)
+		switch n {
+		case 0, 1:
+			s = ", then. " + s
+		case 2: // do nothing
+		}
+	}
+	n = rand.Intn(6)
 	switch n {
 	case 0:
-		return "I found just the thing. " + s
+		return "I found just the thing" + s
 	case 1:
-		return "This is the one for you. " + s
+		return "This is the one for you" + s
 	case 2:
 		return "You'll love this. " + s
 	case 3:
