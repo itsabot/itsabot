@@ -167,7 +167,6 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 }
 
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
-	var tsk *task.Task
 	state := getState()
 	switch state {
 	case StatePreferences:
@@ -385,7 +384,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		tsk, err = task.New(ctx, resp, respMsg)
+		tsk, err := task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
 		}
@@ -407,10 +406,6 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		resp.State["state"] = StateComplete
 		resp.Sentence = "Great! I've placed the order. You'll receive a confirmation by email."
-	}
-	// check if the state changed away from StateAuth
-	if tsk != nil && state == StateAuth && getState() != StateAuth {
-		tsk.ResetState()
 	}
 	return nil
 }

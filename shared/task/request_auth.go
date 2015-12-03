@@ -56,7 +56,10 @@ const (
 // which will also authenticate the user.
 func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	log.Println("REQUESTAUTH")
-	t.typ = "Auth"
+	if len(t.typ) == 0 {
+		t.typ = "Auth"
+		t.ResetState()
+	}
 	log.Println("state", t.getState())
 	if t.getState() == authStateNone {
 		t.setState(authStateStart)
@@ -72,10 +75,11 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	}
 	switch t.getState() {
 	case authStateStart:
+		log.Println("hit authStateStart")
 		t.setState(authStateConfirm)
 		return t.askUserForAuth(m)
 	case authStateConfirm:
-		log.Println("hit authStateConfirm for method", m)
+		log.Println("hit authStateConfirm")
 		switch m {
 		case MethodZip:
 			zip5 := []byte(
