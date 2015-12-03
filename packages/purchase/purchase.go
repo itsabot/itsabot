@@ -444,7 +444,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			case 2:
 				resp.Sentence = "This wine has been personally selected by leading wine experts."
 			}
-		case "price", "cost", "shipping", "how much", "total":
+		case "price", "cost", "shipping", "total":
 			prices := getSelectedProducts().
 				Prices(getShippingAddress())
 			s := fmt.Sprintf("The items cost $%.2f, ",
@@ -494,10 +494,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			if err != nil {
 				return false, err
 			}
-		case "more", "special":
-			modifier = 1
-		case "less":
-			modifier = -1
 		case "cart":
 			prods := getSelectedProducts()
 			var prodNames []string
@@ -587,6 +583,12 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.State["state"] = StateContinueShopping
 		case "help", "command":
 			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
+		case "more", "special":
+			modifier *= modifier
+		case "less":
+			modifier *= modifier
+		case "much", "very", "extremely":
+			modifier *= 2
 		}
 	}
 	return len(resp.Sentence) > 0, nil
