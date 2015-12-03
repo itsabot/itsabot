@@ -509,22 +509,24 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += language.SliceToString(
 					prodNames, "and") + "."
 			}
-			var tmp string
-			r := rand.Intn(2)
-			switch r {
-			case 0:
-				tmp = " Should we keep looking or checkout?"
-			case 1:
-				tmp = " Should we add some more or checkout?"
+			if len(prods) > 0 {
+				var tmp string
+				r := rand.Intn(2)
+				switch r {
+				case 0:
+					tmp = " Should we keep looking or checkout?"
+				case 1:
+					tmp = " Should we add some more or checkout?"
+				}
+				// 255 is the database varchar limit, but we should aim
+				// to be below 140 (sms)
+				if len(resp.Sentence) > 140-len(tmp) {
+					// 4 refers to the length of the ellipsis
+					resp.Sentence = resp.Sentence[0 : 140-len(tmp)-4]
+					resp.Sentence += "... "
+				}
+				resp.Sentence += tmp
 			}
-			// 255 is the database varchar limit, but we should aim
-			// to be below 140 (sms)
-			if len(resp.Sentence) > 140-len(tmp) {
-				// 4 refers to the length of the ellipsis
-				resp.Sentence = resp.Sentence[0 : 140-len(tmp)-4]
-				resp.Sentence += "... "
-			}
-			resp.Sentence += tmp
 			resp.State["state"] = StateContinueShopping
 		case "checkout", "check":
 			prods := getSelectedProducts()
