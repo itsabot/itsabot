@@ -175,7 +175,8 @@ func SuggestedProduct(s string, num uint) string {
 		switch n {
 		case 0, 1:
 			s = ", then. " + s
-		case 2: // do nothing
+		case 2:
+			s = ". " + s
 		}
 	}
 	n = rand.Intn(6)
