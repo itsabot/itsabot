@@ -498,7 +498,11 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
-				name := fmt.Sprintf("%s (%dx$%.2f)", prod.Name,
+				var count string
+				if prod.Count > 1 {
+					count = fmt.Sprintf("%dx", prod.Count)
+				}
+				name := fmt.Sprintf("%s (%s$%.2f)", prod.Name,
 					prod.Count, float64(prod.Price)/100)
 				prodNames = append(prodNames, name)
 			}
