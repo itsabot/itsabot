@@ -170,12 +170,11 @@ func processText(c *echo.Context) (string, error) {
 		return "", err
 	}
 	m := &dt.Msg{User: u, Input: in}
-	m, ctxAdded, err := addContext(m)
+	m, err = addContext(m)
 	if err != nil {
 		log.Println("addContext: ", err)
 	}
-	log.Println("context added", ctxAdded)
-	ret, pname, route, err := callPkg(m, ctxAdded)
+	ret, pname, route, err := callPkg(m)
 	if err != nil && err != ErrMissingPackage {
 		return "", err
 	}

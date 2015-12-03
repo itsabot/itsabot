@@ -204,8 +204,7 @@ func bayesIntToSymbol(c int) (string, error) {
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
 // they refer. TODO refactor
-func addContext(m *dt.Msg) (*dt.Msg, bool, error) {
-	ctxAdded := false
+func addContext(m *dt.Msg) (*dt.Msg, error) {
 	for _, w := range m.Input.StructuredInput.Pronouns() {
 		var ctx string
 		var err error
@@ -215,73 +214,68 @@ func addContext(m *dt.Msg) (*dt.Msg, bool, error) {
 				m.Input.StructuredInput,
 				"objects")
 			if err != nil {
-				return m, false, err
+				return m, err
 			}
 			if ctx == "" {
-				return m, false, nil
+				return m, nil
 			}
 			for i, o := range m.Input.StructuredInput.Objects {
 				if o != w {
 					continue
 				}
 				m.Input.StructuredInput.Objects[i] = ctx
-				ctxAdded = true
 			}
 		case dt.ActorI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"actors")
 			if err != nil {
-				return m, false, err
+				return m, err
 			}
 			if ctx == "" {
-				return m, false, nil
+				return m, nil
 			}
 			for i, o := range m.Input.StructuredInput.Actors {
 				if o != w {
 					continue
 				}
 				m.Input.StructuredInput.Actors[i] = ctx
-				ctxAdded = true
 			}
 		case dt.TimeI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"times")
 			if err != nil {
-				return m, false, err
+				return m, err
 			}
 			if ctx == "" {
-				return m, false, nil
+				return m, nil
 			}
 			for i, o := range m.Input.StructuredInput.Times {
 				if o != w {
 					continue
 				}
 				m.Input.StructuredInput.Times[i] = ctx
-				ctxAdded = true
 			}
 		case dt.PlaceI:
 			ctx, err = getContextObject(m.User, m.Input.StructuredInput,
 				"places")
 			if err != nil {
-				return m, false, err
+				return m, err
 			}
 			if ctx == "" {
-				return m, false, nil
+				return m, nil
 			}
 			for i, o := range m.Input.StructuredInput.Places {
 				if o != w {
 					continue
 				}
 				m.Input.StructuredInput.Places[i] = ctx
-				ctxAdded = true
 			}
 		default:
-			return m, false,
-				errors.New("unknown type found for pronoun")
+			return m, errors.New("unknown type found for pronoun")
 		}
 		log.Println("ctx: ", ctx)
 	}
-	return m, ctxAdded, nil
+	return m, nil
 }
 
 // extractEntity from a word. If a Command, strip any contraction. For example,

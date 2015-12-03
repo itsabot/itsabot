@@ -101,7 +101,7 @@ Loop:
 	}
 }
 
-func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg, string, string, error) {
+func callPkg(m *dt.Msg) (*dt.RespMsg, string, string, error) {
 	reply := &dt.RespMsg{}
 	pw, route, lastRoute, err := getPkg(m)
 	if err != nil {
@@ -114,7 +114,7 @@ func callPkg(m *dt.Msg, ctxAdded bool) (*dt.RespMsg, string, string, error) {
 	}
 	log.Println("sending structured input to", pw.P.Config.Name)
 	c := strings.Title(pw.P.Config.Name)
-	if ctxAdded || lastRoute || len(m.Input.StructuredInput.Commands) == 0 {
+	if lastRoute || len(m.Input.StructuredInput.Commands) == 0 {
 		log.Println("FollowUp")
 		c += ".FollowUp"
 	} else {
