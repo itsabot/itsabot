@@ -135,8 +135,9 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 		resp = m.LastResponse
-		resp.Sentence = ""
 	}
+	resp.Sentence = ""
+	log.Println("starting state", getState())
 	// have we already made the purchase?
 	if getState() == StateComplete {
 		// if so, reset state to allow for other purchases
@@ -153,6 +154,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 	}
+	log.Println("keywords handled. finished?", kw)
 	if !kw {
 		// if purchase has not been made, move user through the
 		// package's states
@@ -529,17 +531,6 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += tmp
 			}
 		case "checkout", "check", "done", "ready":
-			prods := getSelectedProducts()
-			if len(prods) == 1 {
-				tmp := fmt.Sprintf(
-					"Ok. Where should I ship your bottle of %s?",
-					prods[0].Name)
-				resp.Sentence = tmp
-			} else if len(prods) > 1 {
-				resp.Sentence = fmt.Sprintf(
-					"Ok. Where should I ship these %d bottles?",
-					len(prods))
-			}
 			resp.State["state"] = StateShippingAddress
 		case "remove", "rid", "drop":
 			prods := getSelectedProducts()
@@ -587,6 +578,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			modifier *= 2
 		}
 	}
+	log.Printf("%q\n", resp.Sentence)
 	return len(resp.Sentence) > 0, nil
 }
 
