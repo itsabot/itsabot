@@ -498,8 +498,8 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			prods := getSelectedProducts()
 			var prodNames []string
 			for _, prod := range prods {
-				name := fmt.Sprintf("%s ($%.2f)", prod.Name,
-					float64(prod.Price)/100)
+				name := fmt.Sprintf("%s (%dx$%.2f)", prod.Name,
+					prod.Count, float64(prod.Price)/100)
 				prodNames = append(prodNames, name)
 			}
 			if len(prods) == 0 {
@@ -518,9 +518,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				r := rand.Intn(2)
 				switch r {
 				case 0:
-					tmp = " Should we keep looking or checkout?"
+					tmp = " Should we checkout?"
 				case 1:
-					tmp = " Should we add some more or checkout?"
+					tmp = " Are you ready to checkout?"
 				}
 				// 255 is the database varchar limit, but we should aim
 				// to be below 140 (sms)
@@ -532,7 +532,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += tmp
 			}
 			resp.State["state"] = StateContinueShopping
-		case "checkout", "check":
+		case "checkout", "check", "done":
 			prods := getSelectedProducts()
 			if len(prods) == 1 {
 				tmp := fmt.Sprintf(

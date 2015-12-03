@@ -40,9 +40,9 @@ func (prods ProductSels) Prices(addr *Address) map[string]uint64 {
 	m["shipping"] = 1290 + uint64((len(prods)-1)*120)
 	tax := statesTax[addr.State]
 	if tax > 0.0 {
-		tax *= float64(m["total"])
+		tax *= float64(m["products"])
 	}
 	m["tax"] = uint64(math.Ceil(tax))
-	m["total"] = m["product"] + m["shipping"] + m["tax"]
+	m["total"] = m["products"] + m["shipping"] + m["tax"]
 	return m
 }
