@@ -38,9 +38,12 @@ func (prods ProductSels) Prices(addr *Address) map[string]uint64 {
 	}
 	// calculate shipping. note that this is vendor specific
 	m["shipping"] = 1290 + uint64((len(prods)-1)*120)
-	tax := statesTax[addr.State]
-	if tax > 0.0 {
-		tax *= float64(m["products"])
+	var tax float64
+	if addr != nil {
+		tax = statesTax[addr.State]
+		if tax > 0.0 {
+			tax *= float64(m["products"])
+		}
 	}
 	m["tax"] = uint64(math.Ceil(tax))
 	m["total"] = m["products"] + m["shipping"] + m["tax"]
