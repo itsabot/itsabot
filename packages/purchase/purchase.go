@@ -454,7 +454,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			s += fmt.Sprintf("shipping is $%.2f, ",
 				float64(prices[1])/100)
 			if prices[2] > 0.0 {
-				s += fmt.Sprintf(" and tax is $%.2f, ",
+				s += fmt.Sprintf("and tax is $%.2f, ",
 					float64(prices[2])/100)
 			}
 			s += fmt.Sprintf("totaling $%.2f.",
@@ -562,9 +562,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 					"Ok, I'll remove %s.", matches[0])
 				removeSelectedProduct(matches[0])
 			} else {
-				resp.Sentence = "Ok, I'll remove "
-				resp.Sentence += language.SliceToString(matches,
-					"and") + "."
+				resp.Sentence = "Ok, I'll remove those."
 				for _, match := range matches {
 					removeSelectedProduct(match)
 				}
