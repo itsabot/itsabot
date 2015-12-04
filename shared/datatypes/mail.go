@@ -20,7 +20,7 @@ func (sg *MailClient) SendPurchaseConfirmation(p *Purchase) error {
 	if len(products) == 0 {
 		return errors.New("empty products slice in purchase confirmation")
 	}
-	subj := fmt.Sprintf("Order confirmation: #%s", p.ID)
+	subj := fmt.Sprintf("Order confirmation: #%s", p.DisplayID())
 	text := "<html><body>"
 	text += fmt.Sprintf("<p>Hi %s:</p>", p.User.Name)
 	text += "<p>Here's a quick order summary for your records. You bought:</p>"
@@ -61,7 +61,7 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 	}
 	var subj string
 	if os.Getenv("AVA_ENV") == "production" {
-		subj = fmt.Sprintf("Order Request: #%s", p.ID)
+		subj = fmt.Sprintf("Order Request: #%s", p.DisplayID())
 	} else {
 		subj = fmt.Sprintf("[TEST - PLEASE IGNORE] Order Request: #%s", p.ID)
 		(*p.Vendor).ContactName = "Evan"

@@ -544,6 +544,8 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				tskPurch.ResetState()
 			}
 			resp.State["state"] = StateShippingAddress
+		case "thanks", "thank":
+			resp.Sentence = language.Welcome()
 		case "remove", "rid", "drop":
 			prods := getSelectedProducts()
 			var prodNames []string
