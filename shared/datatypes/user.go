@@ -68,6 +68,7 @@ func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 		       brand, stripeid, zip5hash
 		FROM cards
 		WHERE userid=$1`
+	log.Println("getting cards for user", u.ID)
 	var cards []Card
 	err := db.Select(&cards, q, u.ID)
 	return cards, err
