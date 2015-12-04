@@ -156,6 +156,7 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 func (u *User) UpdateAddressName(db *sqlx.DB, id uint64, name string) (*Address,
 	error) {
 	q := `UPDATE addresses SET name=$1 WHERE id=$2`
+	log.Println("updating address name", name, "for id", id)
 	if _, err := db.Exec(q, name, id); err != nil {
 		return nil, err
 	}
