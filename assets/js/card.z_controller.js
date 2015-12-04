@@ -1,5 +1,6 @@
 Card.controller = function() {
-	if (cookie.getItem("id") === null) {
+	var tmp = cookie.getItem("id");
+	if (tmp === null || tmp <= 0) {
 		return m.route("/login");
 	}
 	var _this = this;

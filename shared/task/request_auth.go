@@ -181,7 +181,7 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	cards, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
 	if len(cards) == 0 {
 		log.Println("user has no cards")
-		t.resp.Sentence = "I'll need you to add your card here: https://www.avabot.co/?/cards/new. Let me know when you're done!"
+		t.resp.Sentence = "Great! I'll need you to add your card here, first: https://avabot.co/?/cards/new. Let me know when you're done!"
 		return false, nil
 	}
 	if err != nil {

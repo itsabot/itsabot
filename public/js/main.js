@@ -77,7 +77,8 @@ Card.brandIcon = function(brand) {
 	return icon;
 };
 Card.controller = function() {
-	if (cookie.getItem("id") === null) {
+	var tmp = cookie.getItem("id");
+	if (tmp === null || tmp <= 0) {
 		return m.route("/login");
 	}
 	var _this = this;
@@ -2160,7 +2161,8 @@ var Profile = {
 };
 
 Profile.controller = function() {
-	if (cookie.getItem("id") === null) {
+	var userId = cookie.getItem("id");
+	if (userId === null || userId <= 0) {
 		return m.route("/login");
 	}
 	var _this = this;
@@ -2168,7 +2170,6 @@ Profile.controller = function() {
 	_this.email = m.prop("");
 	_this.phones = new List({type: Phone});
 	_this.cards = new List({type: Card});
-	var userId = cookie.getItem("id");
 	Profile.data(userId).then(function(data) {
 		_this.email(data.Email);
 		_this.username(data.Name);
