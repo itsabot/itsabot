@@ -66,12 +66,12 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	switch t.getState() {
 	case authStateStart:
 		log.Println("hit authStateStart")
-		t.setState(authStateConfirm)
 		return t.askUserForAuth(m)
 	case authStateConfirm:
 		log.Println("hit authStateConfirm")
 		switch m {
 		case MethodZip:
+			log.Println("methodzip")
 			zip5 := []byte(
 				regexNum.FindString(t.ctx.Msg.Input.Sentence))
 			if len(zip5) != 5 {
@@ -131,6 +131,9 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 					}
 					return true, nil
 				}
+			}
+			if rows.Err() != nil {
+				return false, rows.Err()
 			}
 			return false, ErrInvalidAuth
 		case MethodWebCache, MethodWebLogin:
