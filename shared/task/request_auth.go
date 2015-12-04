@@ -198,6 +198,7 @@ func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 	if err := p.UpdateEmailsSent(); err != nil {
 		return false, err
 	}
+	t.setState(authStateStart)
 	return true, nil
 }
 
@@ -238,6 +239,7 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 		return false, err
 	}
 	log.Println("asked user for auth")
+	t.setState(authStateConfirm)
 	return false, nil
 }
 
