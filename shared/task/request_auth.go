@@ -202,22 +202,24 @@ func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 }
 
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
+	log.Println("asking user for auth")
 	_, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
 	if err == sql.ErrNoRows {
 		log.Println("user has no cards")
-		*t.resp.Sentence = "I'll need you to add your card here: https://www.avabot.co/?/cards/new. Let me know when you're done!"
+		t.resp.Sentence = "I'll need you to add your card here: https://www.avabot.co/?/cards/new. Let me know when you're done!"
 		return false, nil
 	}
 	switch m {
 	case MethodZip:
-		*t.resp.Sentence = "To do that, please confirm your billing zip code."
+		t.resp.Sentence = "To do that, please confirm your billing zip code."
+		log.Println("asking user for auth: zip code")
 	case MethodWebCache:
-		*t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.com/?/profile"
+		t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.com/?/profile"
 	case MethodWebLogin:
 		if err := t.ctx.Msg.User.DeleteSessions(t.ctx.DB); err != nil {
 			return false, err
 		}
-		*t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.com/?/login"
+		t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.com/?/login"
 	}
 	tx, err := t.ctx.DB.Beginx()
 	if err != nil {
@@ -235,6 +237,7 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	if err = tx.Commit(); err != nil {
 		return false, err
 	}
+	log.Println("asked user for auth")
 	return false, nil
 }
 
