@@ -19,8 +19,7 @@ var ErrNoAuth = errors.New("no auth found")
 var ErrInvalidAuth = errors.New("invalid auth")
 
 const (
-	authStateNone float64 = iota
-	authStateStart
+	authStateStart float64 = iota
 	authStateConfirm
 )
 
@@ -56,14 +55,8 @@ const (
 // which will also authenticate the user.
 func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	log.Println("REQUESTAUTH")
-	if len(t.typ) == 0 {
-		t.typ = "Auth"
-		t.ResetState()
-	}
+	t.typ = "Auth"
 	log.Println("state", t.getState())
-	if t.getState() == authStateNone {
-		t.setState(authStateStart)
-	}
 	// check last authentication date and method
 	authenticated, err := t.ctx.Msg.User.IsAuthenticated(m)
 	if err != nil {
@@ -169,15 +162,15 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 				return false, err
 			}
 			return true, nil
+		default:
+			return false, errors.New("invalid auth state")
 		}
 	}
-	tmp := fmt.Sprintf("invalid auth state: %f", t.getState())
-	return false, errors.New(tmp)
+	return false, nil
 }
 
 // RequestPurchase will authenticate the user and then charge a card.
-func (t *Task) RequestPurchase(m dt.Method, prds []dt.ProductSel,
-	p *dt.Purchase) (bool, error) {
+func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 	authenticated, err := t.RequestAuth(m)
 	if err != nil {
 		return false, err

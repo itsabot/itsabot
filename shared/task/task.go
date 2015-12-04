@@ -44,10 +44,6 @@ func (t *Task) setState(s float64) {
 	t.resp.State["__taskState"] = s
 }
 
-func (t *Task) ResetState() {
-	t.resp.State["__taskState"] = 0.0
-}
-
 func (t *Task) setInterimID(id uint64) {
 	key := fmt.Sprintf("__task%s_User%dID", t.typ, t.ctx.Msg.User.ID)
 	t.resp.State[key] = id
