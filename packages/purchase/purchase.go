@@ -27,6 +27,8 @@ var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var p *pkg.Pkg
 var ctx *dt.Ctx
+var tskAddr *task.Task
+var tskPurch *task.Task
 
 // resp enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
@@ -337,11 +339,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// tasks are multi-step processes often useful across several
 		// packages
 		var addr *dt.Address
-		tsk, err := task.New(ctx, resp, respMsg)
+		var err error
+		tskAddr, err = task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
 		}
-		done, err := tsk.RequestAddress(&addr, len(prods))
+		done, err := tskAddr.RequestAddress(&addr, len(prods))
 		if err != nil {
 			return err
 		}
@@ -369,6 +372,9 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "Ok."
 			return nil
 		}
+		if tskPurch != nil {
+			tskPurch.ResetState()
+		}
 		resp.State["state"] = StateAuth
 		return updateState(m, resp, respMsg)
 	case StateAuth:
@@ -384,12 +390,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		tsk, err := task.New(ctx, resp, respMsg)
+		tskPurch, err = task.New(ctx, resp, respMsg)
 		if err != nil {
 			return err
 		}
 		log.Println("task init")
-		done, err := tsk.RequestPurchase(task.MethodZip, purchase)
+		done, err := tskPurch.RequestPurchase(task.MethodZip, purchase)
 		log.Println("task fired. request purchase")
 		log.Println("sentence", resp.Sentence)
 		if len(resp.Sentence) == 0 || err == task.ErrInvalidAuth {
@@ -531,6 +537,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence += tmp
 			}
 		case "checkout", "check", "done", "ready":
+			if tskAddr != nil {
+				tskAddr.ResetState()
+			}
 			resp.State["state"] = StateShippingAddress
 		case "remove", "rid", "drop":
 			prods := getSelectedProducts()

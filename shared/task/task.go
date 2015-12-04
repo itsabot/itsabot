@@ -33,7 +33,7 @@ func New(ctx *dt.Ctx, resp *dt.Resp, respMsg *dt.RespMsg) (*Task, error) {
 }
 
 func (t *Task) getState() float64 {
-	tmp := t.resp.State["__taskState"]
+	tmp := t.resp.State[t.key()]
 	if tmp == nil {
 		return addressStateNone
 	}
@@ -41,12 +41,19 @@ func (t *Task) getState() float64 {
 }
 
 func (t *Task) setState(s float64) {
-	t.resp.State["__taskState"] = s
+	t.resp.State[t.key()] = s
+}
+
+func (t *Task) ResetState() {
+	t.resp.State[t.key()] = 0.0
 }
 
 func (t *Task) setInterimID(id uint64) {
-	key := fmt.Sprintf("__task%s_User%dID", t.typ, t.ctx.Msg.User.ID)
-	t.resp.State[key] = id
+	t.resp.State[t.key()] = id
+}
+
+func (t *Task) key() string {
+	return fmt.Sprintf("__task%s_User%dID", t.typ, t.ctx.Msg.User.ID)
 }
 
 // getInterimID is useful when you've saved an object, but haven't finished
