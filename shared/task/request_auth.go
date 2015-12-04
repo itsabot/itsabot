@@ -178,12 +178,15 @@ func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	log.Println("asking user for auth")
-	_, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
+	cards, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
 	log.Println("ERR HERE", err)
-	if err == sql.ErrNoRows {
+	if len(cards) == 0 {
 		log.Println("user has no cards")
 		t.resp.Sentence = "I'll need you to add your card here: https://www.avabot.co/?/cards/new. Let me know when you're done!"
 		return false, nil
+	}
+	if err != nil {
+		return false, err
 	}
 	switch m {
 	case MethodZip:
