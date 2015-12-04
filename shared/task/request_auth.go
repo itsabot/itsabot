@@ -207,15 +207,18 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 		return false, err
 	}
 	q := `INSERT INTO authorizations (authmethod) VALUES ($1) RETURNING id`
-	var aid int
+	var aid uint64
 	if err = tx.QueryRowx(q, m).Scan(&aid); err != nil {
+		log.Println("err scanning")
 		return false, err
 	}
 	q = `UPDATE users SET authorizationid=$1 WHERE id=$2`
 	if _, err = tx.Exec(q, aid, t.ctx.Msg.User.ID); err != nil {
+		log.Println("err updating")
 		return false, err
 	}
 	if err = tx.Commit(); err != nil {
+		log.Println("err committing")
 		return false, err
 	}
 	log.Println("asked user for auth")
