@@ -183,6 +183,7 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	log.Println("asking user for auth")
 	cards, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
 	if err != nil {
+		log.Println("err getting cards")
 		return false, err
 	}
 	if len(cards) == 0 {

@@ -1,8 +1,10 @@
 package dt
 
+import "database/sql"
+
 type Card struct {
 	ID             int
-	AddressID      int
+	AddressID      sql.NullInt64
 	Last4          string
 	CardholderName string
 	ExpMonth       int
