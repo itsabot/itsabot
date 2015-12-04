@@ -69,22 +69,8 @@ func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 		FROM cards
 		WHERE userid=$1`
 	var cards []Card
-	rows, err := db.Queryx(q, u.ID)
-	if err != nil {
-		return cards, err
-	}
-	defer rows.Close()
-	var card Card
-	for rows.Next() {
-		if err = rows.StructScan(&card); err != nil {
-			return cards, err
-		}
-		cards = append(cards, card)
-	}
-	if err = rows.Err(); err != nil {
-		return cards, err
-	}
-	return cards, nil
+	err := db.Select(&cards, q, u.ID)
+	return cards, err
 }
 
 func (u *User) GetPrimaryCard(db *sqlx.DB) (*Card, error) {
@@ -156,7 +142,6 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 func (u *User) UpdateAddressName(db *sqlx.DB, id uint64, name string) (*Address,
 	error) {
 	q := `UPDATE addresses SET name=$1 WHERE id=$2`
-	log.Println("updating address name", name, "for id", id)
 	if _, err := db.Exec(q, name, id); err != nil {
 		return nil, err
 	}
