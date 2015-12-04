@@ -16,6 +16,14 @@ const (
 
 func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {
 	t.typ = "Address"
+	done, err := t.getAddress(dest, prodCount)
+	if done {
+		t.setState(addressStateNone)
+	}
+	return done, err
+}
+
+func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 	var pro string
 	if prodCount == 1 {
 		pro = "it"
@@ -89,4 +97,5 @@ func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {
 		log.Println("warn: invalid state", t.getState())
 	}
 	return false, nil
+
 }

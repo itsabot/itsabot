@@ -619,7 +619,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	switch r {
 	case 0:
 		tmp += "Does that sound good"
-	case 2:
+	case 1:
 		tmp += "Should I add it to your cart"
 	}
 	if len(getSelectedProducts()) > 0 {

@@ -41,8 +41,6 @@ const (
 	MethodWebLogin
 )
 
-// TODO sub-task. RequestCard if no valid credit card matched.
-
 // RequestAuth ensures you're speaking to the correct user. Select the LOWEST
 // level of authentication you'll allow based on a tolerance for fraud weighed
 // against the convenience of the user experience. Methods are organized in
@@ -55,7 +53,6 @@ const (
 // which will also authenticate the user.
 func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	log.Println("REQUESTAUTH")
-	t.typ = "Auth"
 	log.Println("state", t.getState())
 	// check last authentication date and method
 	authenticated, err := t.ctx.Msg.User.IsAuthenticated(m)
@@ -171,35 +168,12 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 
 // RequestPurchase will authenticate the user and then charge a card.
 func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
-	authenticated, err := t.RequestAuth(m)
-	if err != nil {
-		return false, err
+	t.typ = "Purchase"
+	done, err := t.makePurchase(m, p)
+	if done {
+		t.setState(authStateStart)
 	}
-	if !authenticated {
-		return false, nil
-	}
-	desc := fmt.Sprintf("Purchase for $%.2f", float64(p.Total)/100)
-	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
-	chargeParams := &stripe.ChargeParams{
-		Amount:   p.Total,
-		Currency: "usd",
-		Desc:     desc,
-		Customer: t.ctx.Msg.User.StripeCustomerID,
-	}
-	if _, err := charge.New(chargeParams); err != nil {
-		return false, err
-	}
-	if err := t.ctx.SG.SendVendorRequest(p); err != nil {
-		return false, err
-	}
-	if err := t.ctx.SG.SendPurchaseConfirmation(p); err != nil {
-		return false, err
-	}
-	if err := p.UpdateEmailsSent(); err != nil {
-		return false, err
-	}
-	t.setState(authStateStart)
-	return true, nil
+	return done, err
 }
 
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
@@ -263,4 +237,35 @@ func (t *Task) setAuthorized(authID *sql.NullInt64) error {
 		return err
 	}
 	return nil
+}
+
+func (t *Task) makePurchase(m dt.Method, p *dt.Purchase) (bool, error) {
+	authenticated, err := t.RequestAuth(m)
+	if err != nil {
+		return false, err
+	}
+	if !authenticated {
+		return false, nil
+	}
+	desc := fmt.Sprintf("Purchase for $%.2f", float64(p.Total)/100)
+	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
+	chargeParams := &stripe.ChargeParams{
+		Amount:   p.Total,
+		Currency: "usd",
+		Desc:     desc,
+		Customer: t.ctx.Msg.User.StripeCustomerID,
+	}
+	if _, err := charge.New(chargeParams); err != nil {
+		return false, err
+	}
+	if err := t.ctx.SG.SendVendorRequest(p); err != nil {
+		return false, err
+	}
+	if err := t.ctx.SG.SendPurchaseConfirmation(p); err != nil {
+		return false, err
+	}
+	if err := p.UpdateEmailsSent(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
