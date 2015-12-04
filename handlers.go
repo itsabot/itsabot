@@ -418,10 +418,12 @@ func handlerAPICardSubmit(c *echo.Context) error {
 	if err != nil {
 		return jsonError(err)
 	}
+	log.Println("submitting card for user", req.UserID)
 	var userStripeID string
 	q := `SELECT stripecustomerid FROM users WHERE id=$1`
 	if err := db.Get(&userStripeID, q, req.UserID); err != nil {
-		return err
+		log.Println("err with db.Get")
+		return jsonError(err)
 	}
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	cd, err := card.New(&stripe.CardParams{
@@ -429,7 +431,7 @@ func handlerAPICardSubmit(c *echo.Context) error {
 		Token:    req.StripeToken,
 	})
 	if err != nil {
-		return err
+		return jsonError(err)
 	}
 	var crd struct{ ID int }
 	q = `
