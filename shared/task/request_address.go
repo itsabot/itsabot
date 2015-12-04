@@ -80,10 +80,7 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 			}
 		}
 		if len(location) == 0 {
-			yes := language.ExtractYesNo(t.ctx.Msg.Input.Sentence)
-			if !yes.Bool && yes.Valid {
-				return true, nil
-			}
+			return true, nil
 		}
 		addr, err := t.ctx.Msg.User.UpdateAddressName(t.ctx.DB,
 			t.getInterimID(), location)
@@ -97,5 +94,4 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 		log.Println("warn: invalid state", t.getState())
 	}
 	return false, nil
-
 }
