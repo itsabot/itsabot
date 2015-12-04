@@ -77,6 +77,9 @@ Card.brandIcon = function(brand) {
 	return icon;
 };
 Card.controller = function() {
+	if (cookie.getItem("id") === null) {
+		return m.route("/login");
+	}
 	var _this = this;
 	_this.vm = new Card.vm(_this);
 	_this.card = new Card({});
