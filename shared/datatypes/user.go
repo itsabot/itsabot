@@ -65,7 +65,7 @@ func (u *User) IsAuthenticated(m Method) (bool, error) {
 func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 	q := `
 		SELECT id, addressid, last4, cardholdername, expmonth, expyear,
-		       brand, stripeid
+		       brand, stripeid, zip5hash
 		FROM cards
 		WHERE userid=$1`
 	var cards []Card
@@ -80,6 +80,9 @@ func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 			return cards, err
 		}
 		cards = append(cards, card)
+	}
+	if err = rows.Err(); err != nil {
+		return cards, err
 	}
 	return cards, nil
 }

@@ -9,4 +9,5 @@ type Card struct {
 	ExpYear        int
 	Brand          string
 	StripeID       string
+	Zip5Hash       []byte `sql:"zip5hash"`
 }
