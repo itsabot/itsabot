@@ -540,6 +540,9 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			if tskAddr != nil {
 				tskAddr.ResetState()
 			}
+			if tskPurch != nil {
+				tskPurch.ResetState()
+			}
 			resp.State["state"] = StateShippingAddress
 		case "remove", "rid", "drop":
 			prods := getSelectedProducts()
