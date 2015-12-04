@@ -79,7 +79,7 @@ Card.brandIcon = function(brand) {
 Card.controller = function() {
 	var tmp = cookie.getItem("id");
 	if (tmp === null || tmp <= 0) {
-		return m.route("/login");
+		return m.route("/login?r=" + encodeURIComponent(window.location.search));
 	}
 	var _this = this;
 	_this.vm = new Card.vm(_this);
@@ -796,7 +796,12 @@ var Login = {
 			}
 			cookie.setItem("id", data.Id, exp, null, null, secure);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
-			m.route("/profile");
+			var redirect = m.route.param("r");
+			if redirect !== null {
+				m.route("/" + redirect.substring(1));
+			} else {
+				m.route("/profile");
+			}
 		}, function(err) {
 			Login.controller.error(err.Msg);
 		});

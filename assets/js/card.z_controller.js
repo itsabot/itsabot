@@ -1,7 +1,7 @@
 Card.controller = function() {
 	var tmp = cookie.getItem("id");
 	if (tmp === null || tmp <= 0) {
-		return m.route("/login");
+		return m.route("/login?r=" + encodeURIComponent(window.location.search));
 	}
 	var _this = this;
 	_this.vm = new Card.vm(_this);
