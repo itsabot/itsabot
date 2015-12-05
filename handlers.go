@@ -340,7 +340,7 @@ func handlerAPIProfile(c *echo.Context) error {
 		return jsonError(err)
 	}
 	q = `
-		SELECT id, flexid FROM userflexids
+		SELECT flexid FROM userflexids
 		WHERE flexidtype=2 AND userid=$1
 		LIMIT 10`
 	err = db.Select(&user.Phones, q, uid)
