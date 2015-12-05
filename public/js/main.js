@@ -774,6 +774,7 @@ var List = function(data) {
 var Login = {
 	login: function(ev) {
 		ev.preventDefault();
+		Login.controller.error("");
 		var email = document.getElementById("email").value;
 		var pass = document.getElementById("password").value;
 		return m.request({
@@ -793,7 +794,7 @@ var Login = {
 			cookie.setItem("id", data.Id, exp, null, null, secure);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
 			var redirect = m.route.param("r");
-			if (redirect !== null) {
+			if (redirect != null) {
 				m.route("/" + redirect.substring(1));
 			} else {
 				m.route("/profile");
