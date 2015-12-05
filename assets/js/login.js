@@ -20,7 +20,7 @@ var Login = {
 			cookie.setItem("id", data.Id, exp, null, null, secure);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
 			var redirect = m.route.param("r");
-			if redirect !== null {
+			if (redirect !== null) {
 				m.route("/" + redirect.substring(1));
 			} else {
 				m.route("/profile");
