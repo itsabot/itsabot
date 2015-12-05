@@ -61,16 +61,17 @@ var Card = function(data) {
 
 Card.brandIcon = function(brand) {
 	var icon;
-	console.log("brand: " + brand);
 	switch(brand) {
 	case "American Express", "Diners", "Discover", "JCB", "Maestro",
 		"MasterCard", "PayPal", "Visa":
+		console.log("brand: " + brand);
 		var imgPath = brand.toLowerCase().replace(" ", "_");
 		imgPath = "card_" + imgPath + ".svg";
 		imgPath = "/public/images/" + imgPath;
 		icon = m("img", { src: imgPath, class: "icon-fit" });
 		break;
 	default:
+		console.log("no brand match: " + brand)
 		icon = m("span", brand);
 		break;
 	}

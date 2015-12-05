@@ -1,7 +1,7 @@
 var Login = {
 	login: function(ev) {
 		ev.preventDefault();
-		Login.controller.error("");
+		Login.vm.hideError();
 		var email = document.getElementById("email").value;
 		var pass = document.getElementById("password").value;
 		return m.request({
@@ -27,7 +27,7 @@ var Login = {
 				m.route("/profile");
 			}
 		}, function(err) {
-			Login.controller.error(err.Msg);
+			Login.vm.showError(err.Msg);
 		});
 	},
 	checkAuth: function(callback) {
@@ -44,6 +44,17 @@ Login.controller = function() {
 		}
 	});
 	Login.controller.error = m.prop("");
+};
+
+Login.vm = {
+	hideError: function() {
+		Login.controller.error("");
+		document.getElementById("err").classList.add("hidden");
+	},
+	showError: function(err) {
+		Login.controller.error(err);
+		document.getElementById("err").classList.remove("hidden");
+	}
 };
 
 Login.view = function() {
@@ -83,14 +94,10 @@ Login.viewFull = function() {
 						m("div", {
 							class: "col-md-12"
 						}, [
-
-							function() {
-								if (Login.controller.error() !== "") {
-									return m("div", {
-										class: "alert alert-danger"
-									}, Login.controller.error());
-								}
-							}(),
+							m("div", {
+								id: "err",
+								class: "alert alert-danger hidden"
+							}, Login.controller.error()),
 							m("div", {
 								class: "form-group"
 							}, [

@@ -61,16 +61,17 @@ var Card = function(data) {
 
 Card.brandIcon = function(brand) {
 	var icon;
-	console.log("brand: " + brand);
 	switch(brand) {
 	case "American Express", "Diners", "Discover", "JCB", "Maestro",
 		"MasterCard", "PayPal", "Visa":
+		console.log("brand: " + brand);
 		var imgPath = brand.toLowerCase().replace(" ", "_");
 		imgPath = "card_" + imgPath + ".svg";
 		imgPath = "/public/images/" + imgPath;
 		icon = m("img", { src: imgPath, class: "icon-fit" });
 		break;
 	default:
+		console.log("no brand match: " + brand)
 		icon = m("span", brand);
 		break;
 	}
@@ -774,7 +775,7 @@ var List = function(data) {
 var Login = {
 	login: function(ev) {
 		ev.preventDefault();
-		Login.controller.error("");
+		Login.vm.hideError();
 		var email = document.getElementById("email").value;
 		var pass = document.getElementById("password").value;
 		return m.request({
@@ -800,7 +801,7 @@ var Login = {
 				m.route("/profile");
 			}
 		}, function(err) {
-			Login.controller.error(err.Msg);
+			Login.vm.showError(err.Msg);
 		});
 	},
 	checkAuth: function(callback) {
@@ -817,6 +818,17 @@ Login.controller = function() {
 		}
 	});
 	Login.controller.error = m.prop("");
+};
+
+Login.vm = {
+	hideError: function() {
+		Login.controller.error("");
+		document.getElementById("err").classList.add("hidden");
+	},
+	showError: function(err) {
+		Login.controller.error(err);
+		document.getElementById("err").classList.remove("hidden");
+	}
 };
 
 Login.view = function() {
@@ -856,14 +868,10 @@ Login.viewFull = function() {
 						m("div", {
 							class: "col-md-12"
 						}, [
-
-							function() {
-								if (Login.controller.error() !== "") {
-									return m("div", {
-										class: "alert alert-danger"
-									}, Login.controller.error());
-								}
-							}(),
+							m("div", {
+								id: "err",
+								class: "alert alert-danger hidden"
+							}, Login.controller.error()),
 							m("div", {
 								class: "form-group"
 							}, [
