@@ -1,6 +1,5 @@
 body {
 	height: 100%;
-	position: relative;
 }
 p {
 	font-family: 'PT Serif', serif;
@@ -70,9 +69,6 @@ label,
 }
 .gradient.gradient-big {
 	height: 650px;
-	position: absolute;
-	top: 0;
-	left: 0;
 }
 img.img-big {
 	position: absolute;
@@ -106,13 +102,8 @@ footer a:hover {
 	padding: 1.2em 1em;
 	margin-left: 1em;
 }
-.body {
-	padding-bottom: 220px;
-	margin-bottom: 5em;
-}
 footer {
-	position: absolute;
-	bottom: 0;
+	margin-top: 1.5em;
 	width: 100%;
 	min-height: 220px;
 	padding: 3em 0;
@@ -162,6 +153,9 @@ footer .de-emphasized a {
 	height: 650px;
 	margin-bottom: 1em;
 	margin-right: 0;
+}
+.body-container {
+	padding-top: 1.5em;
 }
 .btn:hover {
 	color: #838D8F;
@@ -230,8 +224,10 @@ h2.display {
 }
 .border-right {
 	border-right: 1px solid #555;
-	padding: 1em 0;
-	margin: -1em 0;
+	padding-top: 1em;
+	padding-bottom: 1em;
+	margin-top: -1em;
+	margin-bottom: -1em;
 }
 a.bold {
 	font-family: Montserrat, 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -355,7 +351,7 @@ span.heading {
 	display: block;
 }
 input.form-control {
-	color: #888;
+	color: #333;
 	background-color: #EEE;
 	border: 1px solid #E8E8E8;
 	border-top: 1px solid #DDD;
@@ -373,14 +369,60 @@ input.form-control {
 	font-style: italic;
 	color: #AAA;
 }
-@media (max-width: 528px) {
-	.hide-small {
-		display: none;
+@media (max-width: 320px) {
+	#btns .btn {
+		margin-left: 0 !important;
 	}
 }
 @media (max-width: 992px) {
+	.border-right {
+		border: none;
+	}
+	.hide-small {
+		display: none;
+	}
 	.img-big {
 		display: none;
+	}
+	.jumbo {
+		margin-top: 2em;
+	}
+	.hide-md {
+		display: none;
+	}
+	.jumbo h1 {
+		font-size: 2.5em;
+		line-height: 1em;
+	}
+	.jumbo {
+		text-align: center;
+	}
+	.gradient.gradient-big,
+	.jumbo-container {
+		height: inherit !important;
+		position: relative;
+	}
+	.jumbo a.btn {
+		margin-bottom: 1.5em;
+	}
+	.margin-bottom {
+		margin-bottom: 0.5em;
+	}
+	#btns {
+		margin: 3em 0 1.5em;
+	}
+	#btns .btn {
+		margin-right: 1em;
+		margin-left: 1em;
+	}
+	.body-container {
+		padding-top: 0.5em;
+	}
+	footer {
+		position: relative;
+		padding-top: 1.5em;
+		padding-bottom: 1.5em;
+		min-height: 0;
 	}
 }
 @media (min-width: 992px) {

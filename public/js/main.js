@@ -464,7 +464,7 @@ var Footer = {
 					class: "row"
 				}, [
 					m("div", {
-						class: "col-sm-3 border-right"
+						class: "col-md-3 border-right"
 					}, [
 						m("div", {
 							class: "big-name"
@@ -478,7 +478,7 @@ var Footer = {
 						m("div", "All rights reserved.")
 					]),
 					m("div", {
-						class: "col-sm-2 hide-small"
+						class: "col-md-2 hide-small"
 					}, [
 						m("div", m("a", {
 							href: "/",
@@ -518,7 +518,7 @@ var Footer = {
 						])
 					]),
 					m("div", {
-						class: "col-sm-7 de-emphasized hide-small"
+						class: "col-md-7 de-emphasized hide-small"
 					}, [
 						m("div", [
 							m("a", {
@@ -656,6 +656,7 @@ Index.view = function() {
 								config: m.route
 							}, "Tour"),
 							m("a", {
+								class: "hide-md",
 								href: "https://medium.com/ava-updates/latest"
 							}, "Updates"),
 							function() {
@@ -674,33 +675,33 @@ Index.view = function() {
 					])
 				]),
 				m("div", {
-					class: "container"
+					class: "jumbo container"
 				}, [
 					m("div", {
-						class: "jumbo row"
+						class: "col-md-8"
 					}, [
-						m("div", {
-							class: "col-md-8"
+						m("h1", "Meet Ava."),
+						m("br"),
+						m("h1", "Your new assistant."),
+						m("p", {
+							id: "earlyAccess",
+							class: "hidden fade"
 						}, [
-							m("h1", "Meet Ava."),
-							m("br"),
-							m("h1", "Your new assistant."),
-							m("p", {
-								id: "earlyAccess",
-								class: "hidden fade"
-							}, [
-								'Get early access:',
-								m("h3", 'Text Ava at ', [
-									m("strong", {
-										class: "phone"
-									}, "(424) 297-1568"),
-									' and say "Hi!"'
-								])
-							]),
+							'Get early access:',
+							m("h3", 'Text Ava at ', [
+								m("strong", {
+									class: "phone"
+								}, "(424) 297-1568"),
+								' and say "Hi!"'
+							])
+						]),
+						m("div", {
+							id: "btns-container"
+						}, [
+							m("p", "Get early access to the world's most advanced digital assistant."),
 							m("div", {
 								id: "btns"
 							}, [
-								m("p", "Get early access to the world's most advanced digital assistant."),
 								m("a", {
 									class: "btn",
 									href: "/tour",
@@ -711,55 +712,50 @@ Index.view = function() {
 									onclick: Index.vm.showEarlyAccess
 								}, "Get early access")
 							])
-						]),
-						m("div", {
-							class: "col-md-4"
-						}, [
-							m("img", {
-								class: "img-big",
-								src: "/public/images/iphone.png"
-							})
 						])
-					])
-				])
-			]),
-			m("div", {
-				class: "container"
-			}, [
-				m("div", {
-					class: "row"
-				}, [
-					m("div", {
-						class: "col-md-1"
-					}, [
-						m("div", {
-							class: "label label-primary"
-						}, "New")
 					]),
 					m("div", {
 						class: "col-md-4"
 					}, [
-						m("p", "Car trouble? Ava now finds recommended mechanic and tow services nearby.")
-					]),
-					m("div", {
-						class: "col-md-2"
-					}, [
-						m("a", {
-							class: "bold",
-							href: "https://medium.com/@egtann/car-mechanic-1af70923eb19#.o7htx32u7"
-						}, m.trust("Read more &nbsp; &#9654;"))
+						m("img", {
+							class: "img-big",
+							src: "/public/images/iphone.png"
+						})
 					])
 				])
 			])
-		])
+		]),
+		m("div", {
+			class: "container body-container"
+		}, [
+			m("div", {
+				class: "row"
+			}, [
+				m("div", {
+					class: "col-md-1 margin-bottom"
+				}, [
+					m("div", {
+						class: "label label-primary"
+					}, "New")
+				]),
+				m("div", {
+					class: "col-md-4"
+				}, [
+					m("p", "Car trouble? Ava now finds recommended mechanic and tow services nearby.")
+				]),
+				m("div", {
+					class: "col-md-2"
+				}, [
+					m("a", {
+						class: "bold",
+						href: "https://medium.com/@egtann/car-mechanic-1af70923eb19#.o7htx32u7"
+					}, m.trust("Read more &nbsp; &#9654;"))
+				])
+			])
+		]),
+		Footer.view()
 	]);
 };
-
-/*
-window.onload = function() {
-	Index.controller.init();
-};
-*/
 var List = function(data) {
 	var _this = this;
 	_this.id = Math.floor((Math.random() * 1000000000) + 1);
