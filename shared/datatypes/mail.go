@@ -108,7 +108,7 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 
 func (sg *MailClient) Send(subj, html string, c Contactable) error {
 	msg := sendgrid.NewMail()
-	msg.SetFrom("ava@avabot.com")
+	msg.SetFrom("ava@avabot.co")
 	msg.SetFromName("Ava")
 	msg.AddTo(c.GetEmail())
 	msg.AddToName(c.GetName())
