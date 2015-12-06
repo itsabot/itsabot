@@ -53,7 +53,25 @@ const (
 const pkgName string = "purchase"
 
 var statesShipping = map[string]bool{
+	"AL": true,
+	"AK": true,
+	"AZ": true,
 	"CA": true,
+	"CO": true,
+	"DC": true,
+	"HI": true,
+	"ID": true,
+	"LA": true,
+	"MO": true,
+	"NE": true,
+	"NV": true,
+	"NH": true,
+	"NM": true,
+	"NY": true,
+	"ND": true,
+	"OR": true,
+	"WI": true,
+	"WY": true,
 }
 
 // TODO add support for upselling and promotions. Then a Task interface for
