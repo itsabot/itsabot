@@ -1,6 +1,6 @@
 var Trainer = function() {
-	Trainer.id = m.prop(0);
-	Trainer.sentence = function(id) {
+	var _this = this;
+	_this.sentence = function(id) {
 		var url = "/api/sentence.json";
 		if (id !== undefined) {
 			url += "?id=" + id;
@@ -10,7 +10,7 @@ var Trainer = function() {
 			url: url
 		})
 	};
-	Trainer.save = function() {
+	_this.save = function() {
 		var sentence = "";
 		for (var i = 0; i < Train.vm.words.length; ++i) {
 			var word = Train.vm.words[i];
@@ -29,33 +29,35 @@ var Trainer = function() {
 			data: data
 		});
 	};
+	return this;
 };
 
 var Word = function(word) {
 	var _this = this;
-	Word.value = m.prop(word);
-	Word.type = m.prop("_N(" + _this.value() + ")");
-	Word.setClass = function() {
-		if (Word.classList.length > 0) {
+	_this.value = m.prop(word);
+	_this.type = m.prop("_N(" + _this.value() + ")");
+	_this.setClass = function() {
+		var el = this;
+		if (el.classList.length > 0) {
 			_this.type("_N(" + _this.value() + ")");
-			return Word.className = "";
+			return el.className = "";
 		}
 		switch (Train.vm.trainingCategory()) {
 			case "COMMANDS":
 				_this.type("_C(" + _this.value() + ")");
-				return Word.classList.add("red");
+				return el.classList.add("red");
 			case "OBJECTS":
 				_this.type("_O(" + _this.value() + ")");
-				return Word.classList.add("blue");
+				return el.classList.add("blue");
 			case "ACTORS":
 				_this.type("_A(" + _this.value() + ")");
-				return Word.classList.add("green");
+				return el.classList.add("green");
 			case "TIMES":
 				_this.type("_T(" + _this.value() + ")");
-				return Word.classList.add("yellow");
+				return el.classList.add("yellow");
 			case "PLACES":
 				_this.type("_P(" + _this.value() + ")");
-				return Word.classList.add("pink");
+				return el.classList.add("pink");
 			default:
 				console.error(
 					"invalid training state: " +
@@ -68,14 +70,16 @@ var Word = function(word) {
 var Train = {};
 Train.controller = function() {
 	var id = m.route.param("sentenceID");
-	Train.controller.trainer = new Trainer();
-	Train.controller.trainer.sentence(id).then(function(data) {
-		Train.vm.init(data);
+	var _this = this;
+	_this.trainer = new Trainer();
+	_this.trainer.sentence(id).then(function(data) {
+		Train.vm.init(_this, data);
 	});
+	return this;
 };
 
 Train.vm = {
-	init: function(data) {
+	init: function(controller, data) {
 		Train.vm.state = {};
 		Train.vm.trainer = new Trainer();
 		Train.vm.trainingCategory = m.prop("COMMANDS");
@@ -91,14 +95,14 @@ Train.vm = {
 		window.addEventListener("keypress", function(ev) {
 			if (ev.keyCode === 102 /* 'f' key */ ) {
 				ev.preventDefault();
-				Train.vm.nextCategory();
+				Train.vm.nextCategory(controller);
 			} else if (ev.keyCode === 98 /* 'b' key */ ) {
 				ev.preventDefault();
 				Train.vm.prevCategory();
 			}
 		});
 	},
-	nextCategory: function() {
+	nextCategory: function(controller) {
 		var el = document.getElementById("training-category");
 		var helpTitle = document.getElementById("help-title");
 		var helpBody = document.getElementById("help-body");
@@ -131,7 +135,8 @@ Train.vm = {
 				var btn = document.getElementById("continue-btn");
 				if (btn.innerText !== "Saving..." && btn.innerText !== "Thank you!") {
 					Train.vm.save();
-					Train.controller.trainer.save().then(function() {
+					console.log(controller);
+					controller.trainer.save().then(function() {
 						Train.vm.saveComplete();
 						setTimeout(function() {
 							m.route("/train");

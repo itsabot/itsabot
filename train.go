@@ -35,9 +35,11 @@ func supervisedTrain(in *dt.Input) error {
 	if err != nil {
 		return err
 	}
-	if err = aidedTrain(in, trainID); err != nil {
-		return err
-	}
+	/*
+		if err = aidedTrain(in, trainID); err != nil {
+			return err
+		}
+	*/
 	return nil
 }
 
@@ -82,7 +84,6 @@ func checkConsensus(data *TrainingData) error {
 			return expireHIT(data.ForeignID)
 		}
 	*/
-	log.Println(data.ForeignID)
 	as, err := mt.GetAssignmentsForHIT(data.ForeignID)
 	if err != nil {
 		return err

@@ -124,26 +124,28 @@ func handlerAPISentence(c *echo.Context) error {
 func handlerAPITrainSentence(c *echo.Context) error {
 	var data TrainingData
 	if err := c.Bind(&data); err != nil {
-		return err
+		return jsonError(err)
 	}
 	if err := train(bayes, data.Sentence); err != nil {
-		return err
+		return jsonError(err)
 	}
 	q := `UPDATE trainings SET trainedcount=trainedcount+1 WHERE id=$1`
 	res, err := db.Exec(q, data.ID)
 	if err != nil {
-		return err
+		return jsonError(err)
 	}
 	num, err := res.RowsAffected()
 	if err != nil {
-		return err
+		return jsonError(err)
 	}
 	if num == 0 {
 		return sql.ErrNoRows
 	}
-	if err = checkConsensus(&data); err != nil {
-		return err
-	}
+	/*
+		if err = checkConsensus(&data); err != nil {
+			return jsonError(err)
+		}
+	*/
 	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return err
 	}
