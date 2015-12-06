@@ -697,6 +697,10 @@ func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	if len(results) == 0 {
 		resp.Sentence = "I'm sorry. I couldn't find anything like that."
 	}
+	for i := range results {
+		j := rand.Intn(i + 1)
+		results[i], results[j] = results[j], results[i]
+	}
 	// TODO - better recommendations
 	// results = sales.SortByRecommendation(results)
 	resp.State["recommendations"] = results
