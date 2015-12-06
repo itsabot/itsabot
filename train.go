@@ -31,7 +31,7 @@ type TrainingData struct {
 }
 
 func supervisedTrain(in *dt.Input) error {
-	trainID, err := saveTrainingSentence(in)
+	_, err := saveTrainingSentence(in)
 	if err != nil {
 		return err
 	}

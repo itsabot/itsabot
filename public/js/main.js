@@ -2632,9 +2632,8 @@ Tour.view = function() {
 		Footer.view()
 	]);
 };
-var Trainer = function() {
-	var _this = this;
-	_this.sentence = function(id) {
+var Trainer = {
+	sentence: function(id) {
 		var url = "/api/sentence.json";
 		if (id !== undefined) {
 			url += "?id=" + id;
@@ -2643,8 +2642,8 @@ var Trainer = function() {
 			method: "GET",
 			url: url
 		})
-	};
-	_this.save = function() {
+	},
+	save: function() {
 		var sentence = "";
 		for (var i = 0; i < Train.vm.words.length; ++i) {
 			var word = Train.vm.words[i];
@@ -2662,8 +2661,7 @@ var Trainer = function() {
 			url: "/api/sentence.json",
 			data: data
 		});
-	};
-	return this;
+	}
 };
 
 var Word = function(word) {
@@ -2705,8 +2703,7 @@ var Train = {};
 Train.controller = function() {
 	var id = m.route.param("sentenceID");
 	var _this = this;
-	_this.trainer = new Trainer();
-	_this.trainer.sentence(id).then(function(data) {
+	Trainer.sentence(id).then(function(data) {
 		Train.vm.init(_this, data);
 	});
 	return this;
@@ -2715,7 +2712,6 @@ Train.controller = function() {
 Train.vm = {
 	init: function(controller, data) {
 		Train.vm.state = {};
-		Train.vm.trainer = new Trainer();
 		Train.vm.trainingCategory = m.prop("COMMANDS");
 		Train.vm.state.id = data.ID;
 		Train.vm.state.assignmentId = m.route.param("assignmentId");
@@ -2726,15 +2722,6 @@ Train.vm = {
 		for (var i = 0; i < words.length; ++i) {
 			Train.vm.words[i] = new Word(words[i]);
 		}
-		window.addEventListener("keypress", function(ev) {
-			if (ev.keyCode === 102 /* 'f' key */ ) {
-				ev.preventDefault();
-				Train.vm.nextCategory(controller);
-			} else if (ev.keyCode === 98 /* 'b' key */ ) {
-				ev.preventDefault();
-				Train.vm.prevCategory();
-			}
-		});
 	},
 	nextCategory: function(controller) {
 		var el = document.getElementById("training-category");
@@ -2742,6 +2729,7 @@ Train.vm = {
 		var helpBody = document.getElementById("help-body");
 		switch (Train.vm.trainingCategory()) {
 			case "COMMANDS":
+				console.log("command");
 				Train.vm.trainingCategory("OBJECTS");
 				var btn = document.getElementById("back-btn");
 				btn.classList.remove("hidden");
@@ -2749,6 +2737,7 @@ Train.vm = {
 				helpBody.innerText = "Objects are the direct objects of the sentence.";
 				break;
 			case "OBJECTS":
+				console.log("object");
 				Train.vm.trainingCategory("ACTORS");
 				helpTitle.innerText = "What is an actor? ";
 				helpBody.innerText = "Actors are often the indirect objects of the sentence.";
@@ -2769,12 +2758,11 @@ Train.vm = {
 				var btn = document.getElementById("continue-btn");
 				if (btn.innerText !== "Saving..." && btn.innerText !== "Thank you!") {
 					Train.vm.save();
-					console.log(controller);
-					controller.trainer.save().then(function() {
+					Trainer.save().then(function() {
 						Train.vm.saveComplete();
 						setTimeout(function() {
 							m.route("/train");
-						}, 2000);
+						}, 1000);
 					});
 				}
 				return;
@@ -2966,3 +2954,15 @@ Train.viewEmpty = function() {
 		return view;
 	}
 };
+
+window.addEventListener("keypress", function(ev) {
+	if (m.route() === "/train") {
+		if (ev.keyCode === 102 /* 'f' key */ ) {
+			ev.preventDefault();
+			Train.vm.nextCategory();
+		} else if (ev.keyCode === 98 /* 'b' key */ ) {
+			ev.preventDefault();
+			Train.vm.prevCategory();
+		}
+	}
+});
