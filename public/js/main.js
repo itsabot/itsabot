@@ -798,7 +798,7 @@ var Login = {
 			var redirect = m.route.param("r");
 			alert(redirect.substring(1));
 			if (redirect != null) {
-				m.route("/" + redirect.substring(1));
+				m.route(redirect.substring(1));
 			} else {
 				m.route("/profile");
 			}
