@@ -375,6 +375,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if !statesShipping[addr.State] {
 			resp.Sentence = "I'm sorry, but I can't legally ship wine to that state."
+			return nil
 		}
 		resp.State["shippingAddress"] = addr
 		tmp := fmt.Sprintf("$%.2f including shipping and tax. ",
