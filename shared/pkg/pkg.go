@@ -113,6 +113,13 @@ func (p *Pkg) Register(pkgT interface{}) error {
 // packages will be responsible for saving their own responses. This is not
 // ideal, but it'll work for now.
 func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
+	if r.State["__taskAddress_UserID_5"] != nil {
+		s, ok := r.State["__taskAddress_UserID_5"].(float64)
+		if !ok {
+			s = float64(r.State["__taskAddress_UserID_5"].(uint64))
+		}
+		log.Println("SAVING RESPONSE WITH STATE", s)
+	}
 	state, err := json.Marshal(r.State)
 	if err != nil {
 		return err
