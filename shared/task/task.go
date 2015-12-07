@@ -37,7 +37,14 @@ func (t *Task) getState() float64 {
 	if tmp == nil {
 		return addressStateNone
 	}
-	return tmp.(float64)
+	switch tmp.(type) {
+	case float64:
+		return tmp.(float64)
+	case uint64:
+		return float64(tmp.(uint64))
+	}
+	log.Println("err: state was type", reflect.TypeOf(tmp))
+	return 0.0
 }
 
 func (t *Task) setState(s float64) {
