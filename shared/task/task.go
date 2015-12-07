@@ -60,7 +60,7 @@ func (t *Task) setInterimID(id uint64) {
 }
 
 func (t *Task) key() string {
-	return fmt.Sprintf("__task%s_User%dID", t.typ, t.ctx.Msg.User.ID)
+	return fmt.Sprintf("__task%s_UserID_%d", t.typ, t.ctx.Msg.User.ID)
 }
 
 // getInterimID is useful when you've saved an object, but haven't finished
@@ -72,15 +72,14 @@ func (t *Task) getInterimID() uint64 {
 	if len(t.typ) == 0 {
 		log.Println("warn: t.typ should be set but was \"\"")
 	}
-	key := fmt.Sprintf("__task%s_User%dID", t.typ, t.ctx.Msg.User.ID)
-	switch t.resp.State[key].(type) {
+	switch t.resp.State[t.key()].(type) {
 	case uint64:
-		return t.resp.State[key].(uint64)
+		return t.resp.State[t.key()].(uint64)
 	case float64:
-		return uint64(t.resp.State[key].(float64))
+		return uint64(t.resp.State[t.key()].(float64))
 	default:
 		log.Println("warn: couldn't get interim ID: invalid type",
-			reflect.TypeOf(t.resp.State[key]))
+			reflect.TypeOf(t.resp.State[t.key()]))
 	}
 	return uint64(0)
 }
