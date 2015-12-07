@@ -12,4 +12,5 @@ var List = function(data) {
 			}()
 		]);
 	};
+	return _this;
 };

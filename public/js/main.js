@@ -771,6 +771,7 @@ var List = function(data) {
 			}()
 		]);
 	};
+	return _this;
 };
 var Login = {
 	login: function(ev) {
@@ -2175,6 +2176,10 @@ Profile.controller = function() {
 	if (userId === null || userId <= 0) {
 		return m.route("/login");
 	}
+	var redirect = m.route.param("r");
+	if (redirect != null) {
+		m.route("/" + redirect.substring(1));
+	}
 	var _this = this;
 	_this.username = m.prop("");
 	_this.email = m.prop("");
@@ -2184,8 +2189,14 @@ Profile.controller = function() {
 		_this.email(data.Email);
 		_this.username(data.Name);
 		_this.phones.userId(userId);
+		if (data.Phones === null) {
+			data.Phones = [];
+		}
 		_this.phones.data(data.Phones);
 		_this.cards.userId(userId);
+		if (data.Cards === null) {
+			data.Cards = [];
+		}
 		_this.cards.data(data.Cards);
 	}, function(err) {
 		console.error(err);
