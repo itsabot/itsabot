@@ -32,8 +32,8 @@ func New(ctx *dt.Ctx, resp *dt.Resp, respMsg *dt.RespMsg) (*Task, error) {
 	}, nil
 }
 
-func (t *Task) getState() float64 {
-	tmp := t.resp.State[t.key()]
+func (t *Task) GetState() float64 {
+	tmp := t.resp.State[t.Key()]
 	if tmp == nil {
 		return addressStateNone
 	}
@@ -48,21 +48,18 @@ func (t *Task) getState() float64 {
 }
 
 func (t *Task) setState(s float64) {
-	if s > 3 {
-		panic("task state too high")
-	}
-	t.resp.State[t.key()] = s
+	t.resp.State[t.Key()] = s
 }
 
 func (t *Task) ResetState() {
-	t.resp.State[t.key()] = 0.0
+	t.resp.State[t.Key()] = 0.0
 }
 
 func (t *Task) setInterimID(id uint64) {
-	t.resp.State[t.key()] = id
+	t.resp.State[t.Key()] = id
 }
 
-func (t *Task) key() string {
+func (t *Task) Key() string {
 	return fmt.Sprintf("__task%s_UserID_%d", t.typ, t.ctx.Msg.User.ID)
 }
 
@@ -75,14 +72,14 @@ func (t *Task) getInterimID() uint64 {
 	if len(t.typ) == 0 {
 		log.Println("warn: t.typ should be set but was \"\"")
 	}
-	switch t.resp.State[t.key()].(type) {
+	switch t.resp.State[t.Key()].(type) {
 	case uint64:
-		return t.resp.State[t.key()].(uint64)
+		return t.resp.State[t.Key()].(uint64)
 	case float64:
-		return uint64(t.resp.State[t.key()].(float64))
+		return uint64(t.resp.State[t.Key()].(float64))
 	default:
 		log.Println("warn: couldn't get interim ID: invalid type",
-			reflect.TypeOf(t.resp.State[t.key()]))
+			reflect.TypeOf(t.resp.State[t.Key()]))
 	}
 	return uint64(0)
 }

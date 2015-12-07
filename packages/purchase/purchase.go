@@ -367,6 +367,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return err
 		}
 		if !done {
+			log.Println("task state before save", tskAddr.GetState())
 			return nil
 		}
 		if addr == nil {

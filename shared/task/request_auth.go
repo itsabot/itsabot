@@ -53,7 +53,7 @@ const (
 // which will also authenticate the user.
 func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	log.Println("REQUESTAUTH")
-	log.Println("state", t.getState())
+	log.Println("state", t.GetState())
 	// check last authentication date and method
 	authenticated, err := t.ctx.Msg.User.IsAuthenticated(m)
 	if err != nil {
@@ -63,7 +63,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	if authenticated {
 		return true, nil
 	}
-	switch t.getState() {
+	switch t.GetState() {
 	case authStateStart:
 		log.Println("hit authStateStart")
 		return t.askUserForAuth(m)

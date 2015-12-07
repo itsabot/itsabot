@@ -30,7 +30,7 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 	} else {
 		pro = "them"
 	}
-	switch t.getState() {
+	switch t.GetState() {
 	case addressStateNone:
 		t.resp.Sentence = "Ok. Where should I ship " + pro + "?"
 		t.setState(addressStateAskUser)
@@ -54,7 +54,6 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 		var id uint64
 		if !remembered {
 			log.Println("address was new")
-			t.setState(addressStateGetName)
 			t.resp.Sentence = "Is that your home or office?"
 			id, err = t.ctx.Msg.User.SaveAddress(t.ctx.DB, addr)
 			if err != nil {
@@ -62,6 +61,8 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 			}
 			log.Println("here... setting interim ID")
 			t.setInterimID(id)
+			t.setState(addressStateGetName)
+			log.Println("set state to get name", addressStateGetName)
 			return false, nil
 		}
 		log.Println("address was not new")
@@ -91,7 +92,7 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 		*dest = addr
 		return true, nil
 	default:
-		log.Println("warn: invalid state", t.getState())
+		log.Println("warn: invalid state", t.GetState())
 	}
 	return false, nil
 }
