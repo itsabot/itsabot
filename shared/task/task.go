@@ -48,6 +48,9 @@ func (t *Task) getState() float64 {
 }
 
 func (t *Task) setState(s float64) {
+	if s > 3 {
+		panic("task state too high")
+	}
 	t.resp.State[t.key()] = s
 }
 
