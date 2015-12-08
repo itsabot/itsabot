@@ -48,6 +48,10 @@ func (a ByIndex) StringSlice() []string {
 func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	// TODO catch negative connations in a clause, so the summary does not
 	// include or emphasize them.
+	shortSummary := buildShortSummary(product)
+	if len(product.Reviews) == 0 {
+		return shortSummary, nil
+	}
 	text := product.Reviews[0].Body
 	ec := dt.NewSearchClient()
 	q := map[string]interface{}{
@@ -58,11 +62,11 @@ func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	}
 	res, err := ec.Search("keywords", keywordSource, nil, q)
 	if err != nil {
-		return "", err
+		return shortSummary, err
 	}
 	keywords, err := extractKeywords(text, res.Hits.Hits)
 	if err != nil {
-		return "", err
+		return shortSummary, err
 	}
 	log.Println("=== KEYWORDS ===")
 	log.Println(keywords)
@@ -72,7 +76,7 @@ func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	summary := buildSummary(product, keywords)
 	log.Println("=== SUMMARY ===")
 	log.Println(summary)
-	return summary, nil
+	return shortSummary + summary, nil
 }
 
 func buildSummary(product *dt.Product, keywords []WordT) string {
@@ -131,7 +135,6 @@ func buildSummary(product *dt.Product, keywords []WordT) string {
 		case 9:
 			summary = "You'll love its " + summary
 		}
-		summary = addShortSummary(product, summary)
 		for i := 0; i <= len(nouns)-1; i++ {
 			// TODO design more robust maxLength control
 			if totalNounLen > 60 {
@@ -290,10 +293,10 @@ func Contains(wordList []string, s string) bool {
 	return false
 }
 
-func addShortSummary(p *dt.Product, summary string) string {
+func buildShortSummary(p *dt.Product) string {
 	log.Printf("%+v\n", *p)
 	if len(p.Category) == 0 {
-		return summary
+		return ""
 	}
 	tmp := "It's "
 	n := rand.Intn(8)
@@ -313,5 +316,5 @@ func addShortSummary(p *dt.Product, summary string) string {
 	case 6, 7:
 		tmp += "a "
 	}
-	return tmp + p.Category + ". " + summary
+	return tmp + p.Category + ". "
 }
