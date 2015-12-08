@@ -344,6 +344,8 @@ func Broken() []string {
 func Purchase() []string {
 	return []string{
 		"find",
+		"send",
+		"get",
 		"buy",
 		"purchase",
 		"recommend",

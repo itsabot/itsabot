@@ -7,8 +7,12 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/runes"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/transform"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/unicode/norm"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
@@ -45,11 +49,11 @@ func (a ByIndex) StringSlice() []string {
 // Summarize identifies keyword phrases in text. keywordSource is the
 // ElasticSearch type in the form of index_type. For example, to identify
 // keywords in a wine review, keywordSource would be "products_alcohol".
-func Summarize(text, keywordSource string) (string, error) {
+func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	// TODO catch negative connations in a clause, so the summary does not
 	// include or emphasize them.
+	text := product.Reviews[0].Body
 	ec := dt.NewSearchClient()
-	log.Println("TEXT", text)
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
 			"match": map[string]string{"Name": text},
@@ -69,13 +73,13 @@ func Summarize(text, keywordSource string) (string, error) {
 	keywords = combineKeywordsIntoRanges(keywords)
 	log.Println("=== RANGES ===")
 	log.Println(keywords)
-	summary := buildSummary(keywords)
+	summary := buildSummary(product, keywords)
 	log.Println("=== SUMMARY ===")
 	log.Println(summary)
 	return summary, nil
 }
 
-func buildSummary(keywords []WordT) string {
+func buildSummary(product *dt.Product, keywords []WordT) string {
 	var totalNounLen int
 	var totalAdjLen int
 	var summary string
@@ -131,6 +135,7 @@ func buildSummary(keywords []WordT) string {
 		case 9:
 			summary = "You'll love its " + summary
 		}
+		summary = addShortSummary(product, summary)
 		for i := 0; i <= len(nouns)-1; i++ {
 			// TODO design more robust maxLength control
 			if totalNounLen > 60 {
@@ -287,4 +292,55 @@ func Contains(wordList []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func addShortSummary(p *dt.Product, summary string) string {
+	var beg string
+	if len(p.Category) > 0 {
+		beg = strings.ToLower(p.Category)
+	}
+	if len(p.Varietals) > 0 {
+		v := strings.ToLower(p.Varietals[0])
+		t := transform.Chain(
+			norm.NFD,
+			runes.Remove(runes.In(unicode.Mn)),
+			norm.NFC)
+		s, _, _ := transform.String(t, v)
+		var repeat bool
+		for _, w := range strings.Fields(s) {
+			if w == beg {
+				repeat = true
+				break
+			}
+		}
+		if repeat {
+			beg += " wine. "
+		} else {
+			beg += " " + v + ". "
+		}
+	} else if len(beg) > 0 {
+		beg += " wine. "
+	}
+	if len(beg) == 0 {
+		return summary
+	}
+	tmp := "It's "
+	n := rand.Intn(8)
+	switch n {
+	case 0:
+		tmp += "a gorgeous "
+	case 1:
+		tmp += "a brilliant "
+	case 2:
+		tmp += "an amazing "
+	case 3:
+		tmp += "a spectacular "
+	case 4:
+		tmp += "a tasty "
+	case 5:
+		tmp += "a delicious "
+	case 6, 7:
+		tmp += "a "
+	}
+	return tmp + beg + summary
 }

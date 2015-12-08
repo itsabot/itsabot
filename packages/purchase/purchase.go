@@ -640,8 +640,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	tmp := fmt.Sprintf("A %s%s for $%.2f. ", product.Name, size,
 		float64(product.Price)/100)
 	if len(product.Reviews) > 0 {
-		summary, err := language.Summarize(
-			product.Reviews[0].Body, "products_alcohol")
+		summary, err := language.Summarize(&product, "products_alcohol")
 		if err != nil {
 			return err
 		}
@@ -732,10 +731,20 @@ func getQuery() string {
 
 func getBudget() uint64 {
 	switch resp.State["budget"].(type) {
+	case int64:
+		return uint64(resp.State["budget"].(int64))
 	case uint64:
 		return resp.State["budget"].(uint64)
 	case float64:
 		return uint64(resp.State["budget"].(float64))
+	case string:
+		s, err := strconv.ParseUint(resp.State["budget"].(string), 10,
+			64)
+		if err != nil {
+			log.Println("warn: couldn't get budget: convert from string")
+			s = uint64(0)
+		}
+		return s
 	default:
 		log.Println("warn: couldn't get budget: invalid type",
 			reflect.TypeOf(resp.State["budget"]))

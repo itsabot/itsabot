@@ -10,8 +10,8 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
 	"github.com/avabot/ava/shared/datatypes"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var regexNum = regexp.MustCompile(`\d+`)

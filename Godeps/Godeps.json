@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/avabot/ava",
-	"GoVersion": "go1.5.1",
+	"GoVersion": "go1.5.2",
 	"Packages": [
 		"./..."
 	],
@@ -134,6 +134,18 @@
 		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "4b709d93778b93d2f34943e3142c71578d83ad31"
+		},
+		{
+			"ImportPath": "golang.org/x/text/runes",
+			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
+		},
+		{
+			"ImportPath": "golang.org/x/text/transform",
+			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
+		},
+		{
+			"ImportPath": "golang.org/x/text/unicode/norm",
+			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
 		}
 	]
 }

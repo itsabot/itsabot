@@ -31,12 +31,12 @@ func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
-				"should": []interface{}{
+				"must": []interface{}{
 					map[string]interface{}{
 						"range": map[string]interface{}{
 							"Price": map[string]interface{}{
-								"gte":   budget - uint64(float64(budget)*0.2),
-								"lte":   budget + uint64(float64(budget)*0.2),
+								"gte":   budget - uint64(float64(budget)*0.3),
+								"lte":   budget + uint64(float64(budget)*0.3),
 								"boost": 2.0,
 							},
 						},
@@ -48,7 +48,6 @@ func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
 			},
 		},
 	}
-	log.Println("SEARCHING", typ, "FOR", query, "lte", budget+uint64(float64(budget)*0.2))
 	res, err := ec.Search("products", typ, nil, q)
 	if err != nil {
 		return []Product{}, err

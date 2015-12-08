@@ -48,7 +48,8 @@ func (sg *MailClient) SendPurchaseConfirmation(p *Purchase) error {
 	delivery := time.Now().Add(7 * 24 * time.Hour)
 	delS := delivery.Format("Monday Jan 2, 2006")
 	text += fmt.Sprintf("<p>Expected delivery before %s. ", delS)
-	text += fmt.Sprintf("Your order confirmation number is %s.</p>", p.ID)
+	text += fmt.Sprintf("Your order confirmation number is %s.</p>",
+		p.DisplayID())
 	text += "<p>Glad I could help! :)</p><p>- Ava</p>"
 	text += "</body></html>"
 	return sg.Send(subj, text, p.User)
@@ -63,7 +64,8 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 	if os.Getenv("AVA_ENV") == "production" {
 		subj = fmt.Sprintf("Order Request: #%s", p.DisplayID())
 	} else {
-		subj = fmt.Sprintf("[TEST - PLEASE IGNORE] Order Request: #%s", p.ID)
+		subj = fmt.Sprintf("[TEST - PLEASE IGNORE] Order Request: #%s",
+			p.DisplayID())
 		(*p.Vendor).ContactName = "Evan"
 		(*p.Vendor).ContactEmail = "egtann@gmail.com"
 	}
