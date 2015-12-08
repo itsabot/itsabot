@@ -196,12 +196,12 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 		t.resp.Sentence = "To do that, please confirm your billing zip code."
 		log.Println("asking user for auth: zip code")
 	case MethodWebCache:
-		t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.com/?/profile"
+		t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.co/?/profile"
 	case MethodWebLogin:
 		if err := t.ctx.Msg.User.DeleteSessions(t.ctx.DB); err != nil {
 			return false, err
 		}
-		t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.com/?/login"
+		t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.co/?/login"
 	}
 	tx, err := t.ctx.DB.Beginx()
 	if err != nil {
