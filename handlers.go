@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -25,6 +26,9 @@ import (
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/sms"
 )
+
+var letters = []rune(
+	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
@@ -46,6 +50,8 @@ func initRoutes(e *echo.Echo) {
 	e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
+	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
+	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
 }
@@ -403,6 +409,91 @@ Response:
 	return nil
 }
 
+func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
+	var req struct {
+		Email string
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	var user dt.User
+	q := `SELECT id, name, email FROM users WHERE email=$1`
+	err := db.Get(&user, q, req.Email)
+	if err == sql.ErrNoRows {
+		return jsonError(errors.New("Sorry, there's no record of that email. Are you sure that's the email you used to sign up with and that you typed it correctly?"))
+	}
+	if err != nil {
+		return jsonError(err)
+	}
+	secret := randSeq(40)
+	q = `INSERT INTO passwordresets (userid, secret) VALUES ($1, $2)`
+	if _, err := db.Exec(q, user.ID, secret); err != nil {
+		return jsonError(err)
+	}
+	h := `<html><body>`
+	h += fmt.Sprintf("<p>Hi %s:</p>", user.Name)
+	h += "<p>Please click the following link to reset your password. This link will expire in 30 minutes.</p>"
+	h += fmt.Sprintf("<p>%s</p>", os.Getenv("BASE_URL")+"?/reset_password?s="+secret)
+	h += "<p>If you received this email in error, please ignore it.</p>"
+	h += "<p>Have a great day!</p>"
+	h += "<p>-Ava</p>"
+	h += "</body></html>"
+	if err := mc.Send("Password reset", h, &user); err != nil {
+		return jsonError(err)
+	}
+	if err = c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIResetPasswordSubmit(c *echo.Context) error {
+	var req struct {
+		Secret   string
+		Password string
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	if len(req.Password) < 8 {
+		return jsonError(errors.New("Your password must be at least 8 characters"))
+	}
+	userid := uint64(0)
+	q := `SELECT userid FROM passwordresets
+	      WHERE secret=$1 AND
+	            createdat >= CURRENT_TIMESTAMP - interval '30 minutes'`
+	err := db.Get(&userid, q, req.Secret)
+	if err == sql.ErrNoRows {
+		return jsonError(errors.New("Sorry, that information doesn't match our records."))
+	}
+	if err != nil {
+		return jsonError(err)
+	}
+	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
+	if err != nil {
+		return jsonError(err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return jsonError(err)
+	}
+	q = `UPDATE users SET password=$1 WHERE id=$2`
+	if _, err = tx.Exec(q, hpw, userid); err != nil {
+		return jsonError(err)
+	}
+	q = `DELETE FROM passwordresets WHERE secret=$1`
+	if _, err = tx.Exec(q, req.Secret); err != nil {
+		return jsonError(err)
+	}
+	if err = tx.Commit(); err != nil {
+		return jsonError(err)
+	}
+	if err = c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
 func handlerAPICardSubmit(c *echo.Context) error {
 	var req struct {
 		StripeToken    string
@@ -515,4 +606,12 @@ func validatePhone(s string) error {
 			"Sorry, Ava only serves U.S. customers for now.")
 	}
 	return nil
+}
+
+func randSeq(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

@@ -1,28 +1,18 @@
-var Login = {
-	login: function(ev) {
+var ForgotPassword = {
+	submit: function(ev) {
 		ev.preventDefault();
-		Login.vm.hideError();
+		ForgotPassword.vm.hideError();
 		var email = document.getElementById("email").value;
-		var pass = document.getElementById("password").value;
 		return m.request({
 			method: "POST",
 			data: {
-				email: email,
-				password: pass
+				Email: email
 			},
-			url: "/api/login.json"
+			url: "/api/forgot_password.json"
 		}).then(function(data) {
-			var date = new Date();
-			var exp = date.setDate(date + 30);
-			var secure = true;
-			if (window.location.hostname === "localhost") {
-				secure = false;
-			}
-			cookie.setItem("id", data.Id, exp, null, null, secure);
-			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
-			m.route("/profile");
+			ForgotPassword.vm.showSuccess();
 		}, function(err) {
-			Login.vm.showError(err.Msg);
+			ForgotPassword.vm.showError(err.Msg);
 		});
 	},
 	checkAuth: function(callback) {
@@ -32,37 +22,44 @@ var Login = {
 	}
 };
 
-Login.controller = function() {
-	Login.checkAuth(function(loggedIn) {
+ForgotPassword.controller = function() {
+	ForgotPassword.checkAuth(function(loggedIn) {
 		if (loggedIn) {
 			return m.route("/profile");
 		}
 	});
-	Login.controller.error = m.prop("");
+	ForgotPassword.controller.error = m.prop("");
+	ForgotPassword.controller.success = m.prop("");
 };
 
-Login.vm = {
+ForgotPassword.vm = {
 	hideError: function() {
-		Login.controller.error("");
+		ForgotPassword.controller.error("");
 		document.getElementById("err").classList.add("hidden");
 	},
 	showError: function(err) {
-		Login.controller.error(err);
+		ForgotPassword.controller.error(err);
 		document.getElementById("err").classList.remove("hidden");
+	},
+	showSuccess: function() {
+		ForgotPassword.controller.success("We've emailed you a link to reset your password. Please open that link to continue. For security reasons the link will expire in 30 minutes.");
+		document.getElementById("success").classList.remove("hidden");
+		document.getElementById("form").classList.add("hidden");
+		document.getElementById("btn").classList.add("hidden");
 	}
 };
 
-Login.view = function() {
+ForgotPassword.view = function() {
 	return m("div", {
 		class: "body"
 	}, [
 		header.view(),
-		Login.viewFull(),
+		ForgotPassword.viewFull(),
 		Footer.view()
 	]);
 }
 
-Login.viewFull = function() {
+ForgotPassword.viewFull = function() {
 	return m("div", {
 		id: "full",
 		class: "container"
@@ -79,7 +76,7 @@ Login.viewFull = function() {
 					m("div", {
 						class: "col-md-12 text-center"
 					}, [
-						m("h2", "Log In")
+						m("h2", "Reset Password")
 					])
 				]),
 				m("form", [
@@ -92,34 +89,25 @@ Login.viewFull = function() {
 							m("div", {
 								id: "err",
 								class: "alert alert-danger hidden"
-							}, Login.controller.error()),
+							}, ForgotPassword.controller.error()),
 							m("div", {
-								class: "form-group"
-							}, [
-								m("input", {
-									type: "email",
-									class: "form-control",
-									id: "email",
-									placeholder: "Email"
-								})
-							]),
+								id: "success",
+								class: "alert alert-success hidden"
+							}, ForgotPassword.controller.success()),
 							m("div", {
-								class: "form-group"
+								id: "form"
 							}, [
-								m("input", {
-									type: "password",
-									class: "form-control",
-									id: "password",
-									placeholder: "Password"
-								})
-							]),
-							m("div", {
-								class: "form-group text-right"
-							}, [
-								m("a", {
-									href: "/forgot_password",
-									config: m.route
-								}, "Forgot password?")
+								m("p", "We'll email you a confirmation link to reset your password. Please enter your email below."),
+								m("div", {
+									class: "form-group"
+								}, [
+									m("input", {
+										type: "email",
+										class: "form-control",
+										id: "email",
+										placeholder: "Email"
+									})
+								])
 							])
 						])
 					]),
@@ -136,9 +124,9 @@ Login.viewFull = function() {
 									class: "btn btn-sm",
 									id: "btn",
 									type: "submit",
-									onclick: Login.login,
-									onsubmit: Login.login,
-									value: "Log In"
+									onclick: ForgotPassword.submit,
+									onsubmit: ForgotPassword.submit,
+									value: "Submit"
 								})
 							])
 						])

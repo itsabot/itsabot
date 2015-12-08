@@ -30,6 +30,7 @@ import (
 
 var db *sqlx.DB
 var tc *twilio.Client
+var mc *dt.MailClient
 var bayes *bayesian.Classifier
 var phoneRegex *regexp.Regexp
 var ErrInvalidCommand = errors.New("invalid command")
@@ -88,6 +89,7 @@ func startServer(port string) {
 	log.Println("booting local server")
 	bootRPCServer(port)
 	tc = sms.NewClient()
+	mc = dt.NewMailClient()
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()

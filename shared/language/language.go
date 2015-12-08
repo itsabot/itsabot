@@ -351,6 +351,9 @@ func Purchase() []string {
 		"recommend",
 		"recommendation",
 		"recommendations",
+		"finish",
+		"complete",
+		"cancel",
 	}
 }
 

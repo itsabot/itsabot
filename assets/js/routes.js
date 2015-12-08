@@ -8,6 +8,8 @@ window.onload = function() {
 		"/train/:sentenceID": Train,
 		"/signup": Signup,
 		"/login": Login,
+		"/forgot_password": ForgotPassword,
+		"/reset_password": ResetPassword,
 		"/profile": Profile,
 		"/cards/new": Card
 	});
