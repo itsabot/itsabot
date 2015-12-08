@@ -7,12 +7,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/runes"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/transform"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/text/unicode/norm"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
@@ -295,33 +291,7 @@ func Contains(wordList []string, s string) bool {
 }
 
 func addShortSummary(p *dt.Product, summary string) string {
-	var beg string
-	if len(p.Category) > 0 {
-		beg = strings.ToLower(p.Category)
-	}
-	if len(p.Varietals) > 0 {
-		v := strings.ToLower(p.Varietals[0])
-		t := transform.Chain(
-			norm.NFD,
-			runes.Remove(runes.In(unicode.Mn)),
-			norm.NFC)
-		s, _, _ := transform.String(t, v)
-		var repeat bool
-		for _, w := range strings.Fields(s) {
-			if w == beg {
-				repeat = true
-				break
-			}
-		}
-		if repeat {
-			beg += " wine. "
-		} else {
-			beg += " " + v + ". "
-		}
-	} else if len(beg) > 0 {
-		beg += " wine. "
-	}
-	if len(beg) == 0 {
+	if len(p.Category) == 0 {
 		return summary
 	}
 	tmp := "It's "
@@ -342,5 +312,5 @@ func addShortSummary(p *dt.Product, summary string) string {
 	case 6, 7:
 		tmp += "a "
 	}
-	return tmp + beg + summary
+	return tmp + p.Category + summary
 }
