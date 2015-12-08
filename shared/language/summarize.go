@@ -291,6 +291,7 @@ func Contains(wordList []string, s string) bool {
 }
 
 func addShortSummary(p *dt.Product, summary string) string {
+	log.Printf("%+v\n", *p)
 	if len(p.Category) == 0 {
 		return summary
 	}
@@ -312,5 +313,5 @@ func addShortSummary(p *dt.Product, summary string) string {
 	case 6, 7:
 		tmp += "a "
 	}
-	return tmp + p.Category + summary
+	return tmp + p.Category + ". " + summary
 }
