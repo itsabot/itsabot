@@ -4,6 +4,8 @@ var Card = function(data) {
 	_this.id = m.prop(data.id || 0);
 	_this.cardholderName = m.prop(data.cardholderName || "");
 	_this.number = m.prop(data.number || "");
+	_this.expMonth = m.prop("");
+	_this.expYear = m.prop("");
 	_this.zip5 = m.prop(data.zip5 || "");
 	_this.brand = m.prop("");
 	if (data.expMonth != null && data.expYear != null) {
@@ -57,6 +59,20 @@ var Card = function(data) {
 		});
 		return deferred.promise;
 	};
+	_this.del = function() {
+			var data = {
+				ID: _this.id(),
+				UserID: parseInt(cookie.getItem("id"))
+			};
+			m.request({
+				method: "DELETE",
+				url: "/api/cards.json",
+				data: data
+			}).then(function() {
+			}, function(err) {
+				console.error(err);
+			});
+	};
 };
 
 Card.brandIcon = function(brand) {
@@ -64,7 +80,6 @@ Card.brandIcon = function(brand) {
 	switch(brand) {
 	case "American Express", "Diners", "Discover", "JCB", "Maestro",
 		"MasterCard", "PayPal", "Visa":
-		console.log("brand: " + brand);
 		var imgPath = brand.toLowerCase().replace(" ", "_");
 		imgPath = "card_" + imgPath + ".svg";
 		imgPath = "/public/images/" + imgPath;

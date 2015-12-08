@@ -46,7 +46,19 @@ Profile.controller = function() {
 		if (data.Cards === null) {
 			data.Cards = [];
 		}
-		_this.cards.data(data.Cards);
+		var cards = [];
+		for (var i = 0; i < data.Cards.length; ++i) {
+			var card = new Card();
+			var c = data.Cards[i];
+			card.id(c.Id);
+			card.cardholderName(c.CardholderName);
+			card.brand(c.Brand);
+			card.expMonth(c.ExpMonth);
+			card.expYear(c.ExpYear);
+			card.last4(c.Last4);
+			cards.push(card);
+		}
+		_this.cards.data(cards);
 	}, function(err) {
 		console.error(err);
 	});

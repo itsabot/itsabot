@@ -169,25 +169,26 @@ Card.listView = function(list) {
 		m("tbody", [
 			list.data().map(function(item) {
 				return m("tr", {
-					"key": item.Id
+					key: item.id()
 				}, [
 					m("td", {
 						style: "width: 10%"
-					}, Card.brandIcon(item.Brand)),
-					m("td", item.CardholderName),
-					m("td", {class: "subtle"}, "XXXX-" + item.Last4),
-					m("td", item.ExpMonth + " / " + item.ExpYear),
+					}, Card.brandIcon(item.brand())),
+					m("td", item.cardholderName()),
+					m("td", {class: "subtle"}, "XXXX-" + item.last4()),
+					m("td", item.expMonth() + " / " + item.expYear()),
 					m("td", {
 						class: "text-right"
 					}, [
 						m("img", {
 							class: "icon icon-xs icon-delete",
 							src: "/public/images/icon_delete.svg",
-							onclick: function() {
+							onclick: function(ev) {
 								var c = confirm("Delete this number?");
 								if (c) {
-									// TODO delete from database and update view
-									console.warn("not implemented");
+									item.del();
+									ev.target.parentElement.parentElement.
+										remove();
 								}
 							}
 						})

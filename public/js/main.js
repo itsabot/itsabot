@@ -4,6 +4,8 @@ var Card = function(data) {
 	_this.id = m.prop(data.id || 0);
 	_this.cardholderName = m.prop(data.cardholderName || "");
 	_this.number = m.prop(data.number || "");
+	_this.expMonth = m.prop("");
+	_this.expYear = m.prop("");
 	_this.zip5 = m.prop(data.zip5 || "");
 	_this.brand = m.prop("");
 	if (data.expMonth != null && data.expYear != null) {
@@ -57,6 +59,20 @@ var Card = function(data) {
 		});
 		return deferred.promise;
 	};
+	_this.del = function() {
+			var data = {
+				ID: _this.id(),
+				UserID: parseInt(cookie.getItem("id"))
+			};
+			m.request({
+				method: "DELETE",
+				url: "/api/cards.json",
+				data: data
+			}).then(function() {
+			}, function(err) {
+				console.error(err);
+			});
+	};
 };
 
 Card.brandIcon = function(brand) {
@@ -64,7 +80,6 @@ Card.brandIcon = function(brand) {
 	switch(brand) {
 	case "American Express", "Diners", "Discover", "JCB", "Maestro",
 		"MasterCard", "PayPal", "Visa":
-		console.log("brand: " + brand);
 		var imgPath = brand.toLowerCase().replace(" ", "_");
 		imgPath = "card_" + imgPath + ".svg";
 		imgPath = "/public/images/" + imgPath;
@@ -277,25 +292,26 @@ Card.listView = function(list) {
 		m("tbody", [
 			list.data().map(function(item) {
 				return m("tr", {
-					"key": item.Id
+					key: item.id()
 				}, [
 					m("td", {
 						style: "width: 10%"
-					}, Card.brandIcon(item.Brand)),
-					m("td", item.CardholderName),
-					m("td", {class: "subtle"}, "XXXX-" + item.Last4),
-					m("td", item.ExpMonth + " / " + item.ExpYear),
+					}, Card.brandIcon(item.brand())),
+					m("td", item.cardholderName()),
+					m("td", {class: "subtle"}, "XXXX-" + item.last4()),
+					m("td", item.expMonth() + " / " + item.expYear()),
 					m("td", {
 						class: "text-right"
 					}, [
 						m("img", {
 							class: "icon icon-xs icon-delete",
 							src: "/public/images/icon_delete.svg",
-							onclick: function() {
+							onclick: function(ev) {
 								var c = confirm("Delete this number?");
 								if (c) {
-									// TODO delete from database and update view
-									console.warn("not implemented");
+									item.del();
+									ev.target.parentElement.parentElement.
+										remove();
 								}
 							}
 						})
@@ -2192,7 +2208,19 @@ Profile.controller = function() {
 		if (data.Cards === null) {
 			data.Cards = [];
 		}
-		_this.cards.data(data.Cards);
+		var cards = [];
+		for (var i = 0; i < data.Cards.length; ++i) {
+			var card = new Card();
+			var c = data.Cards[i];
+			card.id(c.Id);
+			card.cardholderName(c.CardholderName);
+			card.brand(c.Brand);
+			card.expMonth(c.ExpMonth);
+			card.expYear(c.ExpYear);
+			card.last4(c.Last4);
+			cards.push(card);
+		}
+		_this.cards.data(cards);
 	}, function(err) {
 		console.error(err);
 	});

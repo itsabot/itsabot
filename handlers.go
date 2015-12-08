@@ -47,6 +47,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/login.json", handlerAPILoginSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
+	e.Delete("/api/cards.json", handlerAPICardDelete)
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -449,6 +450,46 @@ func handlerAPICardSubmit(c *echo.Context) error {
 		return jsonError(err)
 	}
 	if err = c.JSON(http.StatusOK, crd); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPICardDelete(c *echo.Context) error {
+	var req struct {
+		ID     uint64
+		UserID uint64
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	q := `SELECT stripeid FROM cards WHERE id=$1`
+	var crd dt.Card
+	if err := db.Get(&crd, q, req.ID); err != nil {
+		log.Println("couldn't find stripeid", req.ID)
+		return jsonError(err)
+	}
+	q = `DELETE FROM cards WHERE id=$1 AND userid=$2`
+	if _, err := db.Exec(q, req.ID, req.UserID); err != nil {
+		log.Println("couldn't find card", req.ID, req.UserID)
+		return jsonError(err)
+	}
+	q = `SELECT stripecustomerid FROM users WHERE id=$1`
+	var user dt.User
+	if err := db.Get(&user, q, req.UserID); err != nil {
+		log.Println("couldn't find stripecustomerid", req.UserID)
+		return jsonError(err)
+	}
+	err := card.Del(crd.StripeID, &stripe.CardParams{
+		Customer: user.StripeCustomerID,
+	})
+	if err != nil {
+		log.Println("couldn't delete stripe card", crd.StripeID,
+			user.StripeCustomerID)
+		return jsonError(err)
+	}
+	err = c.JSON(http.StatusOK, nil)
+	if err != nil {
 		return jsonError(err)
 	}
 	return nil
