@@ -657,15 +657,11 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	}
 	tmp := fmt.Sprintf("A %s%s for $%.2f. ", product.Name, size,
 		float64(product.Price)/100)
-	if len(product.Reviews) > 0 {
-		summary, err := language.Summarize(&product, "products_alcohol")
-		if err != nil {
-			return err
-		}
-		if len(summary) > 0 {
-			tmp += summary + " "
-		}
+	summary, err := language.Summarize(&product, "products_alcohol")
+	if err != nil {
+		return err
 	}
+	tmp += summary + " "
 	r := rand.Intn(2)
 	switch r {
 	case 0:
