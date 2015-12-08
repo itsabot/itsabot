@@ -3,7 +3,6 @@ package dt
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -123,7 +122,6 @@ func (sg *MailClient) Send(subj, html string, c Contactable) error {
 }
 
 func NewMailClient() *MailClient {
-	log.Println("sendgrid", os.Getenv("SENDGRID_KEY"))
 	return &MailClient{
 		sgc: sendgrid.NewSendGridClientWithApiKey(
 			os.Getenv("SENDGRID_KEY"),

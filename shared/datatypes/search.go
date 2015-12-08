@@ -25,7 +25,7 @@ func NewSearchClient() *SearchClient {
 	return &SearchClient{client}
 }
 
-func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
+func (ec *SearchClient) FindProducts(query, category, typ string, budget uint64,
 	count int) ([]Product, error) {
 	// JSON is the worst querying language ever
 	q := map[string]interface{}{
@@ -43,6 +43,11 @@ func (ec *SearchClient) FindProducts(query, typ string, budget uint64,
 					},
 					map[string]interface{}{
 						"match": map[string]string{"_all": query},
+					},
+					map[string]interface{}{
+						"match": map[string]string{
+							"Category": category,
+						},
 					},
 				},
 			},

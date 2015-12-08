@@ -36,7 +36,10 @@ var resp *dt.Resp
 
 const (
 	StateNone float64 = iota
+	StateRedWhite
+	StateCheckPastPreferences
 	StatePreferences
+	StateCheckPastBudget
 	StateBudget
 	StateSetRecommendations
 	StateRecommendationsAlterBudget
@@ -105,6 +108,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	resp.State = map[string]interface{}{
 		"state":            StateNone,        // maintains state
 		"query":            "",               // search query
+		"category":         "",               // red, white, etc.
 		"budget":           "",               // suggested price
 		"recommendations":  dt.ProductSels{}, // search results
 		"offset":           uint(0),          // index in search
@@ -116,36 +120,9 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	for _, o := range si.Objects {
 		query += o + " "
 	}
-	tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
-		prefs.KeyTaste)
-	if err != nil {
-		return err
-	}
-	if len(tastePref) == 0 {
-		resp.State["query"] = query + " " + tastePref
-		resp.State["state"] = StatePreferences
-		resp.Sentence = "Sure. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
-		return p.SaveResponse(respMsg, resp)
-	}
-	resp.State["query"] = tastePref
-	budgetPref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
-		prefs.KeyBudget)
-	if err != nil {
-		return err
-	}
-	if len(budgetPref) > 0 {
-		resp.State["budget"], err = strconv.ParseUint(budgetPref, 10,
-			64)
-		if err != nil {
-			return err
-		}
-		resp.State["state"] = StateSetRecommendations
-		updateState(m, resp, respMsg)
-		return p.SaveResponse(respMsg, resp)
-	}
-	resp.State["state"] = StateBudget
-	resp.Sentence = "Sure. How much do you usually pay for a bottle?"
-	return t.FollowUp(m, respMsg)
+	resp.Sentence = "Sure. Are you looking for a red or white?"
+	resp.State["state"] = StateRedWhite
+	return p.SaveResponse(respMsg, resp)
 }
 
 func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
@@ -189,24 +166,61 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	state := getState()
 	switch state {
+	case StateRedWhite:
+		log.Println("StateRedWhite")
+		resp.State["category"] = extractWineCategory(m.Input.Sentence)
+		if getCategory() == "" {
+			resp.Sentence = "I'm not sure I understand. Are you looking for red, white, rose, or champagne?"
+			return nil
+		}
+		log.Println("category", getCategory())
+		resp.State["state"] = StateCheckPastPreferences
+		return updateState(m, resp, respMsg)
+	case StateCheckPastPreferences:
+		tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
+			prefs.KeyTaste)
+		if err != nil {
+			return err
+		}
+		if len(tastePref) == 0 {
+			resp.State["state"] = StatePreferences
+			resp.Sentence = "Sure. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
+			return nil
+		}
+		resp.State["query"] = tastePref
+		resp.State["state"] = StateCheckPastBudget
+		return updateState(m, resp, respMsg)
 	case StatePreferences:
-		// TODO ensure Ava remembers past answers for preferences
-		// "I know you're going to love this"
+		resp.State["query"] = getQuery() + " " + m.Input.Sentence
 		if getBudget() == 0 {
-			resp.State["query"] = getQuery() + " " + m.Input.Sentence
-			resp.State["state"] = StateBudget
-			resp.Sentence = "Ok. How much do you usually pay for a bottle of wine?"
+			resp.State["state"] = StateCheckPastBudget
 			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyTaste, getQuery()); err != nil {
 				log.Println("err: saving budget pref")
 				return err
 			}
-		} else {
+			return nil
+		}
+		resp.State["state"] = StateSetRecommendations
+		return updateState(m, resp, respMsg)
+	case StateCheckPastBudget:
+		budgetPref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
+			prefs.KeyBudget)
+		if err != nil {
+			return err
+		}
+		if len(budgetPref) > 0 {
+			resp.State["budget"], err = strconv.ParseUint(
+				budgetPref, 10, 64)
+			if err != nil {
+				return err
+			}
 			resp.State["state"] = StateSetRecommendations
 			return updateState(m, resp, respMsg)
 		}
+		resp.State["state"] = StateBudget
+		resp.Sentence = "Ok. How much do you usually pay for a bottle?"
 	case StateBudget:
-		// TODO ensure Ava remembers past answers for budget
 		val, err := language.ExtractCurrency(m.Input.Sentence)
 		if err != nil {
 			log.Println("err extracting currency")
@@ -489,6 +503,10 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 		case "find", "search", "show":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
+			cat := extractWineCategory(m.Input.Sentence)
+			if len(cat) > 0 {
+				resp.State["category"] = cat
+			}
 			resp.State["state"] = StateSetRecommendations
 			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
 				prefs.KeyTaste, m.Input.Sentence)
@@ -690,8 +708,8 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 }
 
 func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
-	results, err := ctx.EC.FindProducts(getQuery(), "alcohol", getBudget(),
-		20)
+	results, err := ctx.EC.FindProducts(getQuery(), getCategory(),
+		"alcohol", getBudget(), 20)
 	if err != nil {
 		return err
 	}
@@ -727,6 +745,10 @@ func getOffset() uint {
 
 func getQuery() string {
 	return resp.State["query"].(string)
+}
+
+func getCategory() string {
+	return resp.State["category"].(string)
 }
 
 func getBudget() uint64 {
@@ -824,4 +846,29 @@ func getState() float64 {
 		state = 0.0
 	}
 	return state
+}
+
+func extractWineCategory(s string) string {
+	s = strings.ToLower(s)
+	red := strings.Contains(s, "red")
+	var category string
+	if red {
+		category = "red"
+	}
+	white := strings.Contains(s, "white")
+	if white {
+		category = "white"
+	}
+	rose := strings.Contains(s, "rose")
+	if rose {
+		category = "rose"
+	}
+	champagne := strings.Contains(s, "champagne")
+	if !champagne {
+		champagne = strings.Contains(s, "sparkling")
+	}
+	if champagne {
+		category = "champagne"
+	}
+	return category
 }
