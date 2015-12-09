@@ -184,7 +184,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if len(tastePref) == 0 {
 			resp.State["state"] = StatePreferences
-			resp.Sentence = "Sure. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
+			resp.Sentence = "Ok. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
 			return nil
 		}
 		resp.State["query"] = tastePref
@@ -199,7 +199,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 				log.Println("err: saving budget pref")
 				return err
 			}
-			return nil
+			return updateState(m, resp, respMsg)
 		}
 		resp.State["state"] = StateSetRecommendations
 		return updateState(m, resp, respMsg)
@@ -474,6 +474,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 	words := strings.Fields(strings.ToLower(m.Input.Sentence))
 	modifier := 1
 	for _, word := range words {
+		word = strings.TrimRight(word, ",.?;:!")
 		switch word {
 		case "detail", "details", "description", "more about", "review",
 			"rating", "rated":
@@ -487,19 +488,23 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence = "This wine has been personally selected by leading wine experts."
 			}
 		case "price", "cost", "shipping", "total":
-			prices := getSelectedProducts().
-				Prices(getShippingAddress())
-			s := fmt.Sprintf("The items cost $%.2f, ",
-				float64(prices["products"])/100)
-			s += fmt.Sprintf("shipping is $%.2f, ",
-				float64(prices["shipping"])/100)
-			if prices["tax"] > 0.0 {
-				s += fmt.Sprintf("and tax is $%.2f, ",
-					float64(prices["tax"])/100)
+			prods := getSelectedProducts()
+			if len(prods) == 0 {
+				resp.Sentence = "Shipping is around $12 for the first bottle + $1.20 for every bottle after."
+			} else {
+				prices := prods.Prices(getShippingAddress())
+				s := fmt.Sprintf("The items cost $%.2f, ",
+					float64(prices["products"])/100)
+				s += fmt.Sprintf("shipping is $%.2f, ",
+					float64(prices["shipping"])/100)
+				if prices["tax"] > 0.0 {
+					s += fmt.Sprintf("and tax is $%.2f, ",
+						float64(prices["tax"])/100)
+				}
+				s += fmt.Sprintf("totaling $%.2f.",
+					float64(prices["total"])/100)
+				resp.Sentence = s
 			}
-			s += fmt.Sprintf("totaling $%.2f.",
-				float64(prices["total"])/100)
-			resp.Sentence = s
 		case "find", "search", "show":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
@@ -622,10 +627,8 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.State["state"] = StateContinueShopping
 		case "help", "command":
 			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
-		case "more", "special":
-			modifier *= modifier
 		case "less":
-			modifier *= modifier
+			modifier *= -1
 		case "much", "very", "extremely":
 			modifier *= 2
 		}
