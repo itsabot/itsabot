@@ -347,6 +347,7 @@ func Purchase() []string {
 		"send",
 		"get",
 		"buy",
+		"order",
 		"purchase",
 		"recommend",
 		"recommendation",
