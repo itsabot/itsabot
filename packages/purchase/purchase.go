@@ -629,6 +629,8 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			modifier *= -1
 		case "much", "very", "extremely":
 			modifier *= 2
+		case "stop":
+			resp.Sentence = "Ok."
 		}
 	}
 	if getState() != StateProductSelection {
