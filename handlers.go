@@ -291,14 +291,10 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	}
 	var resp struct {
 		Id           int
-		CustomerId   string
 		SessionToken string
 	}
-	q = `SELECT stripecustomerid FROM users WHERE id=$1`
-	if err = db.Get(&resp.CustomerId, q, uid); err != nil {
-		return jsonError(err)
-	}
 	tmp := uuid.NewV4().Bytes()
+	resp.Id = uid
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	if os.Getenv("AVA_ENV") == "production" {
 		fName := strings.Fields(req.Name)[0]
