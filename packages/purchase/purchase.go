@@ -133,7 +133,8 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	resp.State["query"] = query
 	resp.State["category"] = cat
 	resp.State["state"] = StateCheckPastPreferences
-	return updateState(m, resp, respMsg)
+	updateState(m, resp, respMsg)
+	return p.SaveResponse(respMsg, resp)
 }
 
 func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
