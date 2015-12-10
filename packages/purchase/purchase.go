@@ -245,8 +245,10 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			if err != nil {
 				return err
 			}
-			resp.State["state"] = StateSetRecommendations
-			return updateState(m, resp, respMsg)
+			if getBudget() > 0 {
+				resp.State["state"] = StateSetRecommendations
+				return updateState(m, resp, respMsg)
+			}
 		}
 		resp.State["state"] = StateBudget
 		resp.Sentence = "Ok. How much do you usually pay for a bottle?"
@@ -679,7 +681,9 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		} else {
 			resp.Sentence = "I'm out of wines in that category. "
 		}
-		if getBudget() < 5000 {
+		if getBudget() == 0 {
+			resp.State["state"] = StateCheckPastBudget
+		} else if getBudget() < 5000 {
 			resp.Sentence += "Should we look among the more expensive bottles?"
 			resp.State["state"] = StateRecommendationsAlterBudget
 		} else {
