@@ -132,8 +132,14 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	resp.State["query"] = query
 	resp.State["category"] = cat
-	resp.State["state"] = StateCheckPastPreferences
-	updateState(m, resp, respMsg)
+	if len(query) <= 8 {
+		resp.State["state"] = StateCheckPastPreferences
+	} else {
+		resp.State["state"] = StatePreferences
+	}
+	if err := updateState(m, resp, respMsg); err != nil {
+		l.Errorln(err)
+	}
 	return p.SaveResponse(respMsg, resp)
 }
 
