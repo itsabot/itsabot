@@ -124,8 +124,15 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	for _, o := range si.Objects {
 		query += o + " "
 	}
-	resp.Sentence = "Sure. Are you looking for a red or white?"
-	resp.State["state"] = StateRedWhite
+	cat := extractWineCategory(m.Input.Sentence)
+	if len(cat) == 0 {
+		resp.Sentence = "Sure. Are you looking for a red or white?"
+		resp.State["state"] = StateRedWhite
+	} else {
+		resp.State["query"] = query
+		resp.State["category"] = cat
+		resp.State["state"] = StateCheckPastPreferences
+	}
 	return p.SaveResponse(respMsg, resp)
 }
 
