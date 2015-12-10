@@ -3,8 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"log"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
@@ -108,7 +108,7 @@ func getLastInputFromUser(u *dt.User) (*dt.StructuredInput,
 
 func getContextObject(u *dt.User, si *dt.StructuredInput,
 	datatype string) (string, error) {
-	log.Println("db: getting object context")
+	log.Debugln("getting object context")
 	var tmp *dt.StringSlice
 	if u == nil {
 		return "", ErrMissingUser
