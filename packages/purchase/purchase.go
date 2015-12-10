@@ -141,7 +141,9 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		}
 		currency := language.ExtractCurrency(m.Input.Sentence)
 		if currency.Valid && currency.Int64 > 0 {
-			resp.State["budget"] = currency.Int64
+			l.WithField("value", currency.Int64).Debugln(
+				"currency valid and > 0")
+			resp.State["budget"] = uint64(currency.Int64)
 			resp.State["state"] = StateSetRecommendations
 			err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyBudget,
@@ -257,7 +259,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if !val.Valid {
 			return nil
 		}
-		resp.State["budget"] = val.Int64
+		resp.State["budget"] = uint64(val.Int64)
 		resp.State["state"] = StateSetRecommendations
 		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
@@ -801,7 +803,6 @@ func getBudget() uint64 {
 		if err != nil {
 			l.WithField("budget", s).Errorln(
 				"couldn't get budget: convert from string")
-			s = uint64(0)
 		}
 		return s
 	default:
