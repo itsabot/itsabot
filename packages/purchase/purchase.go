@@ -135,7 +135,26 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	if len(query) <= 8 {
 		resp.State["state"] = StateCheckPastPreferences
 	} else {
-		resp.State["state"] = StatePreferences
+		if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
+			prefs.KeyTaste, query); err != nil {
+			l.Errorln("saving taste pref", err)
+		}
+		currency, err := language.ExtractCurrency(m.Input.Sentence)
+		if err != nil {
+			l.Errorln(err)
+		}
+		if currency.Valid && currency.Int64 > 0 {
+			resp.State["budget"] = currency.Int64
+			resp.State["state"] = StateSetRecommendations
+			err = prefs.Save(ctx.DB, resp.UserID, pkgName,
+				prefs.KeyBudget,
+				strconv.FormatInt(currency.Int64, 10))
+			if err != nil {
+				l.Errorln("saving budget pref", err)
+			}
+		} else {
+			resp.State["state"] = StatePreferences
+		}
 	}
 	if err := updateState(m, resp, respMsg); err != nil {
 		l.Errorln(err)
@@ -207,7 +226,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.State["state"] = StateCheckPastBudget
 			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyTaste, getQuery()); err != nil {
-				l.Errorln("saving budget pref", err)
+				l.Errorln("saving taste pref", err)
 				return err
 			}
 			return updateState(m, resp, respMsg)
