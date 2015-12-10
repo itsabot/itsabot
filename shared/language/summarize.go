@@ -2,7 +2,6 @@ package language
 
 import (
 	"encoding/json"
-	"log"
 	"math/rand"
 	"regexp"
 	"sort"
@@ -68,14 +67,8 @@ func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	if err != nil {
 		return shortSummary, err
 	}
-	log.Println("=== KEYWORDS ===")
-	log.Println(keywords)
 	keywords = combineKeywordsIntoRanges(keywords)
-	log.Println("=== RANGES ===")
-	log.Println(keywords)
 	summary := buildSummary(product, keywords)
-	log.Println("=== SUMMARY ===")
-	log.Println(summary)
 	return shortSummary + summary, nil
 }
 
@@ -294,7 +287,6 @@ func Contains(wordList []string, s string) bool {
 }
 
 func buildShortSummary(p *dt.Product) string {
-	log.Printf("%+v\n", *p)
 	if len(p.Category) == 0 {
 		return ""
 	}
