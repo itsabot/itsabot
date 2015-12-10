@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"net/rpc"
 	"runtime"
 	"strconv"
@@ -80,7 +81,8 @@ Loop:
 	}
 	if p == nil {
 		log.Infoln("p is nil, getting last response route")
-		if err := m.GetLastResponse(db); err != nil {
+		err := m.GetLastResponse(db)
+		if err != nil && err != sql.ErrNoRows {
 			return p, route, false, err
 		}
 		if m.LastResponse == nil {
