@@ -2,9 +2,9 @@ package dt
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
 )
 
@@ -25,8 +25,8 @@ func NewSearchClient() *SearchClient {
 	return &SearchClient{client}
 }
 
-func (ec *SearchClient) FindProducts(query, category, typ string, budget uint64,
-	count int) ([]Product, error) {
+func (ec *SearchClient) FindProducts(query, category, typ string,
+	budget uint64) ([]Product, error) {
 	// JSON is the worst querying language ever
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -58,7 +58,11 @@ func (ec *SearchClient) FindProducts(query, category, typ string, budget uint64,
 		return []Product{}, err
 	}
 	if res.Hits.Total == 0 {
-		log.Println("NO RESULTS")
+		log.WithFields(log.Fields{
+			"q":      query,
+			"cat":    category,
+			"budget": budget,
+		}).Infoln("no results")
 		return []Product{}, nil
 	}
 	var products []Product

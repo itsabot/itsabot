@@ -601,7 +601,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				}
 				resp.Sentence += tmp
 			}
-		case "checkout", "check", "done", "ready":
+		case "checkout", "check", "done", "ready", "ship":
 			if tskAddr != nil {
 				tskAddr.ResetState()
 			}
@@ -744,7 +744,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 
 func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	results, err := ctx.EC.FindProducts(getQuery(), getCategory(),
-		"alcohol", getBudget(), 20)
+		"alcohol", getBudget())
 	if err != nil {
 		return err
 	}
