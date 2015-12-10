@@ -11,7 +11,6 @@ func Alcohol() []string {
 		"booze",
 		"cider",
 		"port",
-		"sherry",
 		"bordeaux",
 		"burgundy",
 		"alsace",
