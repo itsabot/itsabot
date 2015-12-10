@@ -346,7 +346,9 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		selection, err := currentSelection(resp.State)
 		if err == ErrEmptyRecommendations {
 			resp.Sentence = "I couldn't find any wines like that. "
-			if getBudget() < 5000 {
+			if getBudget() == 0 {
+				resp.State["state"] = StateCheckPastBudget
+			} else if getBudget() < 5000 {
 				resp.Sentence += "Should we look among the more expensive bottles?"
 				resp.State["state"] = StateRecommendationsAlterBudget
 			} else {
