@@ -178,9 +178,14 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
-	kw, err := handleKeywords(m, resp, respMsg)
-	if err != nil {
-		return err
+	var kw bool
+	var err error
+	words := strings.Fields(strings.ToLower(m.Input.Sentence))
+	if getState() > StateSetRecommendations {
+		kw, err = handleKeywords(m, resp, respMsg, words)
+		if err != nil {
+			return err
+		}
 	}
 	l.WithField("found", kw).Debugln("keywords handled")
 	if !kw {
@@ -344,9 +349,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		selection, err := currentSelection(resp.State)
 		if err == ErrEmptyRecommendations {
 			resp.Sentence = "I couldn't find any wines like that. "
-			if getBudget() == 0 {
-				resp.State["state"] = StateCheckPastBudget
-			} else if getBudget() < 5000 {
+			if getBudget() < 5000 {
 				resp.Sentence += "Should we look among the more expensive bottles?"
 				resp.State["state"] = StateRecommendationsAlterBudget
 			} else {
@@ -493,9 +496,8 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	return &recs[offset], nil
 }
 
-func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
-	error) {
-	words := strings.Fields(strings.ToLower(m.Input.Sentence))
+func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg,
+	words []string) (bool, error) {
 	modifier := 1
 	for _, word := range words {
 		word = strings.TrimRight(word, ",.?;:!")
@@ -680,9 +682,7 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		} else {
 			resp.Sentence = "I'm out of wines in that category. "
 		}
-		if getBudget() == 0 {
-			resp.State["state"] = StateCheckPastBudget
-		} else if getBudget() < 5000 {
+		if getBudget() < 5000 {
 			resp.Sentence += "Should we look among the more expensive bottles?"
 			resp.State["state"] = StateRecommendationsAlterBudget
 		} else {
