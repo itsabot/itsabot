@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net/rpc"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
 )
@@ -31,7 +30,10 @@ var client *rpc.Client
 // is encountered. Note that packages will only listen when ALL criteria are met
 func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	pt := p.Config.Port + 1
-	log.Println("registering package with listen port", pt)
+	log.WithFields(log.Fields{
+		"pkg":  p.Config.Name,
+		"port": pt,
+	}).Debugln("registering")
 	port := ":" + strconv.Itoa(pt)
 	addr := p.Config.ServerAddress + port
 	cl, err := rpc.Dial("tcp", addr)
@@ -42,9 +44,10 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + "_" + o)
 			if regPkgs.Get(s) != nil {
-				log.Println(
-					"warn: duplicate package or trigger",
-					p.Config.Name, s)
+				log.WithFields(log.Fields{
+					"pkg":   p.Config.Name,
+					"route": s,
+				}).Warnln("duplicate package or trigger")
 			}
 			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: cl})
 		}
@@ -59,7 +62,7 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 		if p != nil {
 			return p, "onboard_onboard", false, nil
 		} else {
-			log.Println("err: missing required onboard package")
+			log.Errorln("missing required onboard package")
 			return nil, "onboard_onboard", false, ErrMissingPackage
 		}
 	}
@@ -70,25 +73,23 @@ Loop:
 		for _, o := range si.Objects {
 			route = strings.ToLower(c + "_" + o)
 			p = regPkgs.Get(route)
-			log.Println("searching for " + strings.ToLower(c+"_"+o))
 			if p != nil {
 				break Loop
 			}
 		}
 	}
 	if p == nil {
-		log.Println("p is nil, getting last response route")
+		log.Infoln("p is nil, getting last response route")
 		if err := m.GetLastResponse(db); err != nil {
 			return p, route, false, err
 		}
 		if m.LastResponse == nil {
-			log.Println("couldn't find last package")
+			log.Infoln("couldn't find last package")
 			return p, route, false, ErrMissingPackage
 		}
 		route = m.LastResponse.Route
 		p = regPkgs.Get(route)
 		if p == nil {
-			log.Println("HERE")
 			return p, route, true, ErrMissingPackage
 		}
 		// TODO pass LastResponse directly to packages via rpc gob
@@ -105,25 +106,26 @@ func callPkg(m *dt.Msg) (*dt.RespMsg, string, string, error) {
 	reply := &dt.RespMsg{}
 	pw, route, lastRoute, err := getPkg(m)
 	if err != nil {
-		log.Println("err: getPkg", err)
+		log.WithField("fn", "callPkg:getPkg").Errorln(err)
 		var pname string
 		if pw != nil {
 			pname = pw.P.Config.Name
 		}
 		return reply, pname, route, err
 	}
-	log.Println("sending structured input to", pw.P.Config.Name)
+	log.WithField("pkg", pw.P.Config.Name).Infoln("sending input")
 	c := strings.Title(pw.P.Config.Name)
 	if lastRoute || len(m.Input.StructuredInput.Commands) == 0 {
-		log.Println("FollowUp")
+		log.WithField("pkg", pw.P.Config.Name).Infoln("follow up")
 		c += ".FollowUp"
 	} else {
+		log.WithField("pkg", pw.P.Config.Name).Infoln("first run")
 		c += ".Run"
 	}
 	m.Route = route
-	log.Println("calling pkg with", fmt.Sprintf("%+v", m))
 	if err := pw.RPCClient.Call(c, m, reply); err != nil {
-		log.Println("invalid response")
+		log.WithField("pkg", pw.P.Config.Name).Errorln(
+			"invalid response", err)
 		return reply, pw.P.Config.Name, route, err
 	}
 	return reply, pw.P.Config.Name, route, nil

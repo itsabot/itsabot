@@ -6,13 +6,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"math/rand"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/renstrom/fuzzysearch/fuzzy"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
@@ -27,6 +27,7 @@ var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var p *pkg.Pkg
 var ctx *dt.Ctx
+var l *log.Entry
 var tskAddr *task.Task
 var tskPurch *task.Task
 
@@ -82,11 +83,14 @@ var statesShipping = map[string]bool{
 
 func main() {
 	flag.Parse()
+	l = log.WithFields(log.Fields{
+		"pkg": pkgName,
+	})
 	rand.Seed(time.Now().UnixNano())
 	var err error
 	ctx, err = dt.NewContext()
 	if err != nil {
-		log.Fatalln(err)
+		l.Fatalln(err)
 	}
 	trigger := &dt.StructuredInput{
 		Commands: language.Purchase(),
@@ -94,11 +98,11 @@ func main() {
 	}
 	p, err = pkg.NewPackage(pkgName, *port, trigger)
 	if err != nil {
-		log.Fatalln("creating package", p.Config.Name, err)
+		l.Fatalln("building", err)
 	}
 	purchase := new(Purchase)
 	if err := p.Register(purchase); err != nil {
-		log.Fatalln("registering package ", err)
+		l.Fatalln("registering", err)
 	}
 }
 
@@ -134,7 +138,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 		resp = m.LastResponse
 	}
 	resp.Sentence = ""
-	log.Println("starting state", getState())
+	l.Debugln("starting state", getState())
 	// have we already made the purchase?
 	if getState() == StateComplete {
 		// if so, reset state to allow for other purchases
@@ -144,18 +148,16 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	// expensive" and have Ava respond appropriately
 	var kw bool
 	if getState() > StateSetRecommendations {
-		log.Println("handling keywords")
 		var err error
 		kw, err = handleKeywords(m, resp, respMsg)
 		if err != nil {
 			return err
 		}
 	}
-	log.Println("keywords handled. finished?", kw)
+	l.WithField("found", kw).Debugln("keywords handled")
 	if !kw {
 		// if purchase has not been made, move user through the
 		// package's states
-		log.Println("updating state", getState())
 		if err := updateState(m, resp, respMsg); err != nil {
 			return err
 		}
@@ -167,13 +169,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	state := getState()
 	switch state {
 	case StateRedWhite:
-		log.Println("StateRedWhite")
 		resp.State["category"] = extractWineCategory(m.Input.Sentence)
 		if getCategory() == "" {
 			resp.Sentence = "I'm not sure I understand. Are you looking for red, white, rose, or champagne?"
 			return nil
 		}
-		log.Println("category", getCategory())
+		l.WithField("cat", getCategory()).Infoln("selected category")
 		resp.State["state"] = StateCheckPastPreferences
 		return updateState(m, resp, respMsg)
 	case StateCheckPastPreferences:
@@ -196,7 +197,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.State["state"] = StateCheckPastBudget
 			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyTaste, getQuery()); err != nil {
-				log.Println("err: saving budget pref")
+				l.Errorln("saving budget pref", err)
 				return err
 			}
 			return updateState(m, resp, respMsg)
@@ -223,7 +224,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	case StateBudget:
 		val, err := language.ExtractCurrency(m.Input.Sentence)
 		if err != nil {
-			log.Println("err extracting currency")
+			l.Errorln("extracting currency", err)
 			return err
 		}
 		if !val.Valid {
@@ -234,15 +235,14 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		err = prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
 		if err != nil {
-			log.Println("err: saving budget pref")
+			l.Errorln("saving budget pref", err)
 			return err
 		}
 		fallthrough
 	case StateSetRecommendations:
-		log.Println("setting recs")
 		err := setRecs(resp, respMsg)
 		if err != nil {
-			log.Println("err setting recs")
+			l.Errorln("setting recs", err)
 			return err
 		}
 		resp.State["state"] = StateMakeRecommendation
@@ -290,7 +290,6 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		return updateState(m, resp, respMsg)
 	case StateMakeRecommendation:
-		log.Println("recommending product")
 		if err := recommendProduct(resp, respMsg); err != nil {
 			return err
 		}
@@ -298,16 +297,13 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		// was the recommendation Ava made good?
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
-			log.Println("StateProductSelection: yes invalid")
 			return nil
 		}
 		if !yes.Bool {
 			resp.State["offset"] = getOffset() + 1
-			log.Println("updating offset", getOffset())
 			resp.State["state"] = StateMakeRecommendation
 			return updateState(m, resp, respMsg)
 		}
-		log.Println("StateProductSelection: yes valid and true")
 		count := language.ExtractCount(m.Input.Sentence)
 		if count.Valid {
 			if count.Int64 == 0 {
@@ -381,7 +377,6 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return err
 		}
 		if !done {
-			log.Println("task state before save", tskAddr.GetState())
 			return nil
 		}
 		if addr == nil {
@@ -428,20 +423,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		log.Println("task init")
 		done, err := tskPurch.RequestPurchase(task.MethodZip, purchase)
-		log.Println("task fired. request purchase")
-		log.Println("sentence", resp.Sentence)
 		if err == task.ErrInvalidAuth {
 			resp.Sentence = "I'm sorry but that doesn't match what I have. You could try to add a new card here: https://avabot.co/?/cards/new"
 			return nil
 		}
 		if err != nil {
-			log.Println("err requesting purchase")
+			l.Errorln("requesting purchase", err)
 			return err
 		}
 		if !done {
-			log.Println("purchase incomplete")
+			l.Infoln("purchase incomplete")
 			return nil
 		}
 		resp.State["state"] = StateComplete
@@ -452,17 +444,18 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 
 func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	recs := getRecommendations()
-	l := uint(len(recs))
-	if l == 0 {
-		log.Println("!!! empty recs !!!")
-		log.Println("query", getQuery())
-		log.Println("offset", getOffset())
-		log.Println("budget", getBudget())
-		log.Println("selectedProducts", len(getSelectedProducts()))
+	ln := uint(len(recs))
+	if ln == 0 {
+		l.WithFields(log.Fields{
+			"q":        getQuery(),
+			"offset":   getOffset(),
+			"budget":   getBudget(),
+			"selProds": len(getSelectedProducts()),
+		}).Warnln("empty recs")
 		return nil, ErrEmptyRecommendations
 	}
 	offset := getOffset()
-	if l <= offset {
+	if ln <= offset {
 		err := errors.New("offset exceeds recommendation length")
 		return nil, err
 	}
@@ -655,7 +648,6 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		return nil
 	}
-	log.Println("showing product")
 	product := recs[offset]
 	var size string
 	product.Size = strings.TrimSpace(strings.ToLower(product.Size))
@@ -740,8 +732,8 @@ func getOffset() uint {
 	case float64:
 		return uint(resp.State["offset"].(float64))
 	default:
-		log.Println("warn: couldn't get offset: invalid type",
-			reflect.TypeOf(resp.State["offset"]))
+		l.WithField("type", reflect.TypeOf(resp.State["offset"])).
+			Errorln("couldn't get offset: invalid type")
 	}
 	return uint(0)
 }
@@ -766,13 +758,14 @@ func getBudget() uint64 {
 		s, err := strconv.ParseUint(resp.State["budget"].(string), 10,
 			64)
 		if err != nil {
-			log.Println("warn: couldn't get budget: convert from string")
+			l.WithField("budget", s).Errorln(
+				"couldn't get budget: convert from string")
 			s = uint64(0)
 		}
 		return s
 	default:
-		log.Println("warn: couldn't get budget: invalid type",
-			reflect.TypeOf(resp.State["budget"]))
+		l.WithField("type", reflect.TypeOf(resp.State["budget"])).
+			Errorln("couldn't get budget: invalid type")
 	}
 	return uint64(0)
 }
@@ -790,35 +783,36 @@ func getSelectedProducts() dt.ProductSels {
 	if !ok {
 		prodMap, ok := resp.State["productsSelected"].(interface{})
 		if !ok {
-			log.Println("productsSelected not found",
+			l.Errorln("productsSelected not found",
 				resp.State["productsSelected"])
 			return nil
 		}
 		byt, err := json.Marshal(prodMap)
 		if err != nil {
-			log.Println("err: marshaling products", err)
+			l.Errorln("marshaling products", err)
 		}
 		if err = json.Unmarshal(byt, &products); err != nil {
-			log.Println("err: unmarshaling products", err)
+			l.Errorln("unmarshaling products", err)
 		}
 	}
 	return products
 }
 
 func removeSelectedProduct(name string) {
-	log.Println("removing", name, "from cart")
+	l.WithField("product", name).Infoln("removing from cart")
 	prods := getSelectedProducts()
 	var success bool
 	for i, prod := range prods {
 		if name == prod.Name {
 			resp.State["productsSelected"] = append(prods[:i],
 				prods[i+1:]...)
-			log.Println("removed", name)
+			l.WithField("product", name).Debugln(
+				"removed from cart")
 			success = true
 		}
 	}
 	if !success {
-		log.Println("failed to remove", name, "from", prods)
+		l.WithField("name", name).Errorln("failed to remove")
 	}
 }
 
@@ -827,16 +821,16 @@ func getRecommendations() []dt.Product {
 	if !ok {
 		prodMap, ok := resp.State["recommendations"].(interface{})
 		if !ok {
-			log.Println("recommendations not found",
+			l.Errorln("recommendations not found",
 				resp.State["recommendations"])
 			return nil
 		}
 		byt, err := json.Marshal(prodMap)
 		if err != nil {
-			log.Println("err: marshaling products", err)
+			l.Errorln("marshaling products", err)
 		}
 		if err = json.Unmarshal(byt, &products); err != nil {
-			log.Println("err: unmarshaling products", err)
+			l.Errorln("unmarshaling products", err)
 		}
 		return nil
 	}

@@ -3,12 +3,12 @@ package pkg
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net"
 	"net/rpc"
 	"os"
 	"strconv"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
 	"github.com/avabot/ava/shared/datatypes"
@@ -67,39 +67,44 @@ func NewPackageWithServer(name, serverAddr string, port int,
 
 // Register with Ava to begin communicating over RPC.
 func (p *Pkg) Register(pkgT interface{}) error {
-	log.Println("connecting to port", p.Config.Port+1, "for", p.Config.Name)
+	log.SetLevel(log.DebugLevel)
+	log.WithFields(log.Fields{
+		"port": p.Config.Port + 1,
+		"pkg":  p.Config.Name,
+	}).Debugln("connecting")
 	l, err := net.Listen("tcp", ":"+strconv.Itoa(p.Config.Port+1))
 	if err != nil {
-		log.Fatalln("rpc listen:", err, p.Config.Name)
+		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
 	if err := rpc.Register(pkgT); err != nil {
-		log.Fatalln(err, p.Config.Name)
+		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
 	port, err := strconv.Atoi(os.Getenv("PORT"))
 	if err != nil {
+		log.WithField("pkg", p.Config.Name).Errorln(err)
 		return err
 	}
 	client, err = rpc.Dial("tcp", ":"+strconv.Itoa(port+1))
 	if err != nil {
+		log.WithField("pkg", p.Config.Name).Errorln(err)
 		return err
 	}
 	var notused string
-	log.Println("calling register", p.Config.Name)
 	err = client.Call("Ava.RegisterPackage", p, &notused)
 	if err != nil {
-		log.Println("err: registering package", p.Config.Name, err)
+		log.WithField("pkg", p.Config.Name).Errorln("calling", err)
 		return err
 	}
-	log.Println("connected with ava", p.Config.Name)
+	log.WithField("pkg", p.Config.Name).Debugln("connected")
 	db, err = ConnectDB()
 	if err != nil {
+		log.WithField("pkg", p.Config.Name).Errorln("connectDB", err)
 		return err
 	}
-	log.Println("connected with database", p.Config.Name)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Fatalln(err)
+			log.WithField("pkg", p.Config.Name).Fatalln(err)
 		}
 		go rpc.ServeConn(conn)
 	}
@@ -113,24 +118,29 @@ func (p *Pkg) Register(pkgT interface{}) error {
 // packages will be responsible for saving their own responses. This is not
 // ideal, but it'll work for now.
 func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
-	if r.State["__taskAddress_UserID_5"] != nil {
-		s, ok := r.State["__taskAddress_UserID_5"].(float64)
-		if !ok {
-			s = float64(r.State["__taskAddress_UserID_5"].(uint64))
-		}
-		log.Println("SAVING RESPONSE WITH STATE", s)
-	}
 	state, err := json.Marshal(r.State)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"pkg": p.Config.Name,
+			"fn":  "SaveResponse",
+		}).Errorln(err)
 		return err
 	}
 	tx, err := db.Beginx()
 	if err != nil {
+		log.WithFields(log.Fields{
+			"pkg": p.Config.Name,
+			"fn":  "SaveResponse",
+		}).Errorln(err)
 		return err
 	}
 	q := `SELECT COUNT(*) FROM states WHERE userid=$1 AND pkgname=$2`
 	var tmp uint64
 	if err = tx.Get(&tmp, q, r.UserID, p.Config.Name); err != nil {
+		log.WithFields(log.Fields{
+			"pkg": p.Config.Name,
+			"fn":  "SaveResponse",
+		}).Errorln(err)
 		return err
 	}
 	if tmp == 0 {
@@ -139,6 +149,10 @@ func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 			VALUES ($1, $2, $3) RETURNING id`
 		row := tx.QueryRowx(q, r.UserID, state, p.Config.Name)
 		if err = row.Scan(&tmp); err != nil {
+			log.WithFields(log.Fields{
+				"pkg": p.Config.Name,
+				"fn":  "SaveResponse",
+			}).Errorln(err)
 			return err
 		}
 	} else {
@@ -148,6 +162,10 @@ func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 			WHERE userid=$2 AND pkgname=$3 RETURNING id`
 		err = tx.QueryRowx(q, state, r.UserID, p.Config.Name).Scan(&tmp)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"pkg": p.Config.Name,
+				"fn":  "SaveResponse",
+			}).Errorln(err)
 			return err
 		}
 	}
@@ -159,13 +177,19 @@ func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 	err = tx.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, tmp).
 		Scan(&tmp)
 	if err != nil {
-		log.Println("ERR SAVING", err)
+		log.WithFields(log.Fields{
+			"pkg": p.Config.Name,
+			"fn":  "SaveResponse",
+		}).Errorln(err)
 		return err
 	}
 	if err = tx.Commit(); err != nil {
+		log.WithFields(log.Fields{
+			"pkg": p.Config.Name,
+			"fn":  "SaveResponse",
+		}).Errorln(err)
 		return err
 	}
-	log.Println("saved route", r.Route)
 	respMsg.ResponseID = tmp
 	respMsg.Sentence = r.Sentence
 	return nil
@@ -179,6 +203,11 @@ func ConnectDB() (*sqlx.DB, error) {
 	} else {
 		db, err = sqlx.Connect("postgres",
 			"user=egtann dbname=ava sslmode=disable")
+	}
+	if err != nil {
+		log.WithFields(log.Fields{
+			"fn": "ConnectDB",
+		}).Errorln(err)
 	}
 	return db, err
 }

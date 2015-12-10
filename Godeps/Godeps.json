@@ -20,6 +20,11 @@
 			"Rev": "b4440419d81240f8451a505b2f806c853bc2befc"
 		},
 		{
+			"ImportPath": "github.com/Sirupsen/logrus",
+			"Comment": "v0.8.7-53-g446d1c1",
+			"Rev": "446d1c146faa8ed3f4218f056fcd165f6bcfda81"
+		},
+		{
 			"ImportPath": "github.com/andybalholm/cascadia",
 			"Rev": "6122e68c2642b7b75c538a63b15168c6c80fb757"
 		},
@@ -134,18 +139,6 @@
 		{
 			"ImportPath": "golang.org/x/net/websocket",
 			"Rev": "4b709d93778b93d2f34943e3142c71578d83ad31"
-		},
-		{
-			"ImportPath": "golang.org/x/text/runes",
-			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
-		},
-		{
-			"ImportPath": "golang.org/x/text/transform",
-			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
-		},
-		{
-			"ImportPath": "golang.org/x/text/unicode/norm",
-			"Rev": "dd164d33a23c6e075adc2b75ac1ae939b81324aa"
 		}
 	]
 }

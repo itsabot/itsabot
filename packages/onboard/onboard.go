@@ -2,11 +2,11 @@ package main
 
 import (
 	"flag"
-	"log"
 	"net/url"
 	"os"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/NickPresta/GoURLShortener"
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/pkg"
 )
@@ -14,11 +14,15 @@ import (
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 
 var p *pkg.Pkg
+var l *log.Entry
 
 type Onboard string
 
 func main() {
 	flag.Parse()
+	l = log.WithFields(log.Fields{
+		"pkg": "onboard",
+	})
 	trigger := &dt.StructuredInput{
 		Commands: []string{"onboard"},
 		Objects:  []string{"onboard"},
@@ -26,11 +30,11 @@ func main() {
 	var err error
 	p, err = pkg.NewPackage("onboard", *port, trigger)
 	if err != nil {
-		log.Fatalln("creating package", p.Config.Name, err)
+		l.Fatalln("building", err)
 	}
 	onboard := new(Onboard)
 	if err := p.Register(onboard); err != nil {
-		log.Fatalln("registering package ", err)
+		l.Fatalln("registering", err)
 	}
 }
 
@@ -40,7 +44,6 @@ func (t *Onboard) Run(m *dt.Msg,
 	if err != nil {
 		return err
 	}
-	log.Println("M", m)
 	resp := m.NewResponse()
 	resp.Sentence = "Hi, I'm Ava, your new personal assistant. To get started, please sign up here: " + u
 	return p.SaveResponse(respMsg, resp)

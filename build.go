@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
+
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
 
 type packagesConf struct {
@@ -19,14 +20,12 @@ func bootDependencies() {
 	// TODO Inspect for errors
 	content, err := ioutil.ReadFile("packages.json")
 	if err != nil {
-		log.Println("err: reading packages.json", err)
-		log.Fatalln("could not start")
+		log.Fatalln("reading packages.json", err)
 	}
 	var conf packagesConf
 	err = json.Unmarshal(content, &conf)
 	if err != nil {
-		log.Println("err: unmarshaling packages", err)
-		log.Fatalln("could not start")
+		log.Fatalln("err: unmarshaling packages", err)
 	}
 	port, err := strconv.Atoi(os.Getenv("PORT"))
 	if err != nil {
@@ -35,14 +34,20 @@ func bootDependencies() {
 	i := 2
 	for name := range conf.Dependencies {
 		p := strconv.Itoa(port + i)
-		log.Println("booting package", name, p)
+		log.WithFields(log.Fields{
+			"pkg":  name,
+			"port": p,
+		}).Debugln("booting")
 		// NOTE assumes packages are installed with go install ./...,
 		// matching Heroku's Go buildpack
 		cmd := exec.Command(name, "-port", p)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err = cmd.Start(); err != nil {
-			log.Fatalln("running package process: ", err)
+			log.WithFields(log.Fields{
+				"pkg":  name,
+				"port": p,
+			}).Fatalln(err)
 		}
 		i += 2
 	}

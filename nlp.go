@@ -6,11 +6,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/shared/datatypes"
 )
@@ -31,7 +31,7 @@ var (
 )
 
 func train(c *bayesian.Classifier, s string) error {
-	log.Println("training classifier")
+	log.Infoln("training classifier")
 	if err := trainClassifier(c, s); err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func train(c *bayesian.Classifier, s string) error {
 }
 
 func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
-	log.Println("loading classifier")
+	log.Debugln("loading classifier")
 	var err error
 	q := `SELECT data FROM ml WHERE name='ner' LIMIT 1`
 	row := db.QueryRowx(q)
@@ -57,19 +57,20 @@ func loadClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	if err == sql.ErrNoRows {
 		c, err = buildClassifier(c)
 		if err != nil {
-			log.Println("err building classifier")
+			log.WithField("fn", "loadClassifier").Errorln(err)
 			return c, err
 		}
 	} else if err != nil {
-		log.Println("err getting classifier from DB")
+		log.WithField("fn", "loadClassifier").Errorln(err)
 		return c, err
 	}
 	buf := bytes.NewBuffer(tmp)
 	c, err = bayesian.NewClassifierFromReader(buf)
 	if err != nil {
-		log.Println("err building new classifier from reader", err)
+		log.WithField("fn", "loadClassifier").Errorln(err)
 		return c, err
 	}
+	log.Infoln("loaded NER classifier")
 	return c, nil
 }
 
@@ -78,6 +79,7 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	filename := path.Join("data", "training", "imperative.txt")
 	fi, err := os.Open(filename)
 	if err != nil {
+		log.WithField("fn", "buildClassifier").Errorln(err)
 		return c, err
 	}
 	defer fi.Close()
@@ -85,24 +87,29 @@ func buildClassifier(c *bayesian.Classifier) (*bayesian.Classifier, error) {
 	line := 1
 	for scanner.Scan() {
 		if err := trainClassifier(c, scanner.Text()); err != nil {
-			log.Println("err: line", line, "::", err)
+			log.WithFields(log.Fields{
+				"fn":   "buildClasssifier",
+				"line": line,
+			}).Errorln(err)
 		}
 		line++
 	}
 	if err := scanner.Err(); err != nil {
+		log.WithField("fn", "buildClassifier").Errorln(err)
 		return c, err
 	}
 	buf := bytes.NewBuffer([]byte{})
 	if err := c.WriteTo(buf); err != nil {
+		log.WithField("fn", "buildClassifier").Errorln(err)
 		return c, err
 	}
 	q := `INSERT INTO ml (name, data) VALUES ('ner', $1)`
 	_, err = db.Exec(q, buf.Bytes())
 	if err != nil {
-		log.Println("err updating ml.ner", err)
+		log.WithField("fn", "buildClassifier").Errorln(err)
 		return c, err
 	}
-	log.Println("new classifier trained")
+	log.Infoln("new classifier trained")
 	return c, nil
 }
 
@@ -273,7 +280,10 @@ func addContext(m *dt.Msg) (*dt.Msg, error) {
 		default:
 			return m, errors.New("unknown type found for pronoun")
 		}
-		log.Println("ctx: ", ctx)
+		log.WithFields(log.Fields{
+			"fn":  "addContext",
+			"ctx": ctx,
+		}).Infoln("context found")
 	}
 	return m, nil
 }
@@ -354,7 +364,11 @@ func classifyTrigram(c *bayesian.Classifier, s string, ws []string, i int) (
 	}
 	m = max(probs)
 	if m <= 0.7 {
-		log.Println(word1, " || ", dt.String[likely+1], " || ", m)
+		log.WithFields(log.Fields{
+			"fn":        "classifyTrigram",
+			"word":      word1,
+			"predicted": dt.String[likely+1],
+		}).Infoln("guessed word classification")
 		needsTraining = true
 	}
 	return dt.WordClass{word1, likely + 1}, needsTraining, nil

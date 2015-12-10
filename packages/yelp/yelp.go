@@ -5,11 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/url"
 	"os"
 	"strings"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/garyburd/go-oauth/oauth"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
@@ -46,14 +46,22 @@ var ErrNoBusinesses = errors.New("no businesses")
 var c client
 var db *sqlx.DB
 var p *pkg.Pkg
+var l *log.Entry
 
 func main() {
 	flag.Parse()
+	l = log.WithFields(log.Fields{
+		"pkg": "yelp",
+	})
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
-	db = connectDB()
+	var err error
+	db, err = pkg.ConnectDB()
+	if err != nil {
+		l.Fatalln(err)
+	}
 	trigger := &dt.StructuredInput{
 		Commands: []string{
 			"find",
@@ -65,14 +73,13 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	var err error
 	p, err = pkg.NewPackage("yelp", *port, trigger)
 	if err != nil {
-		log.Fatalln("creating package", p.Config.Name, err)
+		l.Fatalln("building", err)
 	}
 	yelp := new(Yelp)
 	if err := p.Register(yelp); err != nil {
-		log.Fatalln("registering package ", err)
+		l.Fatalln("registering", err)
 	}
 }
 
@@ -97,7 +104,7 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	resp.State["query"] = query
 	if len(si.Places) == 0 {
-		log.Println("no place entered, getting location")
+		l.Infoln("no place entered, getting location")
 		loc, question, err := knowledge.GetLocation(db, m.User)
 		if err != nil {
 			return err
@@ -128,7 +135,7 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		resp.State["location"] = loc.Name
 	}
 	if err := t.searchYelp(resp); err != nil {
-		log.Println(err)
+		l.WithField("fn", "searchYelp").Errorln(err)
 	}
 	return p.SaveResponse(respMsg, resp)
 }
@@ -138,24 +145,22 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 	respMsg *dt.RespMsg) error {
 	// Retrieve the conversation's context
 	if err := m.GetLastResponse(db); err != nil {
-		log.Println("err getting last response")
+		l.WithField("fn", "GetLastResponse").Errorln(err)
 		return err
 	}
 	resp := m.NewResponse()
 
 	// First we handle dialog. If we asked for a location, use the response
-	log.Printf("state %+v\n", resp.State)
 	if resp.State["location"] == "" {
 		loc := m.Input.StructuredInput.All()
 		resp.State["location"] = loc
 		if err := t.searchYelp(resp); err != nil {
-			log.Println(err)
+			l.WithField("fn", "searchYelp").Fatalln(err)
 		}
 		return p.SaveResponse(respMsg, resp)
 	}
 
 	// If no businesses are returned inform the user now
-	log.Println("businesses", resp.State["businesses"])
 	if resp.State["businesses"] != nil &&
 		len(resp.State["businesses"].([]interface{})) == 0 {
 		resp.Sentence = "I couldn't find anything like that"
@@ -200,7 +205,7 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 		case "not", "else", "no", "anything", "something":
 			resp.State["offset"] = float64(offI + 1)
 			if err := t.searchYelp(resp); err != nil {
-				log.Println(err)
+				l.WithField("fn", "searchYelp").Errorln(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
 		// with bayesian classification
@@ -249,41 +254,26 @@ func getAddress(r *dt.Resp, offset int) string {
 }
 
 func (c *client) get(urlStr string, params url.Values, v interface{}) error {
-	log.Println(urlStr, params)
 	resp, err := c.client.Get(nil, &c.token, urlStr, params)
 	if err != nil {
-		log.Println("1")
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.Println("err:", resp)
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
-}
-
-func connectDB() *sqlx.DB {
-	log.Println("connecting to db")
-	var db *sqlx.DB
-	var err error
-	if os.Getenv("AVA_ENV") == "production" {
-		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
-	} else {
-		db, err = sqlx.Connect("postgres",
-			"user=egtann dbname=ava sslmode=disable")
-	}
-	if err != nil {
-		log.Println("err: could not connect to db", err)
-	}
-	return db
 }
 
 func (t *Yelp) searchYelp(resp *dt.Resp) error {
 	q := resp.State["query"].(string)
 	loc := resp.State["location"].(string)
 	offset := resp.State["offset"].(float64)
-	log.Println("searching yelp", q, loc, offset)
+	l.WithFields(log.Fields{
+		"q":      q,
+		"loc":    loc,
+		"offset": offset,
+	}).Infoln("searching yelp")
 	form := url.Values{
 		"term":     {q},
 		"location": {loc},
@@ -294,6 +284,7 @@ func (t *Yelp) searchYelp(resp *dt.Resp) error {
 	if err != nil {
 		resp.Sentence = "I can't find that for you now. " +
 			"Let's try again later."
+		l.WithField("fn", "get").Errorln(err)
 		return err
 	}
 	resp.State["businesses"] = data.Businesses

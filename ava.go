@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"log"
 	"math/rand"
 	"net"
 	"net/rpc"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -38,8 +38,8 @@ var ErrMissingPackage = errors.New("missing package")
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
 
 func main() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	rand.Seed(time.Now().UnixNano())
+	log.SetLevel(log.DebugLevel)
 	app := cli.NewApp()
 	app.Name = "ava"
 	app.Usage = "general purpose ai platform"
@@ -61,7 +61,7 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		showHelp := true
 		if c.Bool("install") {
-			log.Println("TODO: install packages")
+			log.Info("TODO: install packages")
 			showHelp = false
 		}
 		if c.Bool("server") {
@@ -80,13 +80,12 @@ func startServer(port string) {
 	var err error
 	phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 	if err = checkRequiredEnvVars(); err != nil {
-		log.Println("err:", err)
+		log.Errorln("checking env vars", err)
 	}
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
-		log.Println("err: loading classifier:", err)
+		log.Errorln("loading classifier", err)
 	}
-	log.Println("booting local server")
 	bootRPCServer(port)
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
@@ -94,30 +93,32 @@ func startServer(port string) {
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()
 	initRoutes(e)
-	log.Println("booted ava")
+	log.Infoln("booted ava")
 	e.Run(":" + port)
 }
 
 func bootRPCServer(port string) {
 	ava := new(Ava)
 	if err := rpc.Register(ava); err != nil {
-		log.Println("register ava in rpc", err)
+		log.Errorln("register ava in rpc", err)
 	}
 	p, err := strconv.Atoi(port)
 	if err != nil {
-		log.Println("convert port to int", err)
+		log.Errorln("convert port to int", err)
 	}
 	pt := strconv.Itoa(p + 1)
 	l, err := net.Listen("tcp", ":"+pt)
-	log.Println("booting rpc server", pt)
+	log.WithFields(log.Fields{
+		"port": pt,
+	}).Debugln("booting rpc server")
 	if err != nil {
-		log.Println("err: rpc listen: ", err)
+		log.Errorln("rpc listen", err)
 	}
 	go func() {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				log.Println("err: rpc accept: ", err)
+				log.Errorln("rpc accept", err)
 			}
 			go rpc.ServeConn(conn)
 		}
@@ -125,7 +126,7 @@ func bootRPCServer(port string) {
 }
 
 func connectDB() *sqlx.DB {
-	log.Println("connecting to db")
+	log.Debugln("connecting to db")
 	var d *sqlx.DB
 	var err error
 	if os.Getenv("AVA_ENV") == "production" {
@@ -135,8 +136,9 @@ func connectDB() *sqlx.DB {
 			"user=egtann dbname=ava sslmode=disable")
 	}
 	if err != nil {
-		log.Println("could not connect to db ", err.Error())
+		log.Errorln("connecting to db", err)
 	}
+	log.Infoln("connected to db")
 	return d
 }
 
@@ -153,7 +155,7 @@ func processText(c *echo.Context) (string, error) {
 	}
 	si, annotated, needsTraining, err := classify(bayes, cmd)
 	if err != nil {
-		log.Println("classifying sentence ", err)
+		log.Errorln("classifying sentence", err)
 	}
 	uid, fid, fidT := validateParams(c)
 	in := &dt.Input{
@@ -166,21 +168,24 @@ func processText(c *echo.Context) (string, error) {
 	}
 	u, err := getUser(in)
 	if err == ErrMissingUser {
-		log.Println(err)
+		log.Infoln("missing user", err)
 	} else if err != nil {
-		log.Println("getUser: ", err)
+		log.WithField("fn", "getUser").Errorln(err)
 		return "", err
 	}
 	m := &dt.Msg{User: u, Input: in}
 	m, err = addContext(m)
 	if err != nil {
-		log.Println("addContext: ", err)
+		log.WithField("fn", "addContext").Errorln(err)
 	}
 	ret, pname, route, err := callPkg(m)
 	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "callPkg").Errorln(err)
 		return "", err
 	}
+	var confused bool
 	if len(ret.Sentence) == 0 {
+		confused = true
 		ret.Sentence = language.Confused()
 	}
 	in.StructuredInput = si
@@ -188,9 +193,12 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		return ret.Sentence, err
 	}
+	if confused {
+		log.WithField("inputID", id).Infoln("confused")
+	}
 	in.ID = id
 	if needsTraining {
-		log.Println("needed training")
+		log.WithField("inputID", id).Infoln("needed training")
 		if err = supervisedTrain(in); err != nil {
 			return ret.Sentence, err
 		}
@@ -212,7 +220,7 @@ func validateParams(c *echo.Context) (uint64, string, int) {
 		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 			uid = 0
 		} else if err != nil {
-			log.Fatalln(err)
+			log.WithField("fn", "validateParams").Fatalln(err)
 		}
 	}
 	tmp, ok = c.Get("flexid").(string)
@@ -222,7 +230,8 @@ func validateParams(c *echo.Context) (uint64, string, int) {
 	if len(tmp) > 0 {
 		fid = tmp
 		if len(fid) == 0 {
-			log.Fatalln("flexid is blank")
+			log.WithField("fn", "validateParams").
+				Fatalln("flexid is blank")
 		}
 	}
 	tmp, ok = c.Get("flexidtype").(string)
@@ -236,7 +245,7 @@ func validateParams(c *echo.Context) (uint64, string, int) {
 			// default to 2 (SMS)
 			fidT = 2
 		} else if err != nil {
-			log.Fatalln(err)
+			log.WithField("fn", "validateParams").Fatalln(err)
 		}
 	}
 	return uid, fid, fidT
