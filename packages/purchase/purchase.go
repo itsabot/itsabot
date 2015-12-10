@@ -639,8 +639,13 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 
 func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	recs := getRecommendations()
-	if len(recs) == 0 {
-		resp.Sentence = "I couldn't find any wines like that. "
+	offset := getOffset()
+	if len(recs) == 0 || int(offset) >= len(recs) {
+		if len(recs) == 0 {
+			resp.Sentence = "I couldn't find any wines like that. "
+		} else {
+			resp.Sentence = "I'm out of wines in that category. "
+		}
 		if getBudget() < 5000 {
 			resp.Sentence += "Should we look among the more expensive bottles?"
 			resp.State["state"] = StateRecommendationsAlterBudget
@@ -651,7 +656,6 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		return nil
 	}
 	log.Println("showing product")
-	offset := getOffset()
 	product := recs[offset]
 	var size string
 	product.Size = strings.TrimSpace(strings.ToLower(product.Size))
