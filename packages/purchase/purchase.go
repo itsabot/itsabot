@@ -239,17 +239,20 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
+		l.WithField("budgetPref", budgetPref).Debugln("got budgetPref")
 		if len(budgetPref) > 0 {
 			resp.State["budget"], err = strconv.ParseUint(
 				budgetPref, 10, 64)
 			if err != nil {
 				return err
 			}
+			l.WithField("budget", getBudget()).Debugln("got budget")
 			if getBudget() > 0 {
 				resp.State["state"] = StateSetRecommendations
 				return updateState(m, resp, respMsg)
 			}
 		}
+		l.Debugln("updating state to StateBudget")
 		resp.State["state"] = StateBudget
 		resp.Sentence = "Ok. How much do you usually pay for a bottle?"
 	case StateBudget:
