@@ -22,10 +22,14 @@ var Profile = {
 
 Profile.controller = function() {
 	var userId = cookie.getItem("id");
+	console.log(userId);
 	if (userId === null || userId <= 0) {
+		cookie.removeItem("id");
+		cookie.removeItem("session_token");
 		return m.route("/login");
 	}
 	var redirect = m.route.param("r");
+	console.log(redirect);
 	if (redirect != null) {
 		m.route("/" + redirect.substring(1));
 	}
