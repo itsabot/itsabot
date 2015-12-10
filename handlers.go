@@ -299,7 +299,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	if os.Getenv("AVA_ENV") == "production" {
 		fName := strings.Fields(req.Name)[0]
 		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
-		msg += "Thanks for signing up. How can I help?"
+		msg += "How can I help? Try asking me to help you find a nice bottle of wine."
 		if err = sms.SendMessage(tc, req.FID, msg); err != nil {
 			return jsonError(err)
 		}

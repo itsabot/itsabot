@@ -498,7 +498,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 					float64(prices["total"])/100)
 				resp.Sentence = s
 			}
-		case "find", "search", "show":
+		case "find", "search", "show", "give":
 			resp.State["offset"] = 0
 			resp.State["query"] = m.Input.Sentence
 			cat := extractWineCategory(m.Input.Sentence)
@@ -511,7 +511,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			if err != nil {
 				return false, err
 			}
-		case "similar", "else", "different", "looking", "look":
+		case "similar", "else", "different", "looking", "look", "another", "recommend", "next":
 			resp.State["offset"] = getOffset() + 1
 			resp.State["state"] = StateMakeRecommendation
 		case "expensive", "event", "nice", "nicer", "cheap", "cheaper":
@@ -602,7 +602,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 				resp.Sentence = "I couldn't find a wine like that in your cart."
 			} else if len(matches) == 1 {
 				resp.Sentence = fmt.Sprintf(
-					"Ok, I'll remove %s.", matches[0])
+					"Ok, I'll remove the %s.", matches[0])
 				removeSelectedProduct(matches[0])
 			} else {
 				resp.Sentence = "Ok, I'll remove those."
@@ -620,13 +620,22 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 			resp.State["state"] = StateContinueShopping
 		case "help", "command":
 			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
-		case "less":
+		// NOTE too should work with both expensive and cheap, but
+		// doesn't yet
+		case "less", "too":
 			modifier *= -1
 		case "much", "very", "extremely":
 			modifier *= 2
 		}
 	}
-	log.Printf("%q\n", resp.Sentence)
+	if getState() != StateProductSelection {
+		currency, err := language.ExtractCurrency(resp.Sentence)
+		l.Errorln("extracting currency", err)
+		if currency.Valid && currency.Int64 > 0 {
+			resp.State["budget"] = currency.Int64
+			resp.State["state"] = StateSetRecommendations
+		}
+	}
 	return len(resp.Sentence) > 0, nil
 }
 
