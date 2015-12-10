@@ -24,22 +24,22 @@ var regexNum = regexp.MustCompile(`\d+`)
 // to see if currency text was found. If the response is nil, no currency was
 // found. This API design also maintains consitency when we want to extract and
 // return a struct (which should be returned as a pointer).
-func ExtractCurrency(s string) (sql.NullInt64, error) {
+func ExtractCurrency(s string) sql.NullInt64 {
 	n := sql.NullInt64{
 		Int64: 0,
 		Valid: false,
 	}
 	s = regexCurrency.FindString(s)
 	if len(s) == 0 {
-		return n, nil
+		return n
 	}
 	val, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return n, err
+		return n
 	}
 	n.Int64 = int64(val * 100)
 	n.Valid = true
-	return n, nil
+	return n
 }
 
 func ExtractYesNo(s string) sql.NullBool {

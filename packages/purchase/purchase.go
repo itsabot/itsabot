@@ -139,14 +139,11 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 			prefs.KeyTaste, query); err != nil {
 			l.Errorln("saving taste pref", err)
 		}
-		currency, err := language.ExtractCurrency(m.Input.Sentence)
-		if err != nil {
-			l.Errorln(err)
-		}
+		currency := language.ExtractCurrency(m.Input.Sentence)
 		if currency.Valid && currency.Int64 > 0 {
 			resp.State["budget"] = currency.Int64
 			resp.State["state"] = StateSetRecommendations
-			err = prefs.Save(ctx.DB, resp.UserID, pkgName,
+			err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyBudget,
 				strconv.FormatInt(currency.Int64, 10))
 			if err != nil {
@@ -256,17 +253,13 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		resp.State["state"] = StateBudget
 		resp.Sentence = "Ok. How much do you usually pay for a bottle?"
 	case StateBudget:
-		val, err := language.ExtractCurrency(m.Input.Sentence)
-		if err != nil {
-			l.Errorln("extracting currency", err)
-			return err
-		}
+		val := language.ExtractCurrency(m.Input.Sentence)
 		if !val.Valid {
 			return nil
 		}
 		resp.State["budget"] = val.Int64
 		resp.State["state"] = StateSetRecommendations
-		err = prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
+		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
 		if err != nil {
 			l.Errorln("saving budget pref", err)
@@ -667,8 +660,7 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) (bool,
 		}
 	}
 	if getState() != StateProductSelection {
-		currency, err := language.ExtractCurrency(resp.Sentence)
-		l.Errorln("extracting currency", err)
+		currency := language.ExtractCurrency(resp.Sentence)
 		if currency.Valid && currency.Int64 > 0 {
 			resp.State["budget"] = currency.Int64
 			resp.State["state"] = StateSetRecommendations
