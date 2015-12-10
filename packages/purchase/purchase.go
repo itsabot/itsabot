@@ -128,12 +128,12 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	if len(cat) == 0 {
 		resp.Sentence = "Sure. Are you looking for a red or white?"
 		resp.State["state"] = StateRedWhite
-	} else {
-		resp.State["query"] = query
-		resp.State["category"] = cat
-		resp.State["state"] = StateCheckPastPreferences
+		return p.SaveResponse(respMsg, resp)
 	}
-	return p.SaveResponse(respMsg, resp)
+	resp.State["query"] = query
+	resp.State["category"] = cat
+	resp.State["state"] = StateCheckPastPreferences
+	return updateState(m, resp, respMsg)
 }
 
 func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
@@ -153,13 +153,9 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
-	var kw bool
-	if getState() > StateSetRecommendations {
-		var err error
-		kw, err = handleKeywords(m, resp, respMsg)
-		if err != nil {
-			return err
-		}
+	kw, err := handleKeywords(m, resp, respMsg)
+	if err != nil {
+		return err
 	}
 	l.WithField("found", kw).Debugln("keywords handled")
 	if !kw {
