@@ -533,16 +533,20 @@ func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg,
 			}
 		case "find", "search", "show", "give":
 			resp.State["offset"] = 0
-			resp.State["query"] = m.Input.Sentence
-			cat := extractWineCategory(m.Input.Sentence)
-			if len(cat) > 0 {
-				resp.State["category"] = cat
-			}
-			resp.State["state"] = StateSetRecommendations
+			resp.State["query"] = m.Input.StructuredInput.Objects.
+				String()
 			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
-				prefs.KeyTaste, m.Input.Sentence)
+				prefs.KeyTaste,
+				m.Input.StructuredInput.Objects.String())
 			if err != nil {
 				return false, err
+			}
+			cat := extractWineCategory(m.Input.Sentence)
+			if len(cat) == 0 {
+				resp.State["state"] = StateRedWhite
+			} else {
+				resp.State["category"] = cat
+				resp.State["state"] = StateSetRecommendations
 			}
 		case "similar", "else", "different", "looking", "look", "another", "recommend", "next":
 			resp.State["offset"] = getOffset() + 1
