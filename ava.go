@@ -20,6 +20,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/sms"
 )
@@ -173,12 +174,68 @@ func processText(c *echo.Context) (string, error) {
 		log.WithField("fn", "getUser").Errorln(err)
 		return "", err
 	}
-	m := &dt.Msg{User: u, Input: in}
+	m := dt.NewMessage(u, in)
 	m, err = addContext(m)
 	if err != nil {
 		log.WithField("fn", "addContext").Errorln(err)
 	}
-	ret, pname, route, err := callPkg(m)
+	pkg, route, err := getPkg(m)
+	if err != nil {
+		log.WithField("fn", "getPkg").Error(err)
+		return "", err
+	}
+	// Ava asks questions about words she doesn't understand. To do that,
+	// she creates a knowledge query, which is stored separately from last
+	// responses. The knowledge table can be thought of like a graph, where
+	// words are related to one another within degrees of separation. From
+	// most specific to less and less specific. Questions are asked
+	// recursively up to two times. For example:
+	//
+	// User> Buy me a sau gri.
+	// Ava>  What's a sau gri?
+	// User> Sauvignon Gris
+	// Ava>  (passes "Buy me a Sauvignon Gris" to the package, but is still
+	//        confused)
+	// Ava>  And what's a Sauvignon Gris?
+	// User> white wine
+	// Ava>  (searches for Buy me a Sauvignon Gris white wine, which the
+	//        purchase package can handle)
+	//
+	// Then Ava knows that sau gri is very similar to "Sauvignon Gris", and
+	// somewhat similar to "white wine". The next time a user asks for a
+	// "sau gri" in the same or similar trigram context, "buy me sau gri",
+	// she'll jump right to "Buy me a Sauvignon Gris white wine".
+	//
+	// Ava should also handle confusion across multiple wordtypes in
+	// sequence. For example:
+	//
+	// User> Procure libations
+	// Ava>  What do you mean by procure?
+	// User> buy
+	// Ava>  Ok. And what do you mean by libations?
+	// User> booze
+	// Ava>  What do you mean by booze?
+	// User> alcohol
+	// Ava>  (pass "Buy alcohol" to the package)
+	//
+	if m.LastResponse != nil && route == m.LastResponse.Route {
+		kQuery, err := knowledge.GetActiveQuery(db, u)
+		if err != nil {
+			return "", err
+		}
+		if kQuery != nil {
+			if err := kQuery.Solve(db, m); err != nil {
+				return "", err
+			}
+			return processText(c)
+		}
+	} else {
+		if err := knowledge.SetQueriesInactive(db, u); err != nil {
+			return "", err
+		}
+	}
+	m.Route = route
+	ret, err := callPkg(pkg, m)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "callPkg").Errorln(err)
 		return "", err
@@ -187,14 +244,40 @@ func processText(c *echo.Context) (string, error) {
 	if len(ret.Sentence) == 0 {
 		confused = true
 		ret.Sentence = language.Confused()
+		// fill in learned knowledge of language and try again
+		// TODO results := knowledge.Search(db, )
+		if len(results) > 0 {
+			for _, r := range results {
+			}
+			// TODO assemble trigrams, search knowledgequeries and
+			// replace words with matching trigrams
+			// cmd =
+			c.Set("cmd", cmd)
+			return processText(c)
+		}
 	}
 	in.StructuredInput = si
-	id, err := saveStructuredInput(m, ret.ResponseID, pname, route)
+	id, err := saveStructuredInput(m, ret.ResponseID, pkg.P.Config.Name,
+		route)
 	if err != nil {
 		return ret.Sentence, err
 	}
 	if confused {
 		log.WithField("inputID", id).Infoln("confused")
+		// TODO allow for fuzzy matching. For example
+		//
+		// User> "cab sau"
+		// Ava>  Did you mean Cabernet Sauvignon?
+		if len(si.Commands) > 0 || len(si.Objects) > 0 {
+			qs, err := knowledge.NewQueries(db, pkg.P, m)
+			if err != nil {
+				return ret.Sentence, err
+			}
+			if err = qs[0].Solve(db, m); err != nil {
+				return ret.Sentence, err
+			}
+			return qs[0].Text(), nil
+		}
 	}
 	in.ID = id
 	if needsTraining {

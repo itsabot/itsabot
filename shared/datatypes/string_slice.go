@@ -71,7 +71,10 @@ func (s StringSlice) String() string {
 func (s StringSlice) StringSlice() []string {
 	ss := []string{}
 	for _, tmp := range s {
-		ss = append(ss, tmp)
+		if len(tmp) <= 2 {
+			continue
+		}
+		ss = append(ss, tmp[1:len(tmp)-1])
 	}
 	return ss
 }

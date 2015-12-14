@@ -192,7 +192,7 @@ func combineKeywordsIntoRanges(keywords []WordT) []WordT {
 func appendStops(buf *WordT, keywords []WordT, i, j int) (*WordT, int) {
 	kw := keywords[i]
 	// prevent joining initial stopwords
-	if Contains(StopWords, kw.Word) {
+	if Contains(SummaryStopWords, kw.Word) {
 		return buf, i
 	}
 	// if next word is also a keyword
@@ -222,7 +222,7 @@ func extractKeywords(text string, hits []elastigo.Hit) ([]WordT, error) {
 	words := strings.Fields(text)
 	for i := 0; i < len(words); i++ {
 		word := words[i]
-		if Contains(StopWords, word) {
+		if Contains(SummaryStopWords, word) {
 			keywords = append(keywords, WordT{
 				Word:  word,
 				Index: i,
@@ -253,7 +253,7 @@ func extractKeywords(text string, hits []elastigo.Hit) ([]WordT, error) {
 	return keywords, nil
 }
 
-var StopWords = []string{
+var SummaryStopWords = []string{
 	"and",
 	"but",
 	"for",

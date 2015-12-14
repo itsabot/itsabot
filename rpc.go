@@ -56,15 +56,15 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	return nil
 }
 
-func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
+func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, error) {
 	var p *pkg.PkgWrapper
 	if m.User == nil {
 		p = regPkgs.Get("onboard_onboard")
 		if p != nil {
-			return p, "onboard_onboard", false, nil
+			return p, "onboard_onboard", nil
 		} else {
 			log.Errorln("missing required onboard package")
-			return nil, "onboard_onboard", false, ErrMissingPackage
+			return nil, "onboard_onboard", ErrMissingPackage
 		}
 	}
 	var route string
@@ -83,40 +83,39 @@ Loop:
 		log.Infoln("p is nil, getting last response route")
 		err := m.GetLastResponse(db)
 		if err != nil && err != sql.ErrNoRows {
-			return p, route, false, err
+			return p, route, err
 		}
 		if m.LastResponse == nil {
 			log.Infoln("couldn't find last package")
-			return p, route, false, ErrMissingPackage
+			return p, route, ErrMissingPackage
 		}
 		route = m.LastResponse.Route
 		p = regPkgs.Get(route)
 		if p == nil {
-			return p, route, true, ErrMissingPackage
+			return p, route, ErrMissingPackage
 		}
 		// TODO pass LastResponse directly to packages via rpc gob
 		// encoding, removing the need to nil this out and then look it
 		// up again in the package
 		m.LastResponse = nil
-		return p, route, true, nil
+		return p, route, nil
 	} else {
-		return p, route, false, nil
+		return p, route, nil
 	}
 }
 
-func callPkg(m *dt.Msg) (*dt.RespMsg, string, string, error) {
+func callPkg(pw *pkg.PkgWrapper, m *dt.Msg) (*dt.RespMsg,
+	error) {
 	reply := &dt.RespMsg{}
-	pw, route, lastRoute, err := getPkg(m)
-	if err != nil {
-		log.WithField("fn", "callPkg:getPkg").Errorln(err)
-		var pname string
-		if pw != nil {
-			pname = pw.P.Config.Name
-		}
-		return reply, pname, route, err
-	}
 	log.WithField("pkg", pw.P.Config.Name).Infoln("sending input")
 	c := strings.Title(pw.P.Config.Name)
+	var lastRoute bool
+	if m.LastResponse == nil {
+		lastRoute = false
+	} else {
+		lastRoute = m.Route == m.LastResponse.Route
+	}
+	// TODO is this OR condition really necessary?
 	if lastRoute || len(m.Input.StructuredInput.Commands) == 0 {
 		log.WithField("pkg", pw.P.Config.Name).Infoln("follow up")
 		c += ".FollowUp"
@@ -124,13 +123,12 @@ func callPkg(m *dt.Msg) (*dt.RespMsg, string, string, error) {
 		log.WithField("pkg", pw.P.Config.Name).Infoln("first run")
 		c += ".Run"
 	}
-	m.Route = route
 	if err := pw.RPCClient.Call(c, m, reply); err != nil {
 		log.WithField("pkg", pw.P.Config.Name).Errorln(
 			"invalid response", err)
-		return reply, pw.P.Config.Name, route, err
+		return reply, err
 	}
-	return reply, pw.P.Config.Name, route, nil
+	return reply, nil
 }
 
 func (pm pkgMap) Get(k string) *pkg.PkgWrapper {

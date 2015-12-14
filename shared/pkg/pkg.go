@@ -24,6 +24,7 @@ type PkgWrapper struct {
 // ServerAddress will default to localhost if left blank.
 type Pkg struct {
 	Config  PkgConfig
+	Vocab   *dt.Vocab
 	Trigger *dt.StructuredInput
 }
 

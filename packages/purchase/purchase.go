@@ -2,12 +2,10 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +23,7 @@ type Purchase string
 
 var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
+var vocab dt.Vocab
 var p *pkg.Pkg
 var ctx *dt.Ctx
 var l *log.Entry
@@ -100,6 +99,68 @@ func main() {
 	if err != nil {
 		l.Fatalln("building", err)
 	}
+	p.Vocab = dt.NewVocab(
+		dt.VocabHandler{
+			Fn:       kwDetail,
+			WordType: "Object",
+			Words: []string{"detail", "description", "review",
+				"rating", "about"},
+		},
+		dt.VocabHandler{
+			Fn:       kwPrice,
+			WordType: "Object",
+			Words:    []string{"price", "cost", "shipping", "total"},
+		},
+		dt.VocabHandler{
+			Fn:       kwSearch,
+			WordType: "Command",
+			Words:    []string{"find", "search", "show", "give"},
+		},
+		dt.VocabHandler{
+			Fn:       kwNextProduct,
+			WordType: "Object",
+			Words: []string{"similar", "else", "different",
+				"looking", "another", "recommend", "next"},
+		},
+		dt.VocabHandler{
+			Fn:       kwMoreExpensive,
+			WordType: "Object",
+			Words: []string{"more expensive", "event", "nice",
+				"nicer"},
+		},
+		dt.VocabHandler{
+			Fn:       kwLessExpensive,
+			WordType: "Object",
+			Words: []string{"less expensive", "cheaper", "cheap",
+				"pricey"},
+		},
+		dt.VocabHandler{
+			Fn:       kwCart,
+			WordType: "Object",
+			Words:    []string{"cart"},
+		},
+		dt.VocabHandler{
+			Fn:       kwCheckout,
+			WordType: "Command",
+			Words: []string{"checkout", "check out", "done",
+				"ready", "ship"},
+		},
+		dt.VocabHandler{
+			Fn:       kwRemoveFromCart,
+			WordType: "Command",
+			Words:    []string{"remove", "rid", "drop"},
+		},
+		dt.VocabHandler{
+			Fn:       kwHelp,
+			WordType: "Command",
+			Words:    []string{"help", "command"},
+		},
+		dt.VocabHandler{
+			Fn:       kwStop,
+			WordType: "Command",
+			Words:    []string{"stop"},
+		},
+	)
 	purchase := new(Purchase)
 	if err := p.Register(purchase); err != nil {
 		l.Fatalln("registering", err)
@@ -127,13 +188,13 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	cat := extractWineCategory(m.Input.Sentence)
 	if len(cat) == 0 {
 		resp.Sentence = "Sure. Are you looking for a red or white?"
-		resp.State["state"] = StateRedWhite
+		setState(StateRedWhite)
 		return p.SaveResponse(respMsg, resp)
 	}
 	resp.State["query"] = query
 	resp.State["category"] = cat
 	if len(query) <= 8 {
-		resp.State["state"] = StateCheckPastPreferences
+		setState(StateCheckPastPreferences)
 	} else {
 		if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 			prefs.KeyTaste, query); err != nil {
@@ -144,7 +205,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 			l.WithField("value", currency.Int64).Debugln(
 				"currency valid and > 0")
 			resp.State["budget"] = uint64(currency.Int64)
-			resp.State["state"] = StateSetRecommendations
+			setState(StateSetRecommendations)
 			err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyBudget,
 				strconv.FormatInt(currency.Int64, 10))
@@ -152,7 +213,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 				l.Errorln("saving budget pref", err)
 			}
 		} else {
-			resp.State["state"] = StatePreferences
+			setState(StatePreferences)
 		}
 	}
 	if err := updateState(m, resp, respMsg); err != nil {
@@ -180,9 +241,8 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	// expensive" and have Ava respond appropriately
 	var kw bool
 	var err error
-	words := strings.Fields(strings.ToLower(m.Input.Sentence))
 	if getState() > StateSetRecommendations {
-		kw, err = handleKeywords(m, resp, respMsg, words)
+		kw, err = handleKeywords(ctx, resp, m.Stems)
 		if err != nil {
 			return err
 		}
@@ -204,11 +264,10 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	case StateRedWhite:
 		resp.State["category"] = extractWineCategory(m.Input.Sentence)
 		if getCategory() == "" {
-			resp.Sentence = "I'm not sure I understand. Are you looking for red, white, rose, or champagne?"
 			return nil
 		}
 		l.WithField("cat", getCategory()).Infoln("selected category")
-		resp.State["state"] = StateCheckPastPreferences
+		setState(StateCheckPastPreferences)
 		return updateState(m, resp, respMsg)
 	case StateCheckPastPreferences:
 		tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
@@ -217,17 +276,17 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return err
 		}
 		if len(tastePref) == 0 {
-			resp.State["state"] = StatePreferences
+			setState(StatePreferences)
 			resp.Sentence = "Ok. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
 			return nil
 		}
 		resp.State["query"] = tastePref
-		resp.State["state"] = StateCheckPastBudget
+		setState(StateCheckPastBudget)
 		return updateState(m, resp, respMsg)
 	case StatePreferences:
 		resp.State["query"] = getQuery() + " " + m.Input.Sentence
 		if getBudget() == 0 {
-			resp.State["state"] = StateCheckPastBudget
+			setState(StateCheckPastBudget)
 			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
 				prefs.KeyTaste, getQuery()); err != nil {
 				l.Errorln("saving taste pref", err)
@@ -235,7 +294,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			}
 			return updateState(m, resp, respMsg)
 		}
-		resp.State["state"] = StateSetRecommendations
+		setState(StateSetRecommendations)
 		return updateState(m, resp, respMsg)
 	case StateCheckPastBudget:
 		budgetPref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
@@ -252,12 +311,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			}
 			l.WithField("budget", getBudget()).Debugln("got budget")
 			if getBudget() > 0 {
-				resp.State["state"] = StateSetRecommendations
+				setState(StateSetRecommendations)
 				return updateState(m, resp, respMsg)
 			}
 		}
 		l.Debugln("updating state to StateBudget")
-		resp.State["state"] = StateBudget
+		setState(StateBudget)
 		resp.Sentence = "Ok. How much do you usually pay for a bottle?"
 	case StateBudget:
 		val := language.ExtractCurrency(m.Input.Sentence)
@@ -265,7 +324,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			return nil
 		}
 		resp.State["budget"] = uint64(val.Int64)
-		resp.State["state"] = StateSetRecommendations
+		setState(StateSetRecommendations)
 		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
 		if err != nil {
@@ -274,12 +333,12 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		fallthrough
 	case StateSetRecommendations:
-		err := setRecs(resp, respMsg)
+		err := setRecs(resp)
 		if err != nil {
 			l.Errorln("setting recs", err)
 			return err
 		}
-		resp.State["state"] = StateMakeRecommendation
+		setState(StateMakeRecommendation)
 		return updateState(m, resp, respMsg)
 	case StateRecommendationsAlterBudget:
 		yes := language.ExtractYesNo(m.Input.Sentence)
@@ -295,7 +354,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			}
 		}
 		resp.State["offset"] = 0
-		resp.State["state"] = StateSetRecommendations
+		setState(StateSetRecommendations)
 		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
 		if err != nil {
@@ -316,7 +375,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "Ok. Let me know if there's anything else with which I can help you."
 		}
 		resp.State["offset"] = 0
-		resp.State["state"] = StateSetRecommendations
+		setState(StateSetRecommendations)
 		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
 			strconv.FormatUint(getBudget(), 10))
 		if err != nil {
@@ -324,7 +383,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		return updateState(m, resp, respMsg)
 	case StateMakeRecommendation:
-		if err := recommendProduct(resp, respMsg); err != nil {
+		if err := recommendProduct(resp); err != nil {
 			return err
 		}
 	case StateProductSelection:
@@ -335,7 +394,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if !yes.Bool {
 			resp.State["offset"] = getOffset() + 1
-			resp.State["state"] = StateMakeRecommendation
+			setState(StateMakeRecommendation)
 			return updateState(m, resp, respMsg)
 		}
 		count := language.ExtractCount(m.Input.Sentence)
@@ -351,10 +410,10 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			resp.Sentence = "I couldn't find any wines like that. "
 			if getBudget() < 5000 {
 				resp.Sentence += "Should we look among the more expensive bottles?"
-				resp.State["state"] = StateRecommendationsAlterBudget
+				setState(StateRecommendationsAlterBudget)
 			} else {
 				resp.Sentence += "Should we expand your search to more wines?"
-				resp.State["state"] = StateRecommendationsAlterQuery
+				setState(StateRecommendationsAlterQuery)
 			}
 			return updateState(m, resp, respMsg)
 		}
@@ -378,7 +437,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		resp.State["productsSelected"] = append(getSelectedProducts(),
 			prod)
-		resp.State["state"] = StateContinueShopping
+		setState(StateContinueShopping)
 	case StateContinueShopping:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
@@ -386,16 +445,16 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if yes.Bool {
 			resp.State["offset"] = getOffset() + 1
-			resp.State["state"] = StateMakeRecommendation
+			setState(StateMakeRecommendation)
 		} else {
-			resp.State["state"] = StateShippingAddress
+			setState(StateShippingAddress)
 		}
 		return updateState(m, resp, respMsg)
 	case StateShippingAddress:
 		prods := getSelectedProducts()
 		if len(prods) == 0 {
 			resp.Sentence = "You haven't picked any products. Should we keep looking?"
-			resp.State["state"] = StateContinueShopping
+			setState(StateContinueShopping)
 			return nil
 		}
 		// tasks are multi-step processes often useful across several
@@ -425,7 +484,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			float64(prods.Prices(addr)["total"])/100)
 		tmp += "Should I place the order?"
 		resp.Sentence = fmt.Sprintf("Ok. It comes to %s", tmp)
-		resp.State["state"] = StatePurchase
+		setState(StatePurchase)
 	case StatePurchase:
 		yes := language.ExtractYesNo(m.Input.Sentence)
 		if !yes.Valid {
@@ -438,7 +497,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if tskPurch != nil {
 			tskPurch.ResetState()
 		}
-		resp.State["state"] = StateAuth
+		setState(StateAuth)
 		return updateState(m, resp, respMsg)
 	case StateAuth:
 		// TODO ensure Ava follows up to ensure the delivery occured,
@@ -470,7 +529,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 			l.Infoln("purchase incomplete")
 			return nil
 		}
-		resp.State["state"] = StateComplete
+		setState(StateComplete)
 		resp.Sentence = "Great! I've placed the order. You'll receive a confirmation by email."
 	}
 	return nil
@@ -496,188 +555,22 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	return &recs[offset], nil
 }
 
-func handleKeywords(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg,
-	words []string) (bool, error) {
-	modifier := 1
-	for _, word := range words {
-		word = strings.TrimRight(word, ",.?;:!")
-		switch word {
-		case "detail", "details", "description", "more about", "review",
-			"rating", "rated":
-			r := rand.Intn(3)
-			switch r {
-			case 0:
-				resp.Sentence = "Every wine I recommend is at the top of its craft."
-			case 1:
-				resp.Sentence = "I only recommend the best."
-			case 2:
-				resp.Sentence = "This wine has been personally selected by leading wine experts."
+func handleKeywords(ctx *dt.Ctx, resp *dt.Resp, stems []string) (bool, error) {
+	// TODO move thanks, thank you to Ava core
+	err := p.Vocab.HandleKeywords(ctx, resp, stems)
+	if err == dt.ErrNoFn {
+		if getState() != StateProductSelection {
+			currency := language.ExtractCurrency(resp.Sentence)
+			if currency.Valid && currency.Int64 > 0 {
+				setBudget(uint64(currency.Int64))
+				setState(StateSetRecommendations)
 			}
-		case "price", "cost", "shipping", "total":
-			prods := getSelectedProducts()
-			if len(prods) == 0 {
-				resp.Sentence = "Shipping is around $12 for the first bottle + $1.20 for every bottle after."
-			} else {
-				prices := prods.Prices(getShippingAddress())
-				s := fmt.Sprintf("The items cost $%.2f, ",
-					float64(prices["products"])/100)
-				s += fmt.Sprintf("shipping is $%.2f, ",
-					float64(prices["shipping"])/100)
-				if prices["tax"] > 0.0 {
-					s += fmt.Sprintf("and tax is $%.2f, ",
-						float64(prices["tax"])/100)
-				}
-				s += fmt.Sprintf("totaling $%.2f.",
-					float64(prices["total"])/100)
-				resp.Sentence = s
-			}
-		case "find", "search", "show", "give":
-			resp.State["offset"] = 0
-			resp.State["query"] = m.Input.StructuredInput.Objects.
-				String()
-			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
-				prefs.KeyTaste,
-				m.Input.StructuredInput.Objects.String())
-			if err != nil {
-				return false, err
-			}
-			cat := extractWineCategory(m.Input.Sentence)
-			if len(cat) == 0 {
-				resp.State["state"] = StateRedWhite
-			} else {
-				resp.State["category"] = cat
-				resp.State["state"] = StateSetRecommendations
-			}
-		case "similar", "else", "different", "looking", "look", "another", "recommend", "next":
-			resp.State["offset"] = getOffset() + 1
-			resp.State["state"] = StateMakeRecommendation
-		case "expensive", "event", "nice", "nicer", "cheap", "cheaper":
-			// perfect example of a need for stemming
-			if word == "cheap" || word == "cheaper" {
-				modifier = -1
-			}
-			budg := getBudget()
-			var tmp int
-			if budg >= 10000 {
-				tmp = int(budg) + (5000 * modifier)
-			} else if budg >= 5000 {
-				tmp = int(budg) + (2500 * modifier)
-			} else {
-				tmp = int(budg) + (1500 * modifier)
-			}
-			if tmp <= 0 {
-				tmp = 1000
-			}
-			resp.State["budget"] = uint64(tmp)
-			resp.State["state"] = StateSetRecommendations
-			err := prefs.Save(ctx.DB, ctx.Msg.User.ID, pkgName,
-				prefs.KeyBudget, strconv.Itoa(tmp))
-			if err != nil {
-				return false, err
-			}
-		case "cart":
-			prods := getSelectedProducts()
-			var prodNames []string
-			for _, prod := range prods {
-				var count string
-				if prod.Count > 1 {
-					count = fmt.Sprintf("%dx", prod.Count)
-				}
-				name := fmt.Sprintf("%s (%s$%.2f)", prod.Name,
-					count, float64(prod.Price)/100)
-				prodNames = append(prodNames, name)
-			}
-			if len(prods) == 0 {
-				resp.Sentence = "You haven't picked any wines, yet."
-			} else if len(prods) == 1 {
-				resp.Sentence = "You've picked a " +
-					prodNames[0] + "."
-			} else {
-				resp.Sentence = fmt.Sprintf(
-					"You've picked %d wines: ", len(prods))
-				resp.Sentence += language.SliceToString(
-					prodNames, "and") + "."
-			}
-			if len(prods) > 0 {
-				tmp := " Let me know when you're ready to checkout."
-				// 255 is the database varchar limit, but we should aim
-				// to be below 140 (sms)
-				if len(resp.Sentence) > 140-len(tmp) {
-					// 4 refers to the length of the ellipsis
-					resp.Sentence = resp.Sentence[0 : 140-len(tmp)-4]
-					resp.Sentence += "... "
-				}
-				resp.Sentence += tmp
-			}
-		case "checkout", "check", "done", "ready", "ship":
-			if tskAddr != nil {
-				tskAddr.ResetState()
-			}
-			if tskPurch != nil {
-				tskPurch.ResetState()
-			}
-			resp.State["state"] = StateShippingAddress
-		case "thanks", "thank":
-			resp.Sentence = language.Welcome()
-		case "remove", "rid", "drop":
-			prods := getSelectedProducts()
-			var prodNames []string
-			for _, prod := range prods {
-				prodNames = append(prodNames, prod.Name)
-			}
-			var matches []string
-			for _, w := range strings.Fields(m.Input.Sentence) {
-				if len(w) <= 3 {
-					continue
-				}
-				tmp := fuzzy.FindFold(w, prodNames)
-				if len(tmp) > 0 {
-					matches = append(matches, tmp...)
-				}
-			}
-			if len(matches) == 0 {
-				resp.Sentence = "I couldn't find a wine like that in your cart."
-			} else if len(matches) == 1 {
-				resp.Sentence = fmt.Sprintf(
-					"Ok, I'll remove the %s.", matches[0])
-				removeSelectedProduct(matches[0])
-			} else {
-				resp.Sentence = "Ok, I'll remove those."
-				for _, match := range matches {
-					removeSelectedProduct(match)
-				}
-			}
-			r := rand.Intn(2)
-			switch r {
-			case 0:
-				resp.Sentence += " Is there something else I can help you find?"
-			case 1:
-				resp.Sentence += " Would you like to find another?"
-			}
-			resp.State["state"] = StateContinueShopping
-		case "help", "command":
-			resp.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
-		// NOTE too should work with both expensive and cheap, but
-		// doesn't yet
-		case "less", "too":
-			modifier *= -1
-		case "much", "very", "extremely":
-			modifier *= 2
-		case "stop":
-			resp.Sentence = "Ok."
 		}
 	}
-	if getState() != StateProductSelection {
-		currency := language.ExtractCurrency(resp.Sentence)
-		if currency.Valid && currency.Int64 > 0 {
-			resp.State["budget"] = currency.Int64
-			resp.State["state"] = StateSetRecommendations
-		}
-	}
-	return len(resp.Sentence) > 0, nil
+	return len(resp.Sentence) > 0, err
 }
 
-func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
+func recommendProduct(resp *dt.Resp) error {
 	recs := getRecommendations()
 	offset := getOffset()
 	if len(recs) == 0 || int(offset) >= len(recs) {
@@ -688,10 +581,10 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 		if getBudget() < 5000 {
 			resp.Sentence += "Should we look among the more expensive bottles?"
-			resp.State["state"] = StateRecommendationsAlterBudget
+			setState(StateRecommendationsAlterBudget)
 		} else {
 			resp.Sentence += "Should we expand your search to more wines?"
-			resp.State["state"] = StateRecommendationsAlterQuery
+			setState(StateRecommendationsAlterQuery)
 		}
 		return nil
 	}
@@ -745,11 +638,11 @@ func recommendProduct(resp *dt.Resp, respMsg *dt.RespMsg) error {
 		}
 	}
 	resp.Sentence = language.SuggestedProduct(tmp, offset)
-	resp.State["state"] = StateProductSelection
+	setState(StateProductSelection)
 	return nil
 }
 
-func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
+func setRecs(resp *dt.Resp) error {
 	results, err := ctx.EC.FindProducts(getQuery(), getCategory(),
 		"alcohol", getBudget())
 	if err != nil {
@@ -768,82 +661,6 @@ func setRecs(resp *dt.Resp, respMsg *dt.RespMsg) error {
 	return nil
 }
 
-// TODO customize the type of resp.State, forcing all reads and writes through
-// these getter/setter functions to preserve and handle types across interface{}
-func getOffset() uint {
-	switch resp.State["offset"].(type) {
-	case uint:
-		return resp.State["offset"].(uint)
-	case int:
-		return uint(resp.State["offset"].(int))
-	case float64:
-		return uint(resp.State["offset"].(float64))
-	default:
-		l.WithField("type", reflect.TypeOf(resp.State["offset"])).
-			Errorln("couldn't get offset: invalid type")
-	}
-	return uint(0)
-}
-
-func getQuery() string {
-	return resp.State["query"].(string)
-}
-
-func getCategory() string {
-	return resp.State["category"].(string)
-}
-
-func getBudget() uint64 {
-	switch resp.State["budget"].(type) {
-	case int64:
-		return uint64(resp.State["budget"].(int64))
-	case uint64:
-		return resp.State["budget"].(uint64)
-	case float64:
-		return uint64(resp.State["budget"].(float64))
-	case string:
-		s, err := strconv.ParseUint(resp.State["budget"].(string), 10,
-			64)
-		if err != nil {
-			l.WithField("budget", s).Errorln(
-				"couldn't get budget: convert from string")
-		}
-		return s
-	default:
-		l.WithField("type", reflect.TypeOf(resp.State["budget"])).
-			Errorln("couldn't get budget: invalid type")
-	}
-	return uint64(0)
-}
-
-func getShippingAddress() *dt.Address {
-	addr, ok := resp.State["shippingAddress"].(*dt.Address)
-	if !ok {
-		return nil
-	}
-	return addr
-}
-
-func getSelectedProducts() dt.ProductSels {
-	products, ok := resp.State["productsSelected"].([]dt.ProductSel)
-	if !ok {
-		prodMap, ok := resp.State["productsSelected"].(interface{})
-		if !ok {
-			l.Errorln("productsSelected not found",
-				resp.State["productsSelected"])
-			return nil
-		}
-		byt, err := json.Marshal(prodMap)
-		if err != nil {
-			l.Errorln("marshaling products", err)
-		}
-		if err = json.Unmarshal(byt, &products); err != nil {
-			l.Errorln("unmarshaling products", err)
-		}
-	}
-	return products
-}
-
 func removeSelectedProduct(name string) {
 	l.WithField("product", name).Infoln("removing from cart")
 	prods := getSelectedProducts()
@@ -860,35 +677,6 @@ func removeSelectedProduct(name string) {
 	if !success {
 		l.WithField("name", name).Errorln("failed to remove")
 	}
-}
-
-func getRecommendations() []dt.Product {
-	products, ok := resp.State["recommendations"].([]dt.Product)
-	if !ok {
-		prodMap, ok := resp.State["recommendations"].(interface{})
-		if !ok {
-			l.Errorln("recommendations not found",
-				resp.State["recommendations"])
-			return nil
-		}
-		byt, err := json.Marshal(prodMap)
-		if err != nil {
-			l.Errorln("marshaling products", err)
-		}
-		if err = json.Unmarshal(byt, &products); err != nil {
-			l.Errorln("unmarshaling products", err)
-		}
-		return nil
-	}
-	return products
-}
-
-func getState() float64 {
-	state, ok := resp.State["state"].(float64)
-	if !ok {
-		state = 0.0
-	}
-	return state
 }
 
 func extractWineCategory(s string) string {
@@ -914,4 +702,181 @@ func extractWineCategory(s string) string {
 		category = "champagne"
 	}
 	return category
+}
+
+func kwDetail(_ *dt.Ctx, _ int) (string, error) {
+	var s string
+	r := rand.Intn(3)
+	switch r {
+	case 0:
+		s = "Every wine I recommend is at the top of its craft."
+	case 1:
+		s = "I only recommend the best."
+	case 2:
+		s = "This wine has been personally selected by leading wine experts."
+	}
+	return s, nil
+}
+
+func kwPrice(_ *dt.Ctx, _ int) (string, error) {
+	var s string
+	prods := getSelectedProducts()
+	if len(prods) == 0 {
+		s = "Shipping is around $12 for the first bottle + $1.20 for every bottle after."
+		return s, nil
+	}
+	prices := prods.Prices(getShippingAddress())
+	s = fmt.Sprintf("The items cost $%.2f, ",
+		float64(prices["products"])/100)
+	s += fmt.Sprintf("shipping is $%.2f, ", float64(prices["shipping"])/100)
+	if prices["tax"] > 0.0 {
+		s += fmt.Sprintf("and tax is $%.2f, ",
+			float64(prices["tax"])/100)
+	}
+	s += fmt.Sprintf("totaling $%.2f.", float64(prices["total"])/100)
+	return s, nil
+}
+
+func kwSearch(ctx *dt.Ctx, _ int) (string, error) {
+	setOffset(0)
+	setQuery(ctx.Msg.Input.StructuredInput.Objects.String())
+	err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyTaste,
+		ctx.Msg.Input.StructuredInput.Objects.String())
+	if err != nil {
+		return "", err
+	}
+	cat := extractWineCategory(ctx.Msg.Input.Sentence)
+	if len(cat) == 0 {
+		setState(StateRedWhite)
+	} else {
+		setCategory(cat)
+		setState(StateSetRecommendations)
+	}
+	return "", nil
+}
+
+func kwNextProduct(_ *dt.Ctx, _ int) (string, error) {
+	setOffset(float64(getOffset() + 1))
+	setState(StateMakeRecommendation)
+	return "", nil
+}
+
+func kwLessExpensive(ctx *dt.Ctx, mod int) (string, error) {
+	mod *= -1
+	return kwMoreExpensive(ctx, mod)
+}
+
+func kwMoreExpensive(ctx *dt.Ctx, mod int) (string, error) {
+	budg := getBudget()
+	var tmp int
+	if budg >= 10000 {
+		tmp = int(budg) + (7500 * mod)
+	} else if budg >= 5000 {
+		tmp = int(budg) + (3500 * mod)
+	} else {
+		tmp = int(budg) + (2000 * mod)
+	}
+	if tmp <= 0 {
+		tmp = 1000
+	}
+	setBudget(uint64(tmp))
+	setState(StateSetRecommendations)
+	err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
+		strconv.Itoa(tmp))
+	return "", err
+}
+
+func kwCart(_ *dt.Ctx, _ int) (string, error) {
+	var s string
+	prods := getSelectedProducts()
+	var prodNames []string
+	for _, prod := range prods {
+		var count string
+		if prod.Count > 1 {
+			count = fmt.Sprintf("%dx", prod.Count)
+		}
+		name := fmt.Sprintf("%s (%s$%.2f)", prod.Name, count,
+			float64(prod.Price)/100)
+		prodNames = append(prodNames, name)
+	}
+	if len(prods) == 0 {
+		s = "You haven't picked any wines, yet."
+	} else if len(prods) == 1 {
+		s = "You've picked a " + prodNames[0] + "."
+	} else {
+		s = fmt.Sprintf(
+			"You've picked %d wines: ", len(prods))
+		s += language.SliceToString(prodNames, "and") + "."
+	}
+	if len(prods) > 0 {
+		tmp := " Let me know when you're ready to checkout."
+		// 255 is the database varchar limit, but we should aim
+		// to be below 140 (sms)
+		if len(s) > 140-len(tmp) {
+			// 4 refers to the length of the ellipsis
+			s = s[0 : 140-len(tmp)-4]
+			s += "... "
+		}
+		s += tmp
+	}
+	return s, nil
+}
+
+func kwCheckout(_ *dt.Ctx, _ int) (string, error) {
+	if tskAddr != nil {
+		tskAddr.ResetState()
+	}
+	if tskPurch != nil {
+		tskPurch.ResetState()
+	}
+	setState(StateShippingAddress)
+	return "", nil
+}
+
+func kwRemoveFromCart(ctx *dt.Ctx, _ int) (string, error) {
+	var s string
+	prods := getSelectedProducts()
+	var prodNames []string
+	for _, prod := range prods {
+		prodNames = append(prodNames, prod.Name)
+	}
+	var matches []string
+	for _, w := range strings.Fields(ctx.Msg.Input.Sentence) {
+		if len(w) <= 3 {
+			continue
+		}
+		tmp := fuzzy.FindFold(w, prodNames)
+		if len(tmp) > 0 {
+			matches = append(matches, tmp...)
+		}
+	}
+	if len(matches) == 0 {
+		s = "I couldn't find a wine like that in your cart."
+	} else if len(matches) == 1 {
+		s = fmt.Sprintf("Ok, I'll remove the %s.", matches[0])
+		removeSelectedProduct(matches[0])
+	} else {
+		s = "Ok, I'll remove those."
+		for _, match := range matches {
+			removeSelectedProduct(match)
+		}
+	}
+	r := rand.Intn(2)
+	switch r {
+	case 0:
+		s += " Is there something else I can help you find?"
+	case 1:
+		s += " Would you like to find another?"
+	}
+	setState(StateContinueShopping)
+	return s, nil
+}
+
+func kwHelp(_ *dt.Ctx, _ int) (string, error) {
+	s := "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
+	return s, nil
+}
+
+func kwStop(_ *dt.Ctx, _ int) (string, error) {
+	return "Ok.", nil
 }

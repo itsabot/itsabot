@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/dchest/stemmer/porter2"
 )
 
 type jsonState json.RawMessage
@@ -17,6 +19,7 @@ type Msg struct {
 	User         *User
 	Input        *Input
 	LastResponse *Resp
+	Stems        []string
 	Route        string
 }
 
@@ -56,6 +59,7 @@ type Input struct {
 	FlexID            string
 	FlexIDType        int
 	Sentence          string
+	SentenceNorm      string
 	SentenceAnnotated string
 	ResponseID        uint64
 	StructuredInput   *StructuredInput
@@ -81,6 +85,17 @@ func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
 		FlexIDType:      fidT,
 	}
 	return &in
+}
+
+func NewMessage(u *User, in *Input) *Msg {
+	words := strings.Fields(in.Sentence)
+	eng := porter2.Stemmer
+	stems := []string{}
+	for _, w := range words {
+		w = strings.TrimRight(w, ",.?;:!-/")
+		stems = append(stems, eng.Stem(w))
+	}
+	return &Msg{User: u, Input: in, Stems: stems}
 }
 
 func (m *Msg) GetLastResponse(db *sqlx.DB) error {

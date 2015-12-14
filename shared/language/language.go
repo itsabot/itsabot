@@ -426,3 +426,22 @@ func SliceToString(ss []string, andor string) string {
 	}
 	return ret
 }
+
+var StopWords = []string{
+	"a",
+	"an",
+	"the",
+}
+
+func RemoveStopWords(ss []string) []string {
+	var removal []int
+	for i, s := range ss {
+		if Contains(StopWords, s) {
+			removal = append(removal, i)
+		}
+	}
+	for _, i := range removal {
+		ss = append(ss[:i], ss[i+1:]...)
+	}
+	return ss
+}
