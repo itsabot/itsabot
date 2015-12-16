@@ -98,14 +98,14 @@ func (q *QueryDsl) All() *QueryDsl {
 	return q
 }
 
-// Limit the query to this range
+// Range adds a RANGE FilterOp to the search query
+// Legacy. Use the Filter() function instead
 func (q *QueryDsl) Range(fop *FilterOp) *QueryDsl {
 	if q.FilterVal == nil {
 		q.FilterVal = fop
 		return q
 	}
-	// TODO:  this is not valid, refactor
-	q.FilterVal.Add(fop)
+
 	return q
 }
 
@@ -141,6 +141,13 @@ func (q *QueryDsl) Search(searchFor string) *QueryDsl {
 // Querystring operations
 func (q *QueryDsl) Qs(qs *QueryString) *QueryDsl {
 	q.QueryEmbed.Qs = qs
+	return q
+}
+
+// SetLenient sets whether the query should ignore format based failures,
+// such as passing in text to a number field.
+func (q *QueryDsl) SetLenient(lenient bool) *QueryDsl {
+	q.QueryEmbed.Qs.Lenient = lenient
 	return q
 }
 
@@ -193,7 +200,7 @@ type QueryWrap struct {
 
 // QueryString based search
 func NewQueryString(field, query string) QueryString {
-	return QueryString{"", field, query, "", "", nil}
+	return QueryString{"", field, query, "", "", nil, false}
 }
 
 type QueryString struct {
@@ -203,9 +210,12 @@ type QueryString struct {
 	Exists          string   `json:"_exists_,omitempty"`
 	Missing         string   `json:"_missing_,omitempty"`
 	Fields          []string `json:"fields,omitempty"`
+	Lenient         bool     `json:"lenient,omitempty"`
 	//_exists_:field1,
 	//_missing_:field1,
 }
+
+//I don't know how any of the Term stuff below is supposed to work. -mikeyoon
 
 // Generic Term based (used in query, facet, filter)
 type Term struct {

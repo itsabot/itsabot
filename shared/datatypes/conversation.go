@@ -5,12 +5,16 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"log"
 	"strings"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/dchest/stemmer/porter2"
+)
+
+var (
+	ErrMissingUser = errors.New("missing user")
 )
 
 type jsonState json.RawMessage
@@ -18,6 +22,7 @@ type jsonState json.RawMessage
 type Msg struct {
 	User         *User
 	Input        *Input
+	LastInput    *Input
 	LastResponse *Resp
 	Stems        []string
 	Route        string
@@ -62,7 +67,14 @@ type Input struct {
 	SentenceNorm      string
 	SentenceAnnotated string
 	ResponseID        uint64
+	KnowledgeFilled   bool
 	StructuredInput   *StructuredInput
+}
+
+func (in *Input) Save(db *sqlx.DB) error {
+	q := `UPDATE inputs SET knowledgefilled=TRUE WHERE id=$1`
+	_, err := db.Exec(q, in.ID)
+	return err
 }
 
 func (j *jsonState) Scan(value interface{}) error {
@@ -87,7 +99,7 @@ func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
 	return &in
 }
 
-func NewMessage(u *User, in *Input) *Msg {
+func NewMessage(db *sqlx.DB, u *User, in *Input) *Msg {
 	words := strings.Fields(in.Sentence)
 	eng := porter2.Stemmer
 	stems := []string{}
@@ -95,24 +107,48 @@ func NewMessage(u *User, in *Input) *Msg {
 		w = strings.TrimRight(w, ",.?;:!-/")
 		stems = append(stems, eng.Stem(w))
 	}
-	return &Msg{User: u, Input: in, Stems: stems}
+	var err error
+	m := &Msg{User: u, Input: in, Stems: stems}
+	m, err = addContext(db, m)
+	if err != nil {
+		log.WithField("fn", "addContext").Errorln(err)
+	}
+	return m
+}
+
+func (m *Msg) GetLastInput(db *sqlx.DB) error {
+	log.Debugln("getting last input")
+	q := `SELECT id, sentence, knowledgefilled FROM inputs
+	      WHERE userid=$1
+	      ORDER BY createdat DESC
+	      LIMIT 2`
+	var tmp []Input
+	err := db.Select(&tmp, q, m.User.ID)
+	log.Println(tmp)
+	if len(tmp) > 1 {
+		m.LastInput = &tmp[1]
+	}
+	return err
 }
 
 func (m *Msg) GetLastResponse(db *sqlx.DB) error {
+	log.Debugln("getting last response")
 	if m.User == nil {
-		return errors.New("missing user")
+		return ErrMissingUser
 	}
-	q := `SELECT stateid, route, sentence, userid
+	q := `SELECT id, stateid, route, sentence, userid
 	      FROM responses
 	      WHERE userid=$1
 	      ORDER BY createdat DESC`
 	row := db.QueryRowx(q, m.User.ID)
 	var tmp struct {
+		ID       uint64
 		Route    string
 		Sentence string
 		StateID  sql.NullInt64
 		UserID   uint64
 	}
+	log.Debugln("scanning into response")
 	err := row.StructScan(&tmp)
 	if err == sql.ErrNoRows {
 		m.LastResponse = &Resp{}
@@ -125,17 +161,23 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	if !tmp.StateID.Valid {
 		return errors.New("invalid stateid")
 	}
-	var state []byte
-	q = `SELECT state FROM states WHERE id=$1`
-	if err = db.Get(&state, q, tmp.StateID); err != nil {
-		return err
-	}
 	m.LastResponse = &Resp{
+		ID:       tmp.ID,
 		Route:    tmp.Route,
 		Sentence: tmp.Sentence,
 		UserID:   tmp.UserID,
 	}
-	if err = json.Unmarshal(state, &m.LastResponse.State); err != nil {
+	var state []byte
+	q = `SELECT state FROM states WHERE id=$1`
+	err = db.Get(&state, q, tmp.StateID)
+	if err == sql.ErrNoRows {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(state, &m.LastResponse.State)
+	if err != nil {
 		log.Println("unmarshaling state", err)
 		return err
 	}
@@ -156,4 +198,102 @@ func (m *Msg) NewResponse() *Resp {
 		res.State = m.LastResponse.State
 	}
 	return res
+}
+
+// addContext to a StructuredInput, replacing pronouns with the nouns to which
+// they refer. TODO refactor
+func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
+	for _, w := range m.Input.StructuredInput.Pronouns() {
+		var ctx string
+		var err error
+		switch Pronouns[w] {
+		case ObjectI:
+			ctx, err = getContextObject(db, m.User,
+				m.Input.StructuredInput,
+				"objects")
+			if err != nil {
+				return m, err
+			}
+			if ctx == "" {
+				return m, nil
+			}
+			for i, o := range m.Input.StructuredInput.Objects {
+				if o != w {
+					continue
+				}
+				m.Input.StructuredInput.Objects[i] = ctx
+			}
+		case ActorI:
+			ctx, err = getContextObject(db, m.User,
+				m.Input.StructuredInput, "actors")
+			if err != nil {
+				return m, err
+			}
+			if ctx == "" {
+				return m, nil
+			}
+			for i, o := range m.Input.StructuredInput.Actors {
+				if o != w {
+					continue
+				}
+				m.Input.StructuredInput.Actors[i] = ctx
+			}
+		case TimeI:
+			ctx, err = getContextObject(db, m.User,
+				m.Input.StructuredInput, "times")
+			if err != nil {
+				return m, err
+			}
+			if ctx == "" {
+				return m, nil
+			}
+			for i, o := range m.Input.StructuredInput.Times {
+				if o != w {
+					continue
+				}
+				m.Input.StructuredInput.Times[i] = ctx
+			}
+		case PlaceI:
+			ctx, err = getContextObject(db, m.User,
+				m.Input.StructuredInput, "places")
+			if err != nil {
+				return m, err
+			}
+			if ctx == "" {
+				return m, nil
+			}
+			for i, o := range m.Input.StructuredInput.Places {
+				if o != w {
+					continue
+				}
+				m.Input.StructuredInput.Places[i] = ctx
+			}
+		default:
+			return m, errors.New("unknown type found for pronoun")
+		}
+		log.WithFields(log.Fields{
+			"fn":  "addContext",
+			"ctx": ctx,
+		}).Infoln("context found")
+	}
+	return m, nil
+}
+
+func getContextObject(db *sqlx.DB, u *User, si *StructuredInput,
+	datatype string) (string, error) {
+	log.Debugln("getting object context")
+	var tmp *StringSlice
+	if u == nil {
+		return "", ErrMissingUser
+	}
+	if u != nil {
+		q := `
+			SELECT ` + datatype + `
+			FROM inputs
+			WHERE userid=$1 AND array_length(objects, 1) > 0`
+		if err := db.Get(&tmp, q, u.ID); err != nil {
+			return "", err
+		}
+	}
+	return tmp.Last(), nil
 }

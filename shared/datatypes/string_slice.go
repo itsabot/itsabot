@@ -74,7 +74,7 @@ func (s StringSlice) StringSlice() []string {
 		if len(tmp) <= 2 {
 			continue
 		}
-		ss = append(ss, tmp[1:len(tmp)-1])
+		ss = append(ss, tmp)
 	}
 	return ss
 }

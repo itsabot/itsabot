@@ -1,12 +1,11 @@
 package middleware
 
 import (
-	"log"
 	"net"
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/gommon/color"
+	"github.com/labstack/gommon/color"
 )
 
 func Logger() echo.MiddlewareFunc {
@@ -14,14 +13,16 @@ func Logger() echo.MiddlewareFunc {
 		return func(c *echo.Context) error {
 			req := c.Request()
 			res := c.Response()
+			logger := c.Echo().Logger()
 
 			remoteAddr := req.RemoteAddr
 			if ip := req.Header.Get(echo.XRealIP); ip != "" {
 				remoteAddr = ip
 			} else if ip = req.Header.Get(echo.XForwardedFor); ip != "" {
 				remoteAddr = ip
+			} else {
+				remoteAddr, _, _ = net.SplitHostPort(remoteAddr)
 			}
-			remoteAddr, _, _ = net.SplitHostPort(remoteAddr)
 
 			start := time.Now()
 			if err := h(c); err != nil {
@@ -46,7 +47,7 @@ func Logger() echo.MiddlewareFunc {
 				code = color.Cyan(n)
 			}
 
-			log.Printf("%s %s %s %s %s %d", remoteAddr, method, path, code, stop.Sub(start), size)
+			logger.Info("%s %s %s %s %s %d", remoteAddr, method, path, code, stop.Sub(start), size)
 			return nil
 		}
 	}

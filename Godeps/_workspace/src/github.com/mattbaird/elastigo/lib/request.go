@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	hostpool "github.com/avabot/ava/Godeps/_workspace/src/github.com/bitly/go-hostpool"
+	hostpool "github.com/bitly/go-hostpool"
 )
 
 type Request struct {

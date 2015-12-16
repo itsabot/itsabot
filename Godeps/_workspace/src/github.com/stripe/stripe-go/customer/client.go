@@ -1,4 +1,4 @@
-// Package customer provides the /customes APIs
+// Package customer provides the /customers APIs
 package customer
 
 import (
@@ -57,6 +57,11 @@ func (c Client) New(params *stripe.CustomerParams) (*stripe.Customer, error) {
 				body.Add("trial_end", strconv.FormatInt(params.TrialEnd, 10))
 			}
 		}
+
+		if params.Shipping != nil {
+			params.Shipping.AppendDetails(body)
+		}
+
 		commonParams = &params.Params
 
 		params.AppendTo(body)
@@ -128,6 +133,10 @@ func (c Client) Update(id string, params *stripe.CustomerParams) (*stripe.Custom
 			body.Add("default_source", params.DefaultSource)
 		}
 		params.AppendTo(body)
+
+		if params.Shipping != nil {
+			params.Shipping.AppendDetails(body)
+		}
 	}
 
 	cust := &stripe.Customer{}
@@ -138,12 +147,15 @@ func (c Client) Update(id string, params *stripe.CustomerParams) (*stripe.Custom
 
 // Del removes a customer.
 // For more details see https://stripe.com/docs/api#delete_customer.
-func Del(id string) error {
+func Del(id string) (*stripe.Customer, error) {
 	return getC().Del(id)
 }
 
-func (c Client) Del(id string) error {
-	return c.B.Call("DELETE", "/customers/"+id, c.Key, nil, nil, nil)
+func (c Client) Del(id string) (*stripe.Customer, error) {
+	cust := &stripe.Customer{}
+	err := c.B.Call("DELETE", "/customers/"+id, c.Key, nil, nil, cust)
+
+	return cust, err
 }
 
 // List returns a list of customers.

@@ -69,7 +69,7 @@ func handlerIndex(c *echo.Context) error {
 	if err := tmplLayout.Execute(b, data); err != nil {
 		log.Fatalln(err)
 	}
-	if err = c.HTML(http.StatusOK, "%s", b); err != nil {
+	if err = c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
 		return err
 	}
 	return nil
@@ -567,7 +567,7 @@ func handlerAPICardDelete(c *echo.Context) error {
 		log.Println("couldn't find stripecustomerid", req.UserID)
 		return jsonError(err)
 	}
-	err := card.Del(crd.StripeID, &stripe.CardParams{
+	_, err := card.Del(crd.StripeID, &stripe.CardParams{
 		Customer: user.StripeCustomerID,
 	})
 	if err != nil {

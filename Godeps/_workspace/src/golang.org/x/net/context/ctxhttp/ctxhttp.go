@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"strings"
 
-	"golang.org/x/net/context"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
 )
 
 // Do sends an HTTP request with the provided http.Client and returns an HTTP response.

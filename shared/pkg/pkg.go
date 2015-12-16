@@ -119,6 +119,10 @@ func (p *Pkg) Register(pkgT interface{}) error {
 // packages will be responsible for saving their own responses. This is not
 // ideal, but it'll work for now.
 func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
+	if len(r.Sentence) == 0 {
+		log.Warnln("response sentence empty. skipping save")
+		return nil
+	}
 	state, err := json.Marshal(r.State)
 	if err != nil {
 		log.WithFields(log.Fields{

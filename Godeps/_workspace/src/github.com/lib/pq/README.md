@@ -57,10 +57,12 @@ code still exists in here.
 * Brad Fitzpatrick (bradfitz)
 * Charlie Melbye (cmelbye)
 * Chris Bandy (cbandy)
+* Chris Gilling (cgilling)
 * Chris Walsh (cwds)
 * Dan Sosedoff (sosedoff)
 * Daniel Farina (fdr)
 * Eric Chlebek (echlebek)
+* Eric Garrido (minusnine)
 * Eric Urban (hydrogen18)
 * Everyone at The Go Team
 * Evan Shaw (edsrzf)
@@ -97,4 +99,5 @@ code still exists in here.
 * Timothée Peignier (cyberdelia)
 * Travis Cline (tmc)
 * TruongSinh Tran-Nguyen (truongsinh)
+* Yaismel Miranda (ympons)
 * notedit (notedit)

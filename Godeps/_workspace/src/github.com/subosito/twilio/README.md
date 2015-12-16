@@ -45,7 +45,7 @@ func main() {
 		Body: "Hello Go!",
 	}
 	s, response, err := c.Messages.Send("+15005550006", "+62801234567", params)
-	if err == nil {
+	if err != nil {
 		log.Fatal(s, response, err)
 	}
 
@@ -55,9 +55,8 @@ func main() {
 		"To":   {"+62801234567"},
 		"Body": {"Hello Go!"},
 	})
-	if err == nil {
+	if err != nil {
 		log.Fatal(s, response, err)
 	}
 }
 ```
-

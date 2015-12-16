@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"math/rand"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
@@ -22,6 +24,7 @@ import (
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
+	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/sms"
 )
 
@@ -37,6 +40,13 @@ var phoneRegex *regexp.Regexp
 var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
+
+type Ctx struct {
+	Msg           *dt.Msg
+	Input         *dt.Input
+	User          *dt.User
+	NeedsTraining bool
+}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -90,6 +100,10 @@ func startServer(port string) {
 	bootRPCServer(port)
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
+	appVocab = atomicMap{
+		words: map[string]bool{},
+		mutex: &sync.Mutex{},
+	}
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()
@@ -143,146 +157,215 @@ func connectDB() *sqlx.DB {
 	return d
 }
 
-func processText(c *echo.Context) (string, error) {
+func fillInWithKnowledge(c *echo.Context, p *pkg.Pkg, m *dt.Msg) (string,
+	error) {
+	log.Debugln("filling in with knowledge")
+	/*
+		if m.LastInput.KnowledgeFilled {
+			log.Debugln("last input was knowledgefilled")
+			return "", nil
+		}
+	*/
+	// TODO determine why this reports changed as false when the
+	// knowledgequery DOES exist
+	sentence, changed, err := knowledge.FillIn(db,
+		m.Input.StructuredInput.Objects.StringSlice(), m.Input.Sentence,
+		m.User)
+	if err != nil {
+		return sentence, err
+	}
+	if changed {
+		log.Debugln("before", m.Input.Sentence)
+		log.Debugln("after", sentence)
+		m.Input.KnowledgeFilled = true
+		if err = m.Input.Save(db); err != nil {
+			return sentence, err
+		}
+		return sentence, nil
+	}
+	if err := m.GetLastInput(db); err != nil {
+		return "", err
+	}
+	err = knowledge.SolveLastQuery(db, m)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
+	sentence = m.Input.Sentence
+	if err == sql.ErrNoRows {
+		qs, err := knowledge.NewQueriesForPkg(db, p, m)
+		if err != nil {
+			return "", err
+		}
+		return qs[0].Text(), nil
+	} else {
+		log.Debugln("filling in sentence")
+		var changed bool
+		c.Set("cmd", m.LastInput.Sentence)
+		si, _, _, err := classify(bayes, c.Get("cmd").(string))
+		if err != nil {
+			log.Errorln("classifying lastinput", err)
+			return sentence, err
+		}
+		sentence, changed, err = knowledge.FillIn(db,
+			si.Objects.StringSlice(), m.LastInput.Sentence, m.User)
+		if err != nil {
+			return sentence, err
+		}
+		log.Debugln("before", m.Input.Sentence)
+		log.Debugln("after", sentence)
+		if changed {
+			m.Input.KnowledgeFilled = true
+			if err = m.LastInput.Save(db); err != nil {
+				return sentence, err
+			}
+			return sentence, nil
+		} else {
+			log.Warnln("not changed")
+		}
+	}
+	return sentence, nil
+}
+
+func preprocess(c *echo.Context) (*Ctx, error) {
 	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
-		return "", ErrInvalidCommand
+		return nil, ErrInvalidCommand
 	}
 	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
 		if err := train(bayes, cmd[6:]); err != nil {
-			return "", err
+			return nil, err
 		}
-		return "", nil
+		return nil, nil
 	}
+	uid, fid, fidT := validateParams(c)
 	si, annotated, needsTraining, err := classify(bayes, cmd)
 	if err != nil {
 		log.Errorln("classifying sentence", err)
 	}
-	uid, fid, fidT := validateParams(c)
 	in := &dt.Input{
 		Sentence:          cmd,
 		StructuredInput:   si,
-		UserID:            uid,
 		FlexID:            fid,
 		FlexIDType:        fidT,
+		UserID:            uid,
 		SentenceAnnotated: annotated,
 	}
 	u, err := getUser(in)
-	if err == ErrMissingUser {
+	if err == dt.ErrMissingUser {
 		log.Infoln("missing user", err)
 	} else if err != nil {
 		log.WithField("fn", "getUser").Errorln(err)
+		return nil, err
+	}
+	in.UserID = u.ID
+	in.StructuredInput = si
+	ctx := &Ctx{
+		Input:         in,
+		User:          u,
+		Msg:           dt.NewMessage(db, u, in),
+		NeedsTraining: needsTraining,
+	}
+	return ctx, nil
+}
+
+// TODO mark a knowledgequery with a liveat timestamp if the package returns a
+// successful response. Then when searching knowledgequeries, order by the most
+// recent liveat. Prevents an old (and since outdated) knowledgequery from
+// blocking new, successful ones.
+func processText(c *echo.Context) (string, error) {
+	ctx, err := preprocess(c)
+	if err != nil || ctx == nil /* trained */ {
+		log.WithField("fn", "preprocessForMessage").Error(err)
 		return "", err
 	}
-	m := dt.NewMessage(u, in)
-	m, err = addContext(m)
-	if err != nil {
-		log.WithField("fn", "addContext").Errorln(err)
-	}
-	pkg, route, err := getPkg(m)
+	pkg, route, followup, err := getPkg(ctx.Msg)
 	if err != nil {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
-	// Ava asks questions about words she doesn't understand. To do that,
-	// she creates a knowledge query, which is stored separately from last
-	// responses. The knowledge table can be thought of like a graph, where
-	// words are related to one another within degrees of separation. From
-	// most specific to less and less specific. Questions are asked
-	// recursively up to two times. For example:
-	//
-	// User> Buy me a sau gri.
-	// Ava>  What's a sau gri?
-	// User> Sauvignon Gris
-	// Ava>  (passes "Buy me a Sauvignon Gris" to the package, but is still
-	//        confused)
-	// Ava>  And what's a Sauvignon Gris?
-	// User> white wine
-	// Ava>  (searches for Buy me a Sauvignon Gris white wine, which the
-	//        purchase package can handle)
-	//
-	// Then Ava knows that sau gri is very similar to "Sauvignon Gris", and
-	// somewhat similar to "white wine". The next time a user asks for a
-	// "sau gri" in the same or similar trigram context, "buy me sau gri",
-	// she'll jump right to "Buy me a Sauvignon Gris white wine".
-	//
-	// Ava should also handle confusion across multiple wordtypes in
-	// sequence. For example:
-	//
-	// User> Procure libations
-	// Ava>  What do you mean by procure?
-	// User> buy
-	// Ava>  Ok. And what do you mean by libations?
-	// User> booze
-	// Ava>  What do you mean by booze?
-	// User> alcohol
-	// Ava>  (pass "Buy alcohol" to the package)
-	//
-	if m.LastResponse != nil && route == m.LastResponse.Route {
-		kQuery, err := knowledge.GetActiveQuery(db, u)
+	var filledInWithKnowledge bool
+	var lastQRID uint64
+	if !followup {
+		log.Debugln("conversation change. deleting unused knowledgequeries")
+		if err := knowledge.DeleteQueries(db, ctx.User); err != nil {
+			return "", err
+		}
+	} else {
+		lastQRID, err = knowledge.LastQueryResponseID(db, ctx.Msg)
 		if err != nil {
 			return "", err
 		}
-		if kQuery != nil {
-			if err := kQuery.Solve(db, m); err != nil {
-				return "", err
-			}
-			return processText(c)
+	}
+	if lastQRID > 0 && ctx.Msg.LastResponse.ID == lastQRID {
+		filledInWithKnowledge = true
+		sent, err := fillInWithKnowledge(c, pkg.P, ctx.Msg)
+		if err != nil {
+			log.Errorln("fillInWithKnowledge", err)
+			return "", err
 		}
-	} else {
-		if err := knowledge.SetQueriesInactive(db, u); err != nil {
+		log.Debugln("changed sentence", sent)
+		c.Set("cmd", sent)
+		ctx, err = preprocess(c)
+		if err != nil {
+			log.Errorln("preprocessForMessage", err)
 			return "", err
 		}
 	}
-	m.Route = route
-	ret, err := callPkg(pkg, m)
+	ctx.Msg.Route = route
+	// callPkg nils out lastResponse for rpc gob transfer, so we save a
+	// reference to it here
+	lastResponse := ctx.Msg.LastResponse
+	ret, err := callPkg(pkg, ctx.Msg, followup)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "callPkg").Errorln(err)
 		return "", err
 	}
+	ctx.Msg.LastResponse = lastResponse
 	var confused bool
 	if len(ret.Sentence) == 0 {
-		confused = true
-		ret.Sentence = language.Confused()
+		log.Debugln("pkg response empty")
 		// fill in learned knowledge of language and try again
-		// TODO results := knowledge.Search(db, )
-		if len(results) > 0 {
-			for _, r := range results {
+		if !filledInWithKnowledge {
+			// TODO pass back changed bool
+			sent, err := fillInWithKnowledge(c, pkg.P, ctx.Msg)
+			if err != nil {
+				log.Errorln("fillInWithKnowledge", err)
 			}
-			// TODO assemble trigrams, search knowledgequeries and
-			// replace words with matching trigrams
-			// cmd =
-			c.Set("cmd", cmd)
-			return processText(c)
+			// TODO use changed bool
+			if sent != ctx.Msg.Input.Sentence {
+				c.Set("cmd", sent)
+				return processText(c)
+			}
+		}
+		if len(ret.Sentence) == 0 {
+			ret.Sentence = language.Confused()
 		}
 	}
-	in.StructuredInput = si
-	id, err := saveStructuredInput(m, ret.ResponseID, pkg.P.Config.Name,
-		route)
+	id, err := saveStructuredInput(ctx.Msg, ret.ResponseID,
+		pkg.P.Config.Name, route)
 	if err != nil {
 		return ret.Sentence, err
 	}
-	if confused {
+	if confused && !followup {
 		log.WithField("inputID", id).Infoln("confused")
 		// TODO allow for fuzzy matching. For example
 		//
 		// User> "cab sau"
 		// Ava>  Did you mean Cabernet Sauvignon?
-		if len(si.Commands) > 0 || len(si.Objects) > 0 {
-			qs, err := knowledge.NewQueries(db, pkg.P, m)
+		if len(ctx.Input.StructuredInput.Commands) > 0 ||
+			len(ctx.Input.StructuredInput.Objects) > 0 {
+			qs, err := knowledge.NewQueriesForPkg(db, pkg.P,
+				ctx.Msg)
 			if err != nil {
-				return ret.Sentence, err
-			}
-			if err = qs[0].Solve(db, m); err != nil {
 				return ret.Sentence, err
 			}
 			return qs[0].Text(), nil
 		}
 	}
-	in.ID = id
-	if needsTraining {
+	ctx.Input.ID = id
+	if ctx.NeedsTraining {
 		log.WithField("inputID", id).Infoln("needed training")
-		if err = supervisedTrain(in); err != nil {
+		if err = supervisedTrain(ctx.Input); err != nil {
 			return ret.Sentence, err
 		}
 	}

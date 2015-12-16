@@ -14,7 +14,7 @@ package elastigo
 import (
 	"encoding/json"
 	"fmt"
-	u "github.com/avabot/ava/Godeps/_workspace/src/github.com/araddon/gou"
+	u "github.com/araddon/gou"
 	"strconv"
 	"strings"
 )
@@ -47,7 +47,7 @@ type SearchDsl struct {
 	FacetVal      *FacetDsl                `json:"facets,omitempty"`
 	QueryVal      *QueryDsl                `json:"query,omitempty"`
 	SortBody      []*SortDsl               `json:"sort,omitempty"`
-	FilterVal     *FilterWrap              `json:"filter,omitempty"`
+	FilterVal     *FilterOp                `json:"filter,omitempty"`
 	AggregatesVal map[string]*AggregateDsl `json:"aggregations,omitempty"`
 	HighlightVal  *HighlightDsl            `json:"highlight,omitempty"`
 }
@@ -174,12 +174,9 @@ func (s *SearchDsl) Query(q *QueryDsl) *SearchDsl {
 //         Filter().Exists("repository.name"),
 //         Filter().Terms("repository.has_wiki", true)
 //     )
-func (s *SearchDsl) Filter(fl ...interface{}) *SearchDsl {
-	if s.FilterVal == nil {
-		s.FilterVal = NewFilterWrap()
-	}
 
-	s.FilterVal.addFilters(fl)
+func (s *SearchDsl) Filter(fl *FilterOp) *SearchDsl {
+	s.FilterVal = fl
 	return s
 }
 

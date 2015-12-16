@@ -20,7 +20,9 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/fileupload"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/invoice"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/invoiceitem"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/order"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/plan"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/product"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/recipient"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/refund"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/reversal"
@@ -101,6 +103,12 @@ type API struct {
 	Reversals *reversal.Client
 	// BankAccounts is the client used to invoke /accounts/bank_accounts APIs.
 	BankAccounts *bankaccount.Client
+	// Products is the client used to invoke /products APIs.
+	// For more details see https://stripe.com/docs/api#products.
+	Products *product.Client
+	// Orders is the client used to invoke /orders APIs.
+	// For more details see https://stripe.com/docs/api#orders.
+	Orders *order.Client
 }
 
 // Init initializes the Stripe client with the appropriate secret key
@@ -134,6 +142,8 @@ func (a *API) Init(key string, backends *Backends) {
 	a.BitcoinTransactions = &bitcointransaction.Client{B: backends.API, Key: key}
 	a.Reversals = &reversal.Client{B: backends.API, Key: key}
 	a.BankAccounts = &bankaccount.Client{B: backends.API, Key: key}
+	a.Products = &product.Client{B: backends.API, Key: key}
+	a.Orders = &order.Client{B: backends.API, Key: key}
 }
 
 // New creates a new Stripe client with the appropriate secret key

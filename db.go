@@ -4,12 +4,10 @@ import (
 	"database/sql"
 	"errors"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/shared/datatypes"
 )
 
 var (
-	ErrMissingUser   = errors.New("missing user")
 	ErrMissingFlexID = errors.New("missing flexid")
 )
 
@@ -75,7 +73,7 @@ func getUser(in *dt.Input) (*dt.User, error) {
 		      ORDER BY createdat DESC`
 		err := db.Get(&in.UserID, q, in.FlexID)
 		if err == sql.ErrNoRows {
-			return nil, ErrMissingUser
+			return nil, dt.ErrMissingUser
 		} else if err != nil {
 			return nil, err
 		}
@@ -104,23 +102,4 @@ func getInputAnnotation(id int) (string, error) {
 func getLastInputFromUser(u *dt.User) (*dt.StructuredInput,
 	error) {
 	return &(dt.StructuredInput{}), nil
-}
-
-func getContextObject(u *dt.User, si *dt.StructuredInput,
-	datatype string) (string, error) {
-	log.Debugln("getting object context")
-	var tmp *dt.StringSlice
-	if u == nil {
-		return "", ErrMissingUser
-	}
-	if u != nil {
-		q := `
-			SELECT ` + datatype + `
-			FROM inputs
-			WHERE userid=$1 AND array_length(objects, 1) > 0`
-		if err := db.Get(&tmp, q, u.ID); err != nil {
-			return "", err
-		}
-	}
-	return tmp.Last(), nil
 }

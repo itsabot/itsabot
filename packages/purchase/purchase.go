@@ -82,6 +82,7 @@ var statesShipping = map[string]bool{
 
 func main() {
 	flag.Parse()
+	log.SetLevel(log.DebugLevel)
 	l = log.WithFields(log.Fields{
 		"pkg": pkgName,
 	})
@@ -109,12 +110,8 @@ func main() {
 		dt.VocabHandler{
 			Fn:       kwPrice,
 			WordType: "Object",
-			Words:    []string{"price", "cost", "shipping", "total"},
-		},
-		dt.VocabHandler{
-			Fn:       kwSearch,
-			WordType: "Command",
-			Words:    []string{"find", "search", "show", "give"},
+			Words: []string{"price", "cost", "shipping",
+				"total"},
 		},
 		dt.VocabHandler{
 			Fn:       kwNextProduct,
@@ -133,6 +130,11 @@ func main() {
 			WordType: "Object",
 			Words: []string{"less expensive", "cheaper", "cheap",
 				"pricey"},
+		},
+		dt.VocabHandler{
+			Fn:       kwSearch,
+			WordType: "Command",
+			Words:    []string{"find", "search", "show", "give"},
 		},
 		dt.VocabHandler{
 			Fn:       kwCart,
@@ -239,6 +241,7 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	}
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
+	// TODO implement better state rules like a proper state machine
 	var kw bool
 	var err error
 	if getState() > StateSetRecommendations {
@@ -738,6 +741,7 @@ func kwPrice(_ *dt.Ctx, _ int) (string, error) {
 }
 
 func kwSearch(ctx *dt.Ctx, _ int) (string, error) {
+	l.Debugln("hit kwSearch")
 	setOffset(0)
 	setQuery(ctx.Msg.Input.StructuredInput.Objects.String())
 	err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyTaste,
@@ -878,5 +882,6 @@ func kwHelp(_ *dt.Ctx, _ int) (string, error) {
 }
 
 func kwStop(_ *dt.Ctx, _ int) (string, error) {
+	l.Debugln("hit kwStop")
 	return "Ok.", nil
 }

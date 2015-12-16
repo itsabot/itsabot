@@ -5,7 +5,7 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+	"golang.org/x/net/websocket"
 )
 
 func main() {
@@ -28,7 +28,6 @@ func main() {
 			}
 			fmt.Println(msg)
 		}
-		return
 	})
 
 	e.Run(":1323")

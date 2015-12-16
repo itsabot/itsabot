@@ -89,7 +89,7 @@ $ go get github.com/labstack/echo
 
 ## [Recipes](http://labstack.com/echo/recipes/hello-world)
 
-## [Guide](http://labstack.com/echo/guide)
+## [Guide](http://labstack.com/echo/guide/installation)
 
 ## Echo System
 
@@ -100,14 +100,16 @@ Community created packages for Echo
 - [permissions2](https://github.com/xyproto/permissions2)
 - [permissionbolt](https://github.com/xyproto/permissionbolt)
 - [echo-middleware](https://github.com/syntaqx/echo-middleware)
+- [dpecho](https://github.com/deferpanic/dpecho)
+- [echosentry](https://github.com/01walid/echosentry)
 
 ## Contribute
 
 **Use issues for everything**
 
 - Report problems
-- Discuss before sending pull request
-- Suggest new features
+- Discuss before sending a pull request
+- Suggest new features/recipes
 - Improve/fix documentation
 
 ## Credits

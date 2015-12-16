@@ -2,11 +2,8 @@ package echo
 
 import (
 	"bufio"
-	"log"
 	"net"
 	"net/http"
-
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/gommon/color"
 )
 
 type (
@@ -15,11 +12,12 @@ type (
 		status    int
 		size      int64
 		committed bool
+		echo      *Echo
 	}
 )
 
-func NewResponse(w http.ResponseWriter) *Response {
-	return &Response{writer: w}
+func NewResponse(w http.ResponseWriter, e *Echo) *Response {
+	return &Response{writer: w, echo: e}
 }
 
 func (r *Response) SetWriter(w http.ResponseWriter) {
@@ -36,8 +34,7 @@ func (r *Response) Writer() http.ResponseWriter {
 
 func (r *Response) WriteHeader(code int) {
 	if r.committed {
-		// TODO: Warning
-		log.Printf("echo => %s", color.Yellow("response already committed"))
+		r.echo.Logger().Warn("response already committed")
 		return
 	}
 	r.status = code
@@ -78,14 +75,10 @@ func (r *Response) Committed() bool {
 	return r.committed
 }
 
-func (r *Response) reset(w http.ResponseWriter) {
+func (r *Response) reset(w http.ResponseWriter, e *Echo) {
 	r.writer = w
 	r.size = 0
 	r.status = http.StatusOK
 	r.committed = false
+	r.echo = e
 }
-
-//func (r *Response) clear() {
-//	r.Header().Del(ContentType)
-//	r.committed = false
-//}

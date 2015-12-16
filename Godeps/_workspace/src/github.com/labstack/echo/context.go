@@ -4,23 +4,25 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"net/http"
-	spath "path"
-
-	"fmt"
+	"path/filepath"
 
 	"net/url"
 
 	"bytes"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
+	"golang.org/x/net/websocket"
 )
 
 type (
 	// Context represents context for the current request. It holds request and
 	// response objects, path parameters, data and registered handler.
 	Context struct {
+		context.Context
 		request  *http.Request
 		response *Response
 		socket   *websocket.Conn
+		path     string
 		pnames   []string
 		pvalues  []string
 		query    url.Values
@@ -54,6 +56,11 @@ func (c *Context) Response() *Response {
 // Socket returns *websocket.Conn.
 func (c *Context) Socket() *websocket.Conn {
 	return c.socket
+}
+
+// Path returns the registered path for the handler.
+func (c *Context) Path() string {
+	return c.path
 }
 
 // P returns path parameter by index.
@@ -125,31 +132,19 @@ func (c *Context) Render(code int, name string, data interface{}) (err error) {
 	return
 }
 
-// HTML formats according to a format specifier and sends HTML response with
-// status code.
-func (c *Context) HTML(code int, format string, a ...interface{}) (err error) {
-	buf := new(bytes.Buffer)
-	_, err = fmt.Fprintf(buf, format, a...)
-	if err != nil {
-		return err
-	}
+// HTML sends an HTTP response with status code.
+func (c *Context) HTML(code int, html string) (err error) {
 	c.response.Header().Set(ContentType, TextHTMLCharsetUTF8)
 	c.response.WriteHeader(code)
-	c.response.Write(buf.Bytes())
+	c.response.Write([]byte(html))
 	return
 }
 
-// String formats according to a format specifier and sends text response with status
-// code.
-func (c *Context) String(code int, format string, a ...interface{}) (err error) {
-	buf := new(bytes.Buffer)
-	_, err = fmt.Fprintf(buf, format, a...)
-	if err != nil {
-		return err
-	}
-	c.response.Header().Set(ContentType, TextPlain)
+// String sends a string response with status code.
+func (c *Context) String(code int, s string) (err error) {
+	c.response.Header().Set(ContentType, TextPlainCharsetUTF8)
 	c.response.WriteHeader(code)
-	c.response.Write(buf.Bytes())
+	c.response.Write([]byte(s))
 	return
 }
 
@@ -163,6 +158,22 @@ func (c *Context) JSON(code int, i interface{}) (err error) {
 	c.response.WriteHeader(code)
 	c.response.Write(b)
 	return
+}
+
+// JSONIndent sends a JSON response with status code, but it applies prefix and indent to format the output.
+func (c *Context) JSONIndent(code int, i interface{}, prefix string, indent string) (err error) {
+	b, err := json.MarshalIndent(i, prefix, indent)
+	if err != nil {
+		return err
+	}
+	c.json(code, b)
+	return
+}
+
+func (c *Context) json(code int, b []byte) {
+	c.response.Header().Set(ContentType, ApplicationJSONCharsetUTF8)
+	c.response.WriteHeader(code)
+	c.response.Write(b)
 }
 
 // JSONP sends a JSONP response with status code. It uses `callback` to construct
@@ -193,15 +204,32 @@ func (c *Context) XML(code int, i interface{}) (err error) {
 	return
 }
 
+// XMLIndent sends an XML response with status code, but it applies prefix and indent to format the output.
+func (c *Context) XMLIndent(code int, i interface{}, prefix string, indent string) (err error) {
+	b, err := xml.MarshalIndent(i, prefix, indent)
+	if err != nil {
+		return err
+	}
+	c.xml(code, b)
+	return
+}
+
+func (c *Context) xml(code int, b []byte) {
+	c.response.Header().Set(ContentType, ApplicationXMLCharsetUTF8)
+	c.response.WriteHeader(code)
+	c.response.Write([]byte(xml.Header))
+	c.response.Write(b)
+}
+
 // File sends a response with the content of the file. If `attachment` is set
 // to true, the client is prompted to save the file with provided `name`,
 // name can be empty, in that case name of the file is used.
-func (c *Context) File(name, path string, attachment bool) (err error) {
-	dir, file := spath.Split(path)
+func (c *Context) File(path, name string, attachment bool) (err error) {
+	dir, file := filepath.Split(path)
 	if attachment {
 		c.response.Header().Set(ContentDisposition, "attachment; filename="+name)
 	}
-	if err = serveFile(dir, file, c); err != nil {
+	if err = c.echo.serveFile(dir, file, c); err != nil {
 		c.response.Header().Del(ContentDisposition)
 	}
 	return
@@ -227,9 +255,14 @@ func (c *Context) Error(err error) {
 	c.echo.httpErrorHandler(err, c)
 }
 
+// Echo returns the `Echo` instance.
+func (c *Context) Echo() *Echo {
+	return c.echo
+}
+
 func (c *Context) reset(r *http.Request, w http.ResponseWriter, e *Echo) {
 	c.request = r
-	c.response.reset(w)
+	c.response.reset(w, e)
 	c.query = nil
 	c.store = nil
 	c.echo = e

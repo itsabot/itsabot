@@ -89,7 +89,7 @@ Sends an XML HTTP response with status code.
 Context.HTML(code int, html string) error
 ```
 
-Sends an HTML HTTP response with status code.
+Sends an HTML response with status code.
 
 ### String
 
@@ -97,12 +97,12 @@ Sends an HTML HTTP response with status code.
 Context.String(code int, s string) error
 ```
 
-Sends a text/plain HTTP response with status code.
+Sends a string response with status code.
 
 ### File
 
 ```go
-Context.File(name, path string, attachment bool) error
+Context.File(path, name string, attachment bool) error
 ```
 
 File sends a response with the content of the file. If `attachment` is set
