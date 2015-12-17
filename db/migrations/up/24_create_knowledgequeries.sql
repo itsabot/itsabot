@@ -1,13 +1,11 @@
-CREATE TABLE knowledgequeries (
+CREATE TABLE knowledgenodes (
 	id SERIAL,
 	userid INTEGER NOT NULL,
-	responseid INTEGER,
 	term VARCHAR(35) NOT NULL,
 	termlength INTEGER NOT NULL,
-	trigram VARCHAR(255) NOT NULL,
-	wordtype VARCHAR(7) NOT NULL,
+	termtype INTEGER NOT NULL, -- 1: commandNode, 2: objectNode
 	relation VARCHAR(255),
-	active BOOLEAN NOT NULL DEFAULT TRUE,
+	confidence INTEGER DEFAULT 50 NOT NULL, -- between 0 and 100
 	createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
 	UNIQUE (userid, term, trigram),
 	PRIMARY KEY (id)
