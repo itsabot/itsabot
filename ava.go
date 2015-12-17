@@ -283,84 +283,62 @@ func processText(c *echo.Context) (string, error) {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
-	var filledInWithKnowledge bool
-	var lastQRID uint64
 	if !followup {
 		log.Debugln("conversation change. deleting unused knowledgequeries")
 		if err := knowledge.DeleteQueries(db, ctx.User); err != nil {
 			return "", err
 		}
-	} else {
-		lastQRID, err = knowledge.LastQueryResponseID(db, ctx.Msg)
-		if err != nil {
-			return "", err
-		}
 	}
-	if lastQRID > 0 && ctx.Msg.LastResponse.ID == lastQRID {
-		filledInWithKnowledge = true
-		sent, err := fillInWithKnowledge(c, pkg.P, ctx.Msg)
-		if err != nil {
-			log.Errorln("fillInWithKnowledge", err)
-			return "", err
-		}
-		log.Debugln("changed sentence", sent)
-		c.Set("cmd", sent)
-		ctx, err = preprocess(c)
-		if err != nil {
-			log.Errorln("preprocessForMessage", err)
-			return "", err
-		}
-	}
-	ctx.Msg.Route = route
-	// callPkg nils out lastResponse for rpc gob transfer, so we save a
-	// reference to it here
-	lastResponse := ctx.Msg.LastResponse
 	ret, err := callPkg(pkg, ctx.Msg, followup)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "callPkg").Errorln(err)
 		return "", err
 	}
-	ctx.Msg.LastResponse = lastResponse
-	var confused bool
+	var edges []edge
 	if len(ret.Sentence) == 0 {
-		log.Debugln("pkg response empty")
-		// fill in learned knowledge of language and try again
-		if !filledInWithKnowledge {
-			// TODO pass back changed bool
-			sent, err := fillInWithKnowledge(c, pkg.P, ctx.Msg)
+		edges, err = searchEdgesForTerm(ctx.Input.Sentence)
+		if err != nil {
+			return "", err
+		}
+		for i, e := range edges {
+			// TODO reprocess with modified sentence
+			ret, err = callPkg(pkg, ctx.Msg, followup)
 			if err != nil {
-				log.Errorln("fillInWithKnowledge", err)
+				return "", err
 			}
-			// TODO use changed bool
-			if sent != ctx.Msg.Input.Sentence {
-				c.Set("cmd", sent)
-				return processText(c)
+			if len(ret.Sentence) > 0 {
+				e.IncrementConfidence()
+				break
 			}
+			e.DecrementConfidence()
 		}
-		if len(ret.Sentence) == 0 {
-			ret.Sentence = language.Confused()
+	}
+	var nodes []node
+	if len(ret.Sentence) == 0 {
+		nodes, err = searchNodes(ctx.Input.Sentence, len(edges))
+		if err != nil {
+			return "", err
 		}
+		for _, n := range nodes {
+			// TODO reprocess with modified sentence
+			ret, err = callPkg(pkg, ctx.Msg, followup)
+			if err != nil {
+				return "", err
+			}
+			if len(ret.Sentence) > 0 {
+				n.IncrementConfidence()
+				break
+			}
+			n.DecrementConfidence()
+		}
+	}
+	if len(ret.Sentence) == 0 {
+		ret.Sentence = language.Confused()
 	}
 	id, err := saveStructuredInput(ctx.Msg, ret.ResponseID,
 		pkg.P.Config.Name, route)
 	if err != nil {
 		return ret.Sentence, err
-	}
-	if confused && !followup {
-		log.WithField("inputID", id).Infoln("confused")
-		// TODO allow for fuzzy matching. For example
-		//
-		// User> "cab sau"
-		// Ava>  Did you mean Cabernet Sauvignon?
-		if len(ctx.Input.StructuredInput.Commands) > 0 ||
-			len(ctx.Input.StructuredInput.Objects) > 0 {
-			qs, err := knowledge.NewQueriesForPkg(db, pkg.P,
-				ctx.Msg)
-			if err != nil {
-				return ret.Sentence, err
-			}
-			return qs[0].Text(), nil
-		}
 	}
 	ctx.Input.ID = id
 	if ctx.NeedsTraining {

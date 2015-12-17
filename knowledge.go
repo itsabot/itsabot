@@ -3,9 +3,11 @@ package main
 import (
 	"database/sql"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/dchest/stemmer/porter2"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -21,7 +23,7 @@ type graphObj interface {
 	DecrementConfidence(*sqlx.DB) error
 }
 
-// gsMax defines the max number of edges and nodes returned from a search
+// gsMax defines the max number of edges and nodes returned from a search.
 const int gsMax = 3
 
 // TODO add trigram support around the term
@@ -37,84 +39,56 @@ type node struct {
 	UpdatedAt  *time.Time
 }
 
+// TODO add support for startnodeterm
 type edge struct {
-	StartNodeID uint64
-	EndNodeID   uint64
-	UserID      uint64
-	NodePath    dt.Uint64_Slice
-	Confidence  int
-	CreatedAt   *time.Time
+	StartNodeTerm string
+	StartNodeID   uint64
+	EndNodeID     uint64
+	UserID        uint64
+	NodePath      dt.Uint64_Slice
+	Confidence    int
+	CreatedAt     *time.Time
 }
 
-func searchEdges(start *node, u *dt.User) ([]edge, error) {
+func searchEdgesForTerm(term string) ([]edge, error) {
 	var edges []edge
-	q := `SELECT startnodeid, endnodeid, userid, nodepath, confidence
+	q := `SELECT startnodeterm, startnodeid, endnodeid, userid, nodepath,
+	          confidence
 	      FROM knowledgeedges
-	      WHERE userid=$1 AND startnodeid=$2
+	      WHERE startnodeterm=$1
 	      ORDER BY confidence DESC
 	      LIMIT ` + strconv.FormatInt(gsMax, 10)
-	if err := db.Select(&edges, q, u.ID, start.ID); err != nil {
-		return nil, edges
-	}
-	if len(edges) >= gsMax {
-		return edges, nil
-	}
-	q := `SELECT startnodeid, endnodeid, userid, nodepath, confidence
-	      FROM knowledgeedges
-	      WHERE userid<>$1 AND startnodeid=$2
-	      ORDER BY confidence DESC
-	      LIMIT ` + strconv.FormatInt(gsMax-len(edges), 10)
-	rows, err := db.Queryx(q, u.ID, start.ID)
-	if err != nil {
+	if err := db.Select(&edges, q, term); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var tmp edge
-	for rows.Next() {
-		if err = rows.Scan(&tmp); err != nil {
-			return nil, err
-		}
-		edges = append(edges, tmp)
-	}
-	if rows.Err() != nil {
-		return nil, rows.Err()
+	return edges, nil
+}
+
+func searchEdges(start *node) ([]edge, error) {
+	var edges []edge
+	// consider searching to prioritize one's own userid
+	q := `SELECT startnodeterm, startnodeid, endnodeid, userid, nodepath,
+	          confidence
+	      FROM knowledgeedges
+	      WHERE startnodeid=$1
+	      ORDER BY confidence DESC
+	      LIMIT ` + strconv.FormatInt(gsMax, 10)
+	if err := db.Select(&edges, q, start.ID); err != nil {
+		return nil, edges
 	}
 	return edges, nil
 }
 
 // searchNodes runs when searchEdges fails to return at least gsMax results
-func searchNodes(term string, u *dt.User, edgesFound int) ([]node, error) {
+func searchNodes(term string, edgesFound int) ([]node, error) {
 	var nodes []node
 	q := `SELECT id, term, termlength, termtype, relation, userid, createdat
 	      FROM knowledgenodes
-	      WHERE userid=$1 AND term=$2 AND relation IS NOT NULL
+	      WHERE term=$1 AND relation IS NOT NULL
 	      ORDER BY confidence
 	      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
-	if err := db.Select(&nodes, q, u.ID, term); err != nil {
+	if err := db.Select(&nodes, q, term); err != nil {
 		return nil, err
-	}
-	if len(nodes)+edgesFound >= 3 {
-		return nodes, nil
-	}
-	q := `SELECT id, term, termlength, termtype, relation, userid, createdat
-	      FROM knowledgenodes
-	      WHERE userid<>$1 AND term=$2 AND relation IS NOT NULL
-	      ORDER BY confidence
-	      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
-	rows, err := db.Queryx(q, u.ID, term, start.ID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var tmp node
-	for rows.Next() {
-		if err = rows.Scan(&tmp); err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, tmp)
-	}
-	if rows.Err() != nil {
-		return nil, rows.Err()
 	}
 	return nodes, nil
 }
@@ -145,4 +119,19 @@ func (e *edge) DecrementConfidence(db *sqlx.DB) error {
 	q := `UPDATE knowledgeedges SET confidence=confidence-1 WHERE id=$2`
 	_, err := db.Exec(q, e.Confidence, e.ID)
 	return err
+}
+
+// upToBigrams splits a sentence into all possible 1-gram and 2-gram combos and
+// stems each of the terms
+func upToBigrams(s string) []string {
+	eng := porter2.Stemmer
+	s = eng.Stem(s)
+	ss := strings.Fields(s)
+	for i := range ss {
+		if len(ss) > i+1 {
+			break
+		}
+		ss = append(ss, ss[i]+" "+ss[i+1])
+	}
+	return ss
 }
