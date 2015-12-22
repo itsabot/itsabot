@@ -23,7 +23,15 @@ func (s *Uint64_Slice) Scan(src interface{}) error {
 	if err != nil && err.Error() != "EOF" {
 		return err
 	}
-	*s = Uint64_Slice(slice)
+	var tmp []uint64
+	for _, s := range slice {
+		ui64, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return err
+		}
+		tmp = append(tmp, ui64)
+	}
+	*s = tmp
 	return nil
 }
 

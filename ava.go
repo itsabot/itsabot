@@ -268,10 +268,6 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 	return ctx, nil
 }
 
-// TODO mark a knowledgequery with a liveat timestamp if the package returns a
-// successful response. Then when searching knowledgequeries, order by the most
-// recent liveat. Prevents an old (and since outdated) knowledgequery from
-// blocking new, successful ones.
 func processText(c *echo.Context) (string, error) {
 	ctx, err := preprocess(c)
 	if err != nil || ctx == nil /* trained */ {
@@ -283,16 +279,23 @@ func processText(c *echo.Context) (string, error) {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
+	ret, err := callPkg(pkg, ctx.Msg, followup)
+	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "callPkg").Errorln(err)
+		return "", err
+	}
 	if !followup {
 		log.Debugln("conversation change. deleting unused knowledgequeries")
 		if err := knowledge.DeleteQueries(db, ctx.User); err != nil {
 			return "", err
 		}
-	}
-	ret, err := callPkg(pkg, ctx.Msg, followup)
-	if err != nil && err != ErrMissingPackage {
-		log.WithField("fn", "callPkg").Errorln(err)
-		return "", err
+	} else if len(ret.Sentence) == 0 {
+		// get queries. If any relation is null, pose question
+		n, err := getActiveNode(db, u)
+		if err != nil {
+			return "", err
+		}
+		return n.Text(), nil
 	}
 	var edges []edge
 	if len(ret.Sentence) == 0 {
@@ -300,37 +303,46 @@ func processText(c *echo.Context) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		for i, e := range edges {
-			// TODO reprocess with modified sentence
+		for _, e := range edges {
+			ctx.Input.Sentence = replaceSentence(ctx.Input, &e)
 			ret, err = callPkg(pkg, ctx.Msg, followup)
 			if err != nil {
 				return "", err
 			}
 			if len(ret.Sentence) > 0 {
-				e.IncrementConfidence()
+				e.IncrementConfidence(db)
 				break
 			}
-			e.DecrementConfidence()
+			e.DecrementConfidence(db)
 		}
 	}
 	var nodes []node
 	if len(ret.Sentence) == 0 {
-		nodes, err = searchNodes(ctx.Input.Sentence, len(edges))
+		nodes, err = searchNodes(ctx.Input.Sentence, int64(len(edges)))
 		if err != nil {
 			return "", err
 		}
 		for _, n := range nodes {
-			// TODO reprocess with modified sentence
+			ctx.Input.Sentence = replaceSentence(ctx.Input, &n)
+			log.Debugln("changed sentence", ctx.Input.Sentence)
+			log.Debugln("changed msg sentence", ctx.Msg.Input.Sentence)
 			ret, err = callPkg(pkg, ctx.Msg, followup)
 			if err != nil {
 				return "", err
 			}
 			if len(ret.Sentence) > 0 {
-				n.IncrementConfidence()
+				n.IncrementConfidence(db)
 				break
 			}
-			n.DecrementConfidence()
+			n.DecrementConfidence(db)
 		}
+	}
+	if len(ret.Sentence) == 0 {
+		queries, err := knowledge.NewQueriesForPkg(db, pkg.P, ctx.Msg)
+		if err != nil {
+			return "", err
+		}
+		return queries[0].Text(), nil
 	}
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()

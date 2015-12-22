@@ -24,7 +24,7 @@ type Query struct {
 	ResponseID sql.NullInt64
 	Term       string
 	Relation   sql.NullString
-	WordType   string
+	TermType string
 	Trigram    string
 	Active     bool
 	CreatedAt  *time.Time
@@ -77,13 +77,12 @@ func GetAddress(db *sqlx.DB, u *dt.User, sent string) (*dt.Address, error) {
 	return addr, nil
 }
 
-// TODO move Query related things to Ava, making them private
 func GetActiveQuery(db *sqlx.DB, u *dt.User) (*Query, error) {
 	qry := &Query{}
-	q := `SELECT id, userid, term, wordtype, relation
-	      FROM knowledgequeries
-	      WHERE userid=$1 AND active=TRUE`
-	err := db.Select(qry, q, u.ID)
+	q := `SELECT id, userid, term, wordtype
+	      FROM knowledgenodes
+	      WHERE userid=$1 AND relation IS NULL`
+	err := db.Get(qry, q, u.ID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -284,6 +283,9 @@ func NewQueriesForPkg(db *sqlx.DB, p *pkg.Pkg, m *dt.Msg) ([]Query, error) {
 		queries = append(queries, query)
 	}
 	log.Debugln("built", len(queries), "queries")
+	if len(queries) == 0 {
+		return queries, errors.New("no new queries")
+	}
 	return queries, nil
 }
 
