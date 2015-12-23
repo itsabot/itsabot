@@ -123,6 +123,7 @@ func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 		log.Warnln("response sentence empty. skipping save")
 		return nil
 	}
+	log.Debugln("RECEIVED ROUTE", r.Route)
 	state, err := json.Marshal(r.State)
 	if err != nil {
 		log.WithFields(log.Fields{

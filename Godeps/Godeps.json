@@ -25,7 +25,7 @@
 			"Rev": "0302d3914d2a6ad61404584cdae6e6dbc9c03599"
 		},
 		{
-			"ImportPath": "github.com/dchest/stemmer",
+			"ImportPath": "github.com/dchest/stemmer/porter2",
 			"Rev": "f1ab276e6cf5fad3f8db813f22e25b1939c8ef70"
 		},
 		{

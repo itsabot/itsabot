@@ -172,6 +172,7 @@ func main() {
 func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	ctx.Msg = m
 	resp = m.NewResponse()
+	resp.Route = m.Route
 	resp.State = map[string]interface{}{
 		"state":            StateNone,        // maintains state
 		"query":            "",               // search query

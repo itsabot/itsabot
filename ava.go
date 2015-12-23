@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"math/rand"
 	"net"
@@ -10,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
@@ -22,9 +20,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/knowledge"
 	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/sms"
 )
 
@@ -43,8 +39,6 @@ var ErrInvalidUserPass = errors.New("Invalid username/password combination")
 
 type Ctx struct {
 	Msg           *dt.Msg
-	Input         *dt.Input
-	User          *dt.User
 	NeedsTraining bool
 }
 
@@ -100,10 +94,7 @@ func startServer(port string) {
 	bootRPCServer(port)
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
-	appVocab = atomicMap{
-		words: map[string]bool{},
-		mutex: &sync.Mutex{},
-	}
+	appVocab = dt.NewAtomicMap()
 	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	e := echo.New()
@@ -157,75 +148,6 @@ func connectDB() *sqlx.DB {
 	return d
 }
 
-func fillInWithKnowledge(c *echo.Context, p *pkg.Pkg, m *dt.Msg) (string,
-	error) {
-	log.Debugln("filling in with knowledge")
-	/*
-		if m.LastInput.KnowledgeFilled {
-			log.Debugln("last input was knowledgefilled")
-			return "", nil
-		}
-	*/
-	// TODO determine why this reports changed as false when the
-	// knowledgequery DOES exist
-	sentence, changed, err := knowledge.FillIn(db,
-		m.Input.StructuredInput.Objects.StringSlice(), m.Input.Sentence,
-		m.User)
-	if err != nil {
-		return sentence, err
-	}
-	if changed {
-		log.Debugln("before", m.Input.Sentence)
-		log.Debugln("after", sentence)
-		m.Input.KnowledgeFilled = true
-		if err = m.Input.Save(db); err != nil {
-			return sentence, err
-		}
-		return sentence, nil
-	}
-	if err := m.GetLastInput(db); err != nil {
-		return "", err
-	}
-	err = knowledge.SolveLastQuery(db, m)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-	sentence = m.Input.Sentence
-	if err == sql.ErrNoRows {
-		qs, err := knowledge.NewQueriesForPkg(db, p, m)
-		if err != nil {
-			return "", err
-		}
-		return qs[0].Text(), nil
-	} else {
-		log.Debugln("filling in sentence")
-		var changed bool
-		c.Set("cmd", m.LastInput.Sentence)
-		si, _, _, err := classify(bayes, c.Get("cmd").(string))
-		if err != nil {
-			log.Errorln("classifying lastinput", err)
-			return sentence, err
-		}
-		sentence, changed, err = knowledge.FillIn(db,
-			si.Objects.StringSlice(), m.LastInput.Sentence, m.User)
-		if err != nil {
-			return sentence, err
-		}
-		log.Debugln("before", m.Input.Sentence)
-		log.Debugln("after", sentence)
-		if changed {
-			m.Input.KnowledgeFilled = true
-			if err = m.LastInput.Save(db); err != nil {
-				return sentence, err
-			}
-			return sentence, nil
-		} else {
-			log.Warnln("not changed")
-		}
-	}
-	return sentence, nil
-}
-
 func preprocess(c *echo.Context) (*Ctx, error) {
 	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
@@ -238,12 +160,43 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 		return nil, nil
 	}
 	uid, fid, fidT := validateParams(c)
+	in, u, needsTraining, err := buildInput(cmd, fid, uid, fidT)
+	if err != nil {
+		return nil, err
+	}
+	ctx := &Ctx{
+		Msg:           dt.NewMessage(db, u, in),
+		NeedsTraining: needsTraining,
+	}
+	return ctx, nil
+}
+
+func processAgain(ctx *Ctx, g graphObj) (*Ctx, error) {
+	var err error
+	if g != nil {
+		ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
+		if err != nil {
+			return ctx, err
+		}
+	}
+	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
+	if err != nil {
+		log.Errorln("classifying sentence", err)
+	}
+	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
+	ctx.Msg.Input.StructuredInput = si
+	return ctx, nil
+}
+
+func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
+	bool, error) {
 	si, annotated, needsTraining, err := classify(bayes, cmd)
 	if err != nil {
 		log.Errorln("classifying sentence", err)
 	}
 	in := &dt.Input{
 		Sentence:          cmd,
+		SentenceFields:    dt.SentenceFields(cmd),
 		StructuredInput:   si,
 		FlexID:            fid,
 		FlexIDType:        fidT,
@@ -255,17 +208,10 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 		log.Infoln("missing user", err)
 	} else if err != nil {
 		log.WithField("fn", "getUser").Errorln(err)
-		return nil, err
+		return nil, u, needsTraining, err
 	}
 	in.UserID = u.ID
-	in.StructuredInput = si
-	ctx := &Ctx{
-		Input:         in,
-		User:          u,
-		Msg:           dt.NewMessage(db, u, in),
-		NeedsTraining: needsTraining,
-	}
-	return ctx, nil
+	return in, u, needsTraining, nil
 }
 
 func processText(c *echo.Context) (string, error) {
@@ -275,36 +221,50 @@ func processText(c *echo.Context) (string, error) {
 		return "", err
 	}
 	pkg, route, followup, err := getPkg(ctx.Msg)
-	if err != nil {
+	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
+	ctx.Msg.Route = route
+	log.Debugln("followup?", followup)
+	// get node, change sentence if active
+	n, err := getActiveNode(db, ctx.Msg.User)
+	if err != nil {
+		return "", err
+	}
+	if n != nil {
+		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
+		if err != nil {
+			return "", err
+		}
+		ctx, err = processAgain(ctx, n)
+		if err != nil {
+			return "", err
+		}
+		log.Debugln("new", ctx.Msg.Input.Sentence)
+	}
 	ret, err := callPkg(pkg, ctx.Msg, followup)
-	if err != nil && err != ErrMissingPackage {
+	if err != nil {
 		log.WithField("fn", "callPkg").Errorln(err)
 		return "", err
 	}
 	if !followup {
 		log.Debugln("conversation change. deleting unused knowledgequeries")
-		if err := knowledge.DeleteQueries(db, ctx.User); err != nil {
+		if err := deleteNodes(db, ctx.Msg.User); err != nil {
 			return "", err
 		}
-	} else if len(ret.Sentence) == 0 {
-		// get queries. If any relation is null, pose question
-		n, err := getActiveNode(db, u)
-		if err != nil {
-			return "", err
-		}
-		return n.Text(), nil
 	}
-	var edges []edge
+	var edges []*edge
 	if len(ret.Sentence) == 0 {
-		edges, err = searchEdgesForTerm(ctx.Input.Sentence)
+		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
 		if err != nil {
 			return "", err
 		}
 		for _, e := range edges {
-			ctx.Input.Sentence = replaceSentence(ctx.Input, &e)
+			ctx, err = processAgain(ctx, e)
+			if err != nil {
+				return "", err
+			}
 			ret, err = callPkg(pkg, ctx.Msg, followup)
 			if err != nil {
 				return "", err
@@ -316,16 +276,18 @@ func processText(c *echo.Context) (string, error) {
 			e.DecrementConfidence(db)
 		}
 	}
-	var nodes []node
+	var nodes []*node
 	if len(ret.Sentence) == 0 {
-		nodes, err = searchNodes(ctx.Input.Sentence, int64(len(edges)))
+		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
+			int64(len(edges)))
 		if err != nil {
 			return "", err
 		}
 		for _, n := range nodes {
-			ctx.Input.Sentence = replaceSentence(ctx.Input, &n)
-			log.Debugln("changed sentence", ctx.Input.Sentence)
-			log.Debugln("changed msg sentence", ctx.Msg.Input.Sentence)
+			ctx, err = processAgain(ctx, n)
+			if err != nil {
+				return "", err
+			}
 			ret, err = callPkg(pkg, ctx.Msg, followup)
 			if err != nil {
 				return "", err
@@ -337,25 +299,54 @@ func processText(c *echo.Context) (string, error) {
 			n.DecrementConfidence(db)
 		}
 	}
-	if len(ret.Sentence) == 0 {
-		queries, err := knowledge.NewQueriesForPkg(db, pkg.P, ctx.Msg)
+	log.Debugln("nodes found", nodes)
+	log.Debugln("ret.Sentence", ret.Sentence)
+	if len(ret.Sentence) == 0 && len(nodes) == 0 {
+		nodes, err := newNodes(db, appVocab, ctx.Msg)
 		if err != nil {
 			return "", err
 		}
-		return queries[0].Text(), nil
+		if len(nodes) > 0 {
+			log.Debugln("created nodes, still need to save")
+			ret.Sentence = nodes[0].Text()
+		} else {
+			log.Debugln("processing again")
+			ctx, err = processAgain(ctx, nil)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	if len(ret.Sentence) == 0 {
+		pkg, route, followup, err = getPkg(ctx.Msg)
+		if err != nil {
+			log.WithField("fn", "getPkg").Error(err)
+			return "", err
+		}
+		ctx.Msg.Route = route
+		ret, err = callPkg(pkg, ctx.Msg, followup)
+		if err != nil {
+			log.WithField("fn", "callPkg").Errorln(err)
+			return "", err
+		}
 	}
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
 	}
-	id, err := saveStructuredInput(ctx.Msg, ret.ResponseID,
-		pkg.P.Config.Name, route)
-	if err != nil {
-		return ret.Sentence, err
+	var pkgName string
+	if pkg != nil {
+		pkgName = pkg.P.Config.Name
+	} else {
+		pkgName = ""
 	}
-	ctx.Input.ID = id
+	id, err := saveStructuredInput(ctx.Msg, ret.ResponseID, pkgName, route)
+	if err != nil {
+		return "", err
+	}
+	ctx.Msg.Input.ID = id
 	if ctx.NeedsTraining {
 		log.WithField("inputID", id).Infoln("needed training")
-		if err = supervisedTrain(ctx.Input); err != nil {
+		if err = supervisedTrain(ctx.Msg.Input); err != nil {
 			return ret.Sentence, err
 		}
 	}

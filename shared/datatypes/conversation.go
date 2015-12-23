@@ -66,9 +66,12 @@ type Input struct {
 	Sentence          string
 	SentenceNorm      string
 	SentenceAnnotated string
-	ResponseID        uint64
-	KnowledgeFilled   bool
-	StructuredInput   *StructuredInput
+	// SentenceFields breaks the sentence into words. Tokens like ,.' are
+	// treated as individual words.
+	SentenceFields  []string
+	ResponseID      uint64
+	KnowledgeFilled bool
+	StructuredInput *StructuredInput
 }
 
 func (in *Input) Save(db *sqlx.DB) error {
@@ -120,15 +123,14 @@ func (m *Msg) GetLastInput(db *sqlx.DB) error {
 	log.Debugln("getting last input")
 	q := `SELECT id, sentence, knowledgefilled FROM inputs
 	      WHERE userid=$1
-	      ORDER BY createdat DESC
-	      LIMIT 2`
-	var tmp []Input
-	err := db.Select(&tmp, q, m.User.ID)
-	log.Println(tmp)
-	if len(tmp) > 1 {
-		m.LastInput = &tmp[1]
+	      ORDER BY createdat DESC`
+	var tmp Input
+	if err := db.Get(&tmp, q, m.User.ID); err != nil {
+		return err
 	}
-	return err
+	tmp.SentenceFields = SentenceFields(tmp.Sentence)
+	m.LastInput = &tmp
+	return nil
 }
 
 func (m *Msg) GetLastResponse(db *sqlx.DB) error {
@@ -296,4 +298,24 @@ func getContextObject(db *sqlx.DB, u *User, si *StructuredInput,
 		}
 	}
 	return tmp.Last(), nil
+}
+
+func SentenceFields(s string) []string {
+	var ret []string
+	for _, w := range strings.Fields(s) {
+		var end bool
+		for _, r := range w {
+			switch r {
+			case '\'', '"', ',', '.', ':', ';', '!', '?':
+				end = true
+				ret = append(ret, string(r))
+			}
+		}
+		if end {
+			ret = append(ret, strings.ToLower(w[:len(w)-1]))
+		} else {
+			ret = append(ret, strings.ToLower(w))
+		}
+	}
+	return ret
 }
