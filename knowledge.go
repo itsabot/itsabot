@@ -119,6 +119,9 @@ func (n *node) updateRelation(db *sqlx.DB, si *dt.StructuredInput) error {
 	} else {
 		return errors.New("invalid node TermType")
 	}
+	if rel == n.Term {
+		return nil
+	}
 	q := `UPDATE knowledgenodes SET relation=$1 WHERE id=$2`
 	n.Relation.String = rel
 	n.Relation.Valid = true
@@ -197,10 +200,8 @@ func upToBigrams(s string) []string {
 }
 
 func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
-	err := msg.GetLastInput(db)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
+	log.Debugf("%+v\n", g)
+	msg.LastInput = msg.Input
 	tmp := []string{}
 	trm := strings.Fields(g.Trm())
 	for i := 0; i < len(msg.LastInput.SentenceFields); i++ {
@@ -211,8 +212,8 @@ func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 			break
 		}
 		wSlice := msg.LastInput.SentenceFields[i : i+len(trm)]
-		log.Debugln("comparing", wSlice, "=?", trm)
 		ws := strings.Join(wSlice, " ")
+		log.Debugln("comparing", ws, "=?", trm)
 		if ws == g.Trm() {
 			log.Debugln("matched. inserting", g.Rel())
 			tmp = append(tmp, g.Rel())
@@ -220,7 +221,9 @@ func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 		tmp = append(tmp, wSlice[0])
 		log.Debugln("tmp", tmp)
 	}
-	return updateSentence(tmp), nil
+	s := updateSentence(tmp)
+	log.Debugln("updated sentence", s)
+	return s, nil
 }
 
 func updateSentence(sentenceFields []string) string {
@@ -230,10 +233,12 @@ func updateSentence(sentenceFields []string) string {
 	// almost certainly could be done in 1 loop instead of 2, avoiding the
 	// separate strings.Join
 	var tmp string
+	log.Debugln("sentenceFields", sentenceFields)
 	for i := 1; i < len(sentenceFields); i++ {
 		tmp = sentenceFields[i]
 		switch tmp {
 		case "\"", "'", ",", ".", ":", ";", "!", "?":
+			log.Debugln("found punctuation")
 			sentenceFields[i-1] = sentenceFields[i-1] + tmp
 			sentenceFields[i] = ""
 		}
@@ -245,7 +250,7 @@ func getActiveNode(db *sqlx.DB, u *dt.User) (*node, error) {
 	n := &node{}
 	q := `SELECT id, userid, term, termtype, relation
 	      FROM knowledgenodes
-	      WHERE userid=$1 AND relation IS NULL`
+	      WHERE userid=$1 AND relation IS NULL OR relation=''`
 	err := db.Get(n, q, u.ID)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -261,6 +266,7 @@ func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	log.Debugln("sso", sso)
 	cmd := extractCommand(av, m, words, ssc)
 	obj := extractObject(av, m, words, sso)
+	eng := porter2.Stemmer
 	var nodes []*node
 	q := `INSERT INTO knowledgenodes
 	      (term, termlength, termtype, userid) VALUES ($1, $2, $3, $4)
@@ -268,6 +274,7 @@ func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	var id uint64
 	if cmd != nil {
 		log.Debugln("building knowledge node around command")
+		cmd.Word = eng.Stem(cmd.Word)
 		n := node{
 			Term:       strings.ToLower(cmd.Word),
 			TermLength: len(cmd.Word),

@@ -171,23 +171,6 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 	return ctx, nil
 }
 
-func processAgain(ctx *Ctx, g graphObj) (*Ctx, error) {
-	var err error
-	if g != nil {
-		ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
-		if err != nil {
-			return ctx, err
-		}
-	}
-	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
-	}
-	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
-	ctx.Msg.Input.StructuredInput = si
-	return ctx, nil
-}
-
 func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
 	bool, error) {
 	si, annotated, needsTraining, err := classify(bayes, cmd)
@@ -214,6 +197,99 @@ func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
 	return in, u, needsTraining, nil
 }
 
+func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
+	error) {
+	var edges []*edge
+	var err error
+	if len(ret.Sentence) == 0 {
+		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range edges {
+			ctx, ret, err = processAgain(ctx, e, followup)
+			if err != nil {
+				return nil, err
+			}
+			if len(ret.Sentence) > 0 {
+				e.IncrementConfidence(db)
+				break
+			}
+			e.DecrementConfidence(db)
+		}
+	}
+	var nodes []*node
+	if len(ret.Sentence) == 0 {
+		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
+			int64(len(edges)))
+		if err != nil {
+			return nil, err
+		}
+		for _, n := range nodes {
+			if len(n.Rel()) == 0 {
+				break
+			}
+			ctx, ret, err = processAgain(ctx, n, followup)
+			if err != nil {
+				return nil, err
+			}
+			if len(ret.Sentence) > 0 {
+				n.IncrementConfidence(db)
+				break
+			}
+			n.DecrementConfidence(db)
+		}
+	}
+	log.Debugln("nodes found", nodes)
+	log.Debugln("ret.Sentence", ret.Sentence)
+	if len(ret.Sentence) == 0 && len(nodes) == 0 {
+		nodes, err := newNodes(db, appVocab, ctx.Msg)
+		if err != nil {
+			return nil, err
+		}
+		if len(nodes) > 0 {
+			log.Debugln("created nodes, still need to save")
+			ret.Sentence = nodes[0].Text()
+			return ret, nil
+		}
+	}
+	/*
+		if len(nodes) > 0 {
+			ctx, ret, err = processAgain(ctx, nodes[0], followup)
+			if err != nil {
+				return nil, err
+			}
+		}
+	*/
+	return ret, nil
+}
+
+func processAgain(ctx *Ctx, g graphObj, followup bool) (*Ctx, *dt.RespMsg,
+	error) {
+	var err error
+	ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
+	if err != nil {
+		return ctx, nil, err
+	}
+	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
+	if err != nil {
+		log.Errorln("classifying sentence", err)
+	}
+	pkg, route, _, err := getPkg(ctx.Msg)
+	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "getPkg").Error(err)
+		return ctx, nil, err
+	}
+	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
+	ctx.Msg.Input.StructuredInput = si
+	ctx.Msg.Route = route
+	ret, err := callPkg(pkg, ctx.Msg, followup)
+	if err != nil {
+		return ctx, nil, err
+	}
+	return ctx, ret, nil
+}
+
 func processText(c *echo.Context) (string, error) {
 	ctx, err := preprocess(c)
 	if err != nil || ctx == nil /* trained */ {
@@ -232,21 +308,22 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if n != nil {
+	var ret *dt.RespMsg
+	if n == nil {
+		ret, err = callPkg(pkg, ctx.Msg, followup)
+		if err != nil {
+			return "", err
+		}
+	} else {
 		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
 		if err != nil {
 			return "", err
 		}
-		ctx, err = processAgain(ctx, n)
+		log.Debugln("new", ctx.Msg.Input.Sentence)
+		ctx, ret, err = processAgain(ctx, n, followup)
 		if err != nil {
 			return "", err
 		}
-		log.Debugln("new", ctx.Msg.Input.Sentence)
-	}
-	ret, err := callPkg(pkg, ctx.Msg, followup)
-	if err != nil {
-		log.WithField("fn", "callPkg").Errorln(err)
-		return "", err
 	}
 	if !followup {
 		log.Debugln("conversation change. deleting unused knowledgequeries")
@@ -254,79 +331,13 @@ func processText(c *echo.Context) (string, error) {
 			return "", err
 		}
 	}
-	var edges []*edge
-	if len(ret.Sentence) == 0 {
-		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
-		if err != nil {
-			return "", err
-		}
-		for _, e := range edges {
-			ctx, err = processAgain(ctx, e)
-			if err != nil {
-				return "", err
-			}
-			ret, err = callPkg(pkg, ctx.Msg, followup)
-			if err != nil {
-				return "", err
-			}
-			if len(ret.Sentence) > 0 {
-				e.IncrementConfidence(db)
-				break
-			}
-			e.DecrementConfidence(db)
-		}
+	ret, err = processKnowledge(ctx, ret, followup)
+	if err != nil {
+		return "", err
 	}
-	var nodes []*node
-	if len(ret.Sentence) == 0 {
-		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
-			int64(len(edges)))
+	if len(ret.Sentence) == 0 && n != nil {
+		ctx, ret, err = processAgain(ctx, n, followup)
 		if err != nil {
-			return "", err
-		}
-		for _, n := range nodes {
-			ctx, err = processAgain(ctx, n)
-			if err != nil {
-				return "", err
-			}
-			ret, err = callPkg(pkg, ctx.Msg, followup)
-			if err != nil {
-				return "", err
-			}
-			if len(ret.Sentence) > 0 {
-				n.IncrementConfidence(db)
-				break
-			}
-			n.DecrementConfidence(db)
-		}
-	}
-	log.Debugln("nodes found", nodes)
-	log.Debugln("ret.Sentence", ret.Sentence)
-	if len(ret.Sentence) == 0 && len(nodes) == 0 {
-		nodes, err := newNodes(db, appVocab, ctx.Msg)
-		if err != nil {
-			return "", err
-		}
-		if len(nodes) > 0 {
-			log.Debugln("created nodes, still need to save")
-			ret.Sentence = nodes[0].Text()
-		} else {
-			log.Debugln("processing again")
-			ctx, err = processAgain(ctx, nil)
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-	if len(ret.Sentence) == 0 {
-		pkg, route, followup, err = getPkg(ctx.Msg)
-		if err != nil {
-			log.WithField("fn", "getPkg").Error(err)
-			return "", err
-		}
-		ctx.Msg.Route = route
-		ret, err = callPkg(pkg, ctx.Msg, followup)
-		if err != nil {
-			log.WithField("fn", "callPkg").Errorln(err)
 			return "", err
 		}
 	}
