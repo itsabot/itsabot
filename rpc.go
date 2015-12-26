@@ -25,12 +25,7 @@ var regPkgs = pkgMap{
 	mutex: &sync.Mutex{},
 }
 
-type atomicMap struct {
-	words map[string]bool
-	mutex *sync.Mutex
-}
-
-var appVocab atomicMap
+var appVocab dt.AtomicMap
 
 var client *rpc.Client
 
@@ -81,12 +76,12 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 			return p, "onboard_onboard", false, nil
 		} else {
 			log.Errorln("missing required onboard package")
-			return nil, "onboard_onboard", false, ErrMissingPackage
+			return p, "onboard_onboard", false, ErrMissingPackage
 		}
 	}
 	err := m.GetLastResponse(db)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, "", false, err
+		return p, "", false, err
 	} else if err == sql.ErrNoRows {
 		log.Errorln("no rows for last response")
 	}
@@ -113,7 +108,8 @@ Loop:
 	route = m.LastResponse.Route
 	p = regPkgs.Get(route)
 	if p == nil {
-		return nil, route, false, ErrMissingPackage
+		log.Debugln("route", route)
+		return p, route, false, ErrMissingPackage
 	}
 	return p, route, true, nil
 }
@@ -121,6 +117,9 @@ Loop:
 func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (*dt.RespMsg,
 	error) {
 	reply := &dt.RespMsg{}
+	if pw == nil {
+		return reply, nil
+	}
 	log.WithField("pkg", pw.P.Config.Name).Infoln("sending input")
 	c := strings.Title(pw.P.Config.Name)
 	// with fixed gob encoding this will not be necessary
@@ -158,21 +157,5 @@ func (pm pkgMap) Set(k string, v *pkg.PkgWrapper) {
 	pm.mutex.Lock()
 	pm.pkgs[k] = v
 	pm.mutex.Unlock()
-	runtime.Gosched()
-}
-
-func (am atomicMap) Get(k string) bool {
-	var b bool
-	am.mutex.Lock()
-	b = am.words[k]
-	am.mutex.Unlock()
-	runtime.Gosched()
-	return b
-}
-
-func (am atomicMap) Set(k string, v bool) {
-	am.mutex.Lock()
-	am.words[k] = v
-	am.mutex.Unlock()
 	runtime.Gosched()
 }

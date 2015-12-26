@@ -2,13 +2,16 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/language"
 )
 
 type nodeTermT int
@@ -54,8 +57,8 @@ type edge struct {
 	CreatedAt     *time.Time
 }
 
-func searchEdgesForTerm(term string) ([]edge, error) {
-	var edges []edge
+func searchEdgesForTerm(term string) ([]*edge, error) {
+	var edges []*edge
 	q := `SELECT startnodeterm, startnodeid, endnodeid, userid, nodepath,
 	          confidence
 	      FROM knowledgeedges
@@ -68,8 +71,8 @@ func searchEdgesForTerm(term string) ([]edge, error) {
 	return edges, nil
 }
 
-func searchEdges(start *node) ([]edge, error) {
-	var edges []edge
+func searchEdges(start *node) ([]*edge, error) {
+	var edges []*edge
 	// consider searching to prioritize one's own userid
 	q := `SELECT startnodeterm, startnodeid, endnodeid, userid, nodepath,
 	          confidence
@@ -84,17 +87,43 @@ func searchEdges(start *node) ([]edge, error) {
 }
 
 // searchNodes runs when searchEdges fails to return at least gsMax results
-func searchNodes(term string, edgesFound int64) ([]node, error) {
-	var nodes []node
-	q := `SELECT id, term, termlength, termtype, relation, userid, createdat
-	      FROM knowledgenodes
-	      WHERE term=$1 AND relation IS NOT NULL
-	      ORDER BY confidence
-	      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
-	if err := db.Select(&nodes, q, term); err != nil {
-		return nil, err
+func searchNodes(term string, edgesFound int64) ([]*node, error) {
+	var nodes []*node
+	bigrams := upToBigrams(term)
+	log.Debugln("bigrams", bigrams)
+	for _, bg := range bigrams {
+		log.Debugln("searching nodes for", bg)
+		q := `SELECT id, term, termlength, termtype, relation, userid,
+		          createdat
+		      FROM knowledgenodes
+		      WHERE term=$1
+		      ORDER BY confidence
+		      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
+		err := db.Select(&nodes, q, bg)
+		if err != nil && err != sql.ErrNoRows {
+			return nil, err
+		}
+		if len(nodes) > 0 {
+			break
+		}
 	}
 	return nodes, nil
+}
+
+func (n *node) updateRelation(db *sqlx.DB, si *dt.StructuredInput) error {
+	var rel string
+	if n.TermType == nodeTermObject {
+		rel = si.Objects.String()
+	} else if n.TermType == nodeTermCommand {
+		rel = si.Commands.Last()
+	} else {
+		return errors.New("invalid node TermType")
+	}
+	q := `UPDATE knowledgenodes SET relation=$1 WHERE id=$2`
+	n.Relation.String = rel
+	n.Relation.Valid = true
+	_, err := db.Exec(q, rel, n.ID)
+	return err
 }
 
 func (n *node) IncrementConfidence(db *sqlx.DB) error {
@@ -116,6 +145,7 @@ func (n *node) Trm() string {
 }
 
 func (n *node) Rel() string {
+	log.Debugf("%+v\n", n)
 	return n.Relation.String
 }
 
@@ -123,7 +153,7 @@ func (n *node) Text() string {
 	var s string
 	if n.TermType == nodeTermObject {
 		s = "What's " + n.Term + "?"
-	} else if qry.WordType == nodeTermCommand {
+	} else if n.TermType == nodeTermCommand {
 		s = "What do you mean by " + strings.ToLower(n.Term) + "?"
 	}
 	return s
@@ -158,7 +188,7 @@ func upToBigrams(s string) []string {
 	s = eng.Stem(s)
 	ss := strings.Fields(s)
 	for i := range ss {
-		if len(ss) > i+1 {
+		if i+1 >= len(ss) {
 			break
 		}
 		ss = append(ss, ss[i]+" "+ss[i+1])
@@ -166,15 +196,31 @@ func upToBigrams(s string) []string {
 	return ss
 }
 
-func replaceSentence(in *dt.Input, g graphObj) string {
+func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
+	err := msg.GetLastInput(db)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
+	}
 	tmp := []string{}
-	for _, w := range in.SentenceFields {
-		if w == g.Trm() {
+	trm := strings.Fields(g.Trm())
+	for i := 0; i < len(msg.LastInput.SentenceFields); i++ {
+		if i+len(trm) > len(msg.LastInput.SentenceFields) {
+			sf := msg.LastInput.SentenceFields
+			tmp = append(tmp, sf[i:len(sf)]...)
+			log.Debugln("reached end. stopping")
+			break
+		}
+		wSlice := msg.LastInput.SentenceFields[i : i+len(trm)]
+		log.Debugln("comparing", wSlice, "=?", trm)
+		ws := strings.Join(wSlice, " ")
+		if ws == g.Trm() {
+			log.Debugln("matched. inserting", g.Rel())
 			tmp = append(tmp, g.Rel())
 		}
-		tmp = append(tmp, w)
+		tmp = append(tmp, wSlice[0])
+		log.Debugln("tmp", tmp)
 	}
-	return updateSentence(tmp)
+	return updateSentence(tmp), nil
 }
 
 func updateSentence(sentenceFields []string) string {
@@ -197,7 +243,7 @@ func updateSentence(sentenceFields []string) string {
 
 func getActiveNode(db *sqlx.DB, u *dt.User) (*node, error) {
 	n := &node{}
-	q := `SELECT id, userid, term, termtype
+	q := `SELECT id, userid, term, termtype, relation
 	      FROM knowledgenodes
 	      WHERE userid=$1 AND relation IS NULL`
 	err := db.Get(n, q, u.ID)
@@ -207,58 +253,55 @@ func getActiveNode(db *sqlx.DB, u *dt.User) (*node, error) {
 	return n, err
 }
 
-func newNodes(db *sqlx.DB, p *pkg.Pkg, m *dt.Msg) ([]node, error) {
+func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	log.Debugln("creating new knowledge nodes")
 	words := strings.Fields(m.Input.Sentence)
 	ssc := m.Input.StructuredInput.Commands.StringSlice()
 	sso := m.Input.StructuredInput.Objects.StringSlice()
 	log.Debugln("sso", sso)
-	cmd := extractCommand(p, m, words, ssc)
-	obj := extractObject(p, m, words, sso)
-	var nodes []nodes
+	cmd := extractCommand(av, m, words, ssc)
+	obj := extractObject(av, m, words, sso)
+	var nodes []*node
 	q := `INSERT INTO knowledgenodes
 	      (term, termlength, termtype, userid) VALUES ($1, $2, $3, $4)
 	      RETURNING id`
 	var id uint64
 	if cmd != nil {
 		log.Debugln("building knowledge node around command")
-		err := db.QueryRowx(q, cmd, len(cmd), nodeTermCommand,
+		n := node{
+			Term:       strings.ToLower(cmd.Word),
+			TermLength: len(cmd.Word),
+			TermType:   nodeTermCommand,
+		}
+		err := db.QueryRowx(q, n.Term, n.TermLength, nodeTermCommand,
 			m.User.ID).Scan(&id)
-		if err != nil {
+		if err != nil && err.Error() != `pq: duplicate key value violates unique constraint "knowledgeedges_userid_term_key"` {
 			return nodes, err
 		}
-		n := node{
-			ID: id,
-			Term: cmd,
-			TermLength: len(cmd),
-			TermType: nodeTermCommand,
-		}
-		nodes = append(nodes, n)
+		n.ID = id
+		nodes = append(nodes, &n)
 	}
 	if obj != nil {
 		log.Debugln("building knowledge node around object")
 		log.Debugln("obj", obj.Word)
-		err := db.QueryRowx(q, obj, len(obj), nodeTermObject,
+		n := node{
+			Term:       strings.ToLower(obj.Word),
+			TermLength: len(obj.Word),
+			TermType:   nodeTermObject,
+		}
+		err := db.QueryRowx(q, n.Term, n.TermLength, nodeTermObject,
 			m.User.ID).Scan(&id)
-		if err != nil {
+		if err != nil && err.Error() != `pq: duplicate key value violates unique constraint "knowledgenodes_userid_term_key"` {
 			return nodes, err
 		}
-		n := node{
-			ID: id,
-			Term: obj,
-			TermLength: len(obj),
-			TermType: nodeTermObject,
-		}
-		nodes = append(nodes, n)
+		n.ID = id
+		nodes = append(nodes, &n)
 	}
 	log.Debugln("built", len(nodes), "knowledge nodes")
-	if len(nodes) == 0 {
-		return nodes, errors.New("no new nodes")
-	}
 	return nodes, nil
 }
 
-func extractCommand(p *pkg.Pkg, m *dt.Msg, words,
+func extractCommand(av dt.AtomicMap, m *dt.Msg, words,
 	ssc []string) *language.WordT {
 	var cmd *language.WordT
 	eng := porter2.Stemmer
@@ -266,7 +309,7 @@ func extractCommand(p *pkg.Pkg, m *dt.Msg, words,
 		// we want the command that's closest to the object, i.e. the
 		// last command in the sentence
 		c := ssc[i]
-		if !p.Vocab.Commands[c] {
+		if !av.Get(c) {
 			// this can and should be done much more efficiently
 			ww := language.RemoveStopWords(words)
 			for j := len(ww) - 1; j > 0; j-- {
@@ -285,29 +328,23 @@ func extractCommand(p *pkg.Pkg, m *dt.Msg, words,
 	return cmd
 }
 
-func extractObject(p *pkg.Pkg, m *dt.Msg, words, ssc []string) *language.WordT {
+func extractObject(av dt.AtomicMap, m *dt.Msg, words, ssc []string) *language.WordT {
 	var obj *language.WordT
 	seen := map[string]bool{}
 	for _, w := range m.Input.StructuredInput.Objects.StringSlice() {
-		log.Debugln("word", w)
-		if !p.Vocab.Objects[w] {
-			log.Debugln("here...")
+		if !av.Get(w) {
 			// this can and should be done much more efficiently
 			for i, wrd := range language.RemoveStopWords(words) {
-				log.Debugln("here!", w, wrd)
 				if wrd != w {
 					continue
 				}
-				log.Debugln("here!!!!", i, wrd)
 				if obj == nil {
 					obj = &language.WordT{
 						Index: i,
 						Word:  w,
 					}
-					log.Debugln(i, w)
 				} else if !seen[w] {
 					obj.Word += " " + w
-					log.Debugln(i, w)
 				}
 				seen[w] = true
 			}
@@ -316,31 +353,10 @@ func extractObject(p *pkg.Pkg, m *dt.Msg, words, ssc []string) *language.WordT {
 	return obj
 }
 
-func buildQuery(wt *language.WordT, m *dt.Msg, wordType string,
-	words []string) Query {
-	query := Query{
-		UserID: m.User.ID,
-		Active: true,
+func deleteNodes(db *sqlx.DB, u *dt.User) error {
+	q := `DELETE FROM knowledgenodes WHERE userid=$1 AND relation IS NULL`
+	if _, err := db.Exec(q, u.ID); err != nil && err != sql.ErrNoRows {
+		return err
 	}
-	if wordType == "Command" {
-		query.Term = strings.ToLower(wt.Word)
-	} else {
-		query.Term = wt.Word
-	}
-	tmp := strings.Fields(m.Input.Sentence)
-	tmp = language.RemoveStopWords(tmp)
-	query.Trigram = tmp[wt.Index]
-	if len(tmp) > wt.Index+2 {
-		query.Trigram += " " + tmp[wt.Index+1] + " " +
-			tmp[wt.Index+2]
-	} else if len(tmp) > wt.Index+1 {
-		query.Trigram += " " + tmp[wt.Index+1]
-	}
-	query.Trigram = strings.ToLower(query.Trigram)
-	query.WordType = wordType
-	if m.LastResponse != nil {
-		query.ResponseID.Int64 = int64(m.LastResponse.ID)
-		query.ResponseID.Valid = true
-	}
-	return query
+	return nil
 }
