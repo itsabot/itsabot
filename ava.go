@@ -253,14 +253,12 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 			return ret, nil
 		}
 	}
-	/*
-		if len(nodes) > 0 {
-			ctx, ret, err = processAgain(ctx, nodes[0], followup)
-			if err != nil {
-				return nil, err
-			}
+	if len(nodes) > 0 {
+		ctx, ret, err = processAgain(ctx, nodes[0], followup)
+		if err != nil {
+			return nil, err
 		}
-	*/
+	}
 	return ret, nil
 }
 
@@ -303,24 +301,18 @@ func processText(c *echo.Context) (string, error) {
 	}
 	ctx.Msg.Route = route
 	log.Debugln("followup?", followup)
-	// get node, change sentence if active
 	n, err := getActiveNode(db, ctx.Msg.User)
 	if err != nil {
 		return "", err
 	}
 	var ret *dt.RespMsg
-	if n == nil {
-		ret, err = callPkg(pkg, ctx.Msg, followup)
-		if err != nil {
-			return "", err
-		}
-	} else {
+	if n != nil {
 		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
-		if err != nil {
-			return "", err
+		if err == ErrRelEqTerm {
+			s := "I didn't understand that. What's " + n.Term +
+				" again?"
+			return s, nil
 		}
-		log.Debugln("new", ctx.Msg.Input.Sentence)
-		ctx, ret, err = processAgain(ctx, n, followup)
 		if err != nil {
 			return "", err
 		}
@@ -331,18 +323,25 @@ func processText(c *echo.Context) (string, error) {
 			return "", err
 		}
 	}
-	ret, err = processKnowledge(ctx, ret, followup)
+	ret, err = callPkg(pkg, ctx.Msg, followup)
 	if err != nil {
 		return "", err
 	}
-	if len(ret.Sentence) == 0 && n != nil {
-		ctx, ret, err = processAgain(ctx, n, followup)
+	if len(ret.Sentence) == 0 {
+		ret, err = processKnowledge(ctx, ret, followup)
 		if err != nil {
 			return "", err
 		}
 	}
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
+		if n != nil {
+			log.Debugln("confused with node. deleting unused and last knowledgequeries")
+			err := deleteRecentNodes(db, ctx.Msg.User)
+			if err != nil {
+				return "", err
+			}
+		}
 	}
 	var pkgName string
 	if pkg != nil {

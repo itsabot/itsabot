@@ -433,6 +433,24 @@ var StopWords = []string{
 	"the",
 }
 
+var SwearWords = map[string]bool{
+	"arse":         true,
+	"ass":          true,
+	"asshole":      true,
+	"bastard":      true,
+	"bitch":        true,
+	"cunt":         true,
+	"damn":         true,
+	"fuck":         true,
+	"fucker":       true,
+	"goddamn":      true,
+	"goddamm":      true,
+	"goddam":       true,
+	"motherfucker": true,
+	"shit":         true,
+	"whore":        true,
+}
+
 func RemoveStopWords(ss []string) []string {
 	var removal []int
 	for i, s := range ss {
