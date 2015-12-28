@@ -336,6 +336,7 @@ func processText(c *echo.Context) (string, error) {
 	}
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
+		log.Debugln("confused. node?", n)
 		if n != nil {
 			log.Debugln("confused with node. deleting unused and last knowledgequeries")
 			err := deleteRecentNodes(db, ctx.Msg.User)
