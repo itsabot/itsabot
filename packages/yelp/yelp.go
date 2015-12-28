@@ -155,7 +155,7 @@ func (t *Yelp) FollowUp(m *dt.Msg,
 		loc := m.Input.StructuredInput.All()
 		resp.State["location"] = loc
 		if err := t.searchYelp(resp); err != nil {
-			l.WithField("fn", "searchYelp").Fatalln(err)
+			l.WithField("fn", "searchYelp").Errorln(err)
 		}
 		return p.SaveResponse(respMsg, resp)
 	}
