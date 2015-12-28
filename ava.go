@@ -198,18 +198,18 @@ func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
 }
 
 func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
-	error) {
+	bool, error) {
 	var edges []*edge
 	var err error
 	if len(ret.Sentence) == 0 {
 		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, e := range edges {
 			ctx, ret, err = processAgain(ctx, e, followup)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			if len(ret.Sentence) > 0 {
 				e.IncrementConfidence(db)
@@ -223,7 +223,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
 			int64(len(edges)))
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		for _, n := range nodes {
 			if len(n.Rel()) == 0 {
@@ -231,7 +231,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 			}
 			ctx, ret, err = processAgain(ctx, n, followup)
 			if err != nil {
-				return nil, err
+				return nil, false, err
 			}
 			if len(ret.Sentence) > 0 {
 				n.IncrementConfidence(db)
@@ -245,21 +245,23 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	if len(ret.Sentence) == 0 && len(nodes) == 0 {
 		nodes, err := newNodes(db, appVocab, ctx.Msg)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if len(nodes) > 0 {
 			log.Debugln("created nodes, still need to save")
 			ret.Sentence = nodes[0].Text()
-			return ret, nil
+			return ret, false, nil
 		}
 	}
+	var changed bool
 	if len(nodes) > 0 {
 		ctx, ret, err = processAgain(ctx, nodes[0], followup)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
+		changed = true
 	}
-	return ret, nil
+	return ret, changed, nil
 }
 
 func processAgain(ctx *Ctx, g graphObj, followup bool) (*Ctx, *dt.RespMsg,
@@ -327,8 +329,9 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	var changed bool
 	if len(ret.Sentence) == 0 {
-		ret, err = processKnowledge(ctx, ret, followup)
+		ret, changed, err = processKnowledge(ctx, ret, followup)
 		if err != nil {
 			log.WithField("fn", "callPkg").Errorln(err)
 			return "", err
@@ -337,7 +340,7 @@ func processText(c *echo.Context) (string, error) {
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
 		log.Debugln("confused. node?", n)
-		if n != nil {
+		if changed {
 			log.Debugln("confused with node. deleting unused and last knowledgequeries")
 			err := deleteRecentNodes(db, ctx.Msg.User)
 			if err != nil {
