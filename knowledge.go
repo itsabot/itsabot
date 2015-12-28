@@ -21,6 +21,8 @@ const (
 	nodeTermObject
 )
 
+var ErrRelEqTerm = errors.New("rel cannot == term")
+
 type graphObj interface {
 	IncrementConfidence(*sqlx.DB) error
 	DecrementConfidence(*sqlx.DB) error
@@ -36,6 +38,7 @@ type node struct {
 	ID         uint64
 	UserID     uint64
 	Term       string
+	TermStem   string
 	TermLength int
 	TermType   nodeTermT
 	Confidence int
@@ -96,7 +99,7 @@ func searchNodes(term string, edgesFound int64) ([]*node, error) {
 		q := `SELECT id, term, termlength, termtype, relation, userid,
 		          createdat
 		      FROM knowledgenodes
-		      WHERE term=$1
+		      WHERE termstem=$1
 		      ORDER BY confidence
 		      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
 		err := db.Select(&nodes, q, bg)
@@ -119,10 +122,14 @@ func (n *node) updateRelation(db *sqlx.DB, si *dt.StructuredInput) error {
 	} else {
 		return errors.New("invalid node TermType")
 	}
+	if rel == n.Term {
+		return ErrRelEqTerm
+	}
 	q := `UPDATE knowledgenodes SET relation=$1 WHERE id=$2`
 	n.Relation.String = rel
 	n.Relation.Valid = true
 	_, err := db.Exec(q, rel, n.ID)
+	log.Debugln("updated relation with", rel, "for id", n.ID)
 	return err
 }
 
@@ -197,11 +204,9 @@ func upToBigrams(s string) []string {
 }
 
 func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
-	err := msg.GetLastInput(db)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
+	msg.LastInput = msg.Input
 	tmp := []string{}
+	// TODO move comparison to stemmed versions
 	trm := strings.Fields(g.Trm())
 	for i := 0; i < len(msg.LastInput.SentenceFields); i++ {
 		if i+len(trm) > len(msg.LastInput.SentenceFields) {
@@ -211,8 +216,8 @@ func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 			break
 		}
 		wSlice := msg.LastInput.SentenceFields[i : i+len(trm)]
-		log.Debugln("comparing", wSlice, "=?", trm)
 		ws := strings.Join(wSlice, " ")
+		log.Debugln("comparing", ws, "=?", trm)
 		if ws == g.Trm() {
 			log.Debugln("matched. inserting", g.Rel())
 			tmp = append(tmp, g.Rel())
@@ -220,7 +225,9 @@ func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 		tmp = append(tmp, wSlice[0])
 		log.Debugln("tmp", tmp)
 	}
-	return updateSentence(tmp), nil
+	s := updateSentence(tmp)
+	log.Debugln("updated sentence", s)
+	return s, nil
 }
 
 func updateSentence(sentenceFields []string) string {
@@ -230,10 +237,12 @@ func updateSentence(sentenceFields []string) string {
 	// almost certainly could be done in 1 loop instead of 2, avoiding the
 	// separate strings.Join
 	var tmp string
+	log.Debugln("sentenceFields", sentenceFields)
 	for i := 1; i < len(sentenceFields); i++ {
 		tmp = sentenceFields[i]
 		switch tmp {
 		case "\"", "'", ",", ".", ":", ";", "!", "?":
+			log.Debugln("found punctuation")
 			sentenceFields[i-1] = sentenceFields[i-1] + tmp
 			sentenceFields[i] = ""
 		}
@@ -243,38 +252,46 @@ func updateSentence(sentenceFields []string) string {
 
 func getActiveNode(db *sqlx.DB, u *dt.User) (*node, error) {
 	n := &node{}
-	q := `SELECT id, userid, term, termtype, relation
+	q := `SELECT id, userid, term, termstem, termtype, relation
 	      FROM knowledgenodes
-	      WHERE userid=$1 AND relation IS NULL`
+	      WHERE userid=$1 AND relation IS NULL OR relation=''`
 	err := db.Get(n, q, u.ID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
+	log.Debugln("found active node")
 	return n, err
 }
 
 func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	log.Debugln("creating new knowledge nodes")
 	words := strings.Fields(m.Input.Sentence)
+	if usesOffensiveLanguage(words) {
+		return nil, errors.New("I'm sorry, but I don't respond to foul language.")
+	}
 	ssc := m.Input.StructuredInput.Commands.StringSlice()
 	sso := m.Input.StructuredInput.Objects.StringSlice()
 	log.Debugln("sso", sso)
 	cmd := extractCommand(av, m, words, ssc)
 	obj := extractObject(av, m, words, sso)
+	eng := porter2.Stemmer
 	var nodes []*node
 	q := `INSERT INTO knowledgenodes
-	      (term, termlength, termtype, userid) VALUES ($1, $2, $3, $4)
+	      (term, termstem, termlength, termtype, userid)
+	      VALUES ($1, $2, $3, $4, $5)
 	      RETURNING id`
 	var id uint64
 	if cmd != nil {
 		log.Debugln("building knowledge node around command")
+		stem := eng.Stem(cmd.Word)
 		n := node{
 			Term:       strings.ToLower(cmd.Word),
+			TermStem:   stem,
 			TermLength: len(cmd.Word),
 			TermType:   nodeTermCommand,
 		}
-		err := db.QueryRowx(q, n.Term, n.TermLength, nodeTermCommand,
-			m.User.ID).Scan(&id)
+		err := db.QueryRowx(q, n.Term, n.TermStem, n.TermLength,
+			nodeTermCommand, m.User.ID).Scan(&id)
 		if err != nil && err.Error() != `pq: duplicate key value violates unique constraint "knowledgeedges_userid_term_key"` {
 			return nodes, err
 		}
@@ -283,14 +300,15 @@ func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	}
 	if obj != nil {
 		log.Debugln("building knowledge node around object")
-		log.Debugln("obj", obj.Word)
+		stem := eng.Stem(obj.Word)
 		n := node{
 			Term:       strings.ToLower(obj.Word),
+			TermStem:   stem,
 			TermLength: len(obj.Word),
 			TermType:   nodeTermObject,
 		}
-		err := db.QueryRowx(q, n.Term, n.TermLength, nodeTermObject,
-			m.User.ID).Scan(&id)
+		err := db.QueryRowx(q, n.Term, n.TermStem, n.TermLength,
+			nodeTermObject, m.User.ID).Scan(&id)
 		if err != nil && err.Error() != `pq: duplicate key value violates unique constraint "knowledgenodes_userid_term_key"` {
 			return nodes, err
 		}
@@ -299,6 +317,15 @@ func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	}
 	log.Debugln("built", len(nodes), "knowledge nodes")
 	return nodes, nil
+}
+
+func usesOffensiveLanguage(words []string) bool {
+	for _, w := range words {
+		if language.SwearWords[w] {
+			return true
+		}
+	}
+	return false
 }
 
 func extractCommand(av dt.AtomicMap, m *dt.Msg, words,
@@ -351,6 +378,20 @@ func extractObject(av dt.AtomicMap, m *dt.Msg, words, ssc []string) *language.Wo
 		}
 	}
 	return obj
+}
+
+func deleteRecentNodes(db *sqlx.DB, u *dt.User) error {
+	if err := deleteNodes(db, u); err != nil {
+		return err
+	}
+	q := `DELETE FROM knowledgenodes
+	      WHERE userid=$1
+	      ORDER BY createdat DESC
+	      LIMIT 1`
+	if _, err := db.Exec(q, u.ID); err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	return nil
 }
 
 func deleteNodes(db *sqlx.DB, u *dt.User) error {

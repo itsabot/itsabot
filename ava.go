@@ -171,23 +171,6 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 	return ctx, nil
 }
 
-func processAgain(ctx *Ctx, g graphObj) (*Ctx, error) {
-	var err error
-	if g != nil {
-		ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
-		if err != nil {
-			return ctx, err
-		}
-	}
-	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
-	}
-	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
-	ctx.Msg.Input.StructuredInput = si
-	return ctx, nil
-}
-
 func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
 	bool, error) {
 	si, annotated, needsTraining, err := classify(bayes, cmd)
@@ -214,60 +197,19 @@ func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
 	return in, u, needsTraining, nil
 }
 
-func processText(c *echo.Context) (string, error) {
-	ctx, err := preprocess(c)
-	if err != nil || ctx == nil /* trained */ {
-		log.WithField("fn", "preprocessForMessage").Error(err)
-		return "", err
-	}
-	pkg, route, followup, err := getPkg(ctx.Msg)
-	if err != nil && err != ErrMissingPackage {
-		log.WithField("fn", "getPkg").Error(err)
-		return "", err
-	}
-	ctx.Msg.Route = route
-	log.Debugln("followup?", followup)
-	// get node, change sentence if active
-	n, err := getActiveNode(db, ctx.Msg.User)
-	if err != nil {
-		return "", err
-	}
-	if n != nil {
-		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
-		if err != nil {
-			return "", err
-		}
-		ctx, err = processAgain(ctx, n)
-		if err != nil {
-			return "", err
-		}
-		log.Debugln("new", ctx.Msg.Input.Sentence)
-	}
-	ret, err := callPkg(pkg, ctx.Msg, followup)
-	if err != nil {
-		log.WithField("fn", "callPkg").Errorln(err)
-		return "", err
-	}
-	if !followup {
-		log.Debugln("conversation change. deleting unused knowledgequeries")
-		if err := deleteNodes(db, ctx.Msg.User); err != nil {
-			return "", err
-		}
-	}
+func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
+	error) {
 	var edges []*edge
+	var err error
 	if len(ret.Sentence) == 0 {
 		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, e := range edges {
-			ctx, err = processAgain(ctx, e)
+			ctx, ret, err = processAgain(ctx, e, followup)
 			if err != nil {
-				return "", err
-			}
-			ret, err = callPkg(pkg, ctx.Msg, followup)
-			if err != nil {
-				return "", err
+				return nil, err
 			}
 			if len(ret.Sentence) > 0 {
 				e.IncrementConfidence(db)
@@ -281,16 +223,15 @@ func processText(c *echo.Context) (string, error) {
 		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
 			int64(len(edges)))
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		for _, n := range nodes {
-			ctx, err = processAgain(ctx, n)
-			if err != nil {
-				return "", err
+			if len(n.Rel()) == 0 {
+				break
 			}
-			ret, err = callPkg(pkg, ctx.Msg, followup)
+			ctx, ret, err = processAgain(ctx, n, followup)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
 			if len(ret.Sentence) > 0 {
 				n.IncrementConfidence(db)
@@ -304,27 +245,90 @@ func processText(c *echo.Context) (string, error) {
 	if len(ret.Sentence) == 0 && len(nodes) == 0 {
 		nodes, err := newNodes(db, appVocab, ctx.Msg)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 		if len(nodes) > 0 {
 			log.Debugln("created nodes, still need to save")
 			ret.Sentence = nodes[0].Text()
-		} else {
-			log.Debugln("processing again")
-			ctx, err = processAgain(ctx, nil)
-			if err != nil {
-				return "", err
-			}
+			return ret, nil
 		}
 	}
-	if len(ret.Sentence) == 0 {
-		pkg, route, followup, err = getPkg(ctx.Msg)
+	if len(nodes) > 0 {
+		ctx, ret, err = processAgain(ctx, nodes[0], followup)
 		if err != nil {
-			log.WithField("fn", "getPkg").Error(err)
+			return nil, err
+		}
+	}
+	return ret, nil
+}
+
+func processAgain(ctx *Ctx, g graphObj, followup bool) (*Ctx, *dt.RespMsg,
+	error) {
+	var err error
+	ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
+	if err != nil {
+		return ctx, nil, err
+	}
+	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
+	if err != nil {
+		log.Errorln("classifying sentence", err)
+	}
+	pkg, route, _, err := getPkg(ctx.Msg)
+	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "getPkg").Error(err)
+		return ctx, nil, err
+	}
+	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
+	ctx.Msg.Input.StructuredInput = si
+	ctx.Msg.Route = route
+	ret, err := callPkg(pkg, ctx.Msg, followup)
+	if err != nil {
+		return ctx, nil, err
+	}
+	return ctx, ret, nil
+}
+
+func processText(c *echo.Context) (string, error) {
+	ctx, err := preprocess(c)
+	if err != nil || ctx == nil /* trained */ {
+		log.WithField("fn", "preprocessForMessage").Error(err)
+		return "", err
+	}
+	pkg, route, followup, err := getPkg(ctx.Msg)
+	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "getPkg").Error(err)
+		return "", err
+	}
+	ctx.Msg.Route = route
+	log.Debugln("followup?", followup)
+	n, err := getActiveNode(db, ctx.Msg.User)
+	if err != nil {
+		return "", err
+	}
+	var ret *dt.RespMsg
+	if n != nil {
+		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
+		if err == ErrRelEqTerm {
+			s := "I didn't understand that. What's " + n.Term +
+				" again?"
+			return s, nil
+		}
+		if err != nil {
 			return "", err
 		}
-		ctx.Msg.Route = route
-		ret, err = callPkg(pkg, ctx.Msg, followup)
+	}
+	if !followup {
+		log.Debugln("conversation change. deleting unused knowledgequeries")
+		if err := deleteNodes(db, ctx.Msg.User); err != nil {
+			return "", err
+		}
+	}
+	ret, err = callPkg(pkg, ctx.Msg, followup)
+	if err != nil {
+		return "", err
+	}
+	if len(ret.Sentence) == 0 {
+		ret, err = processKnowledge(ctx, ret, followup)
 		if err != nil {
 			log.WithField("fn", "callPkg").Errorln(err)
 			return "", err
@@ -332,6 +336,13 @@ func processText(c *echo.Context) (string, error) {
 	}
 	if len(ret.Sentence) == 0 {
 		ret.Sentence = language.Confused()
+		if n != nil {
+			log.Debugln("confused with node. deleting unused and last knowledgequeries")
+			err := deleteRecentNodes(db, ctx.Msg.User)
+			if err != nil {
+				return "", err
+			}
+		}
 	}
 	var pkgName string
 	if pkg != nil {
