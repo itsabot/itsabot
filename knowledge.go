@@ -100,7 +100,7 @@ func searchNodes(term string, edgesFound int64) ([]*node, error) {
 		          createdat
 		      FROM knowledgenodes
 		      WHERE termstem=$1
-		      ORDER BY confidence
+		      ORDER BY confidence DESC
 		      LIMIT ` + strconv.FormatInt(gsMax-edgesFound, 10)
 		err := db.Select(&nodes, q, bg)
 		if err != nil && err != sql.ErrNoRows {
