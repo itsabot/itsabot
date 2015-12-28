@@ -14,7 +14,7 @@ package elastigo
 import (
 	"encoding/json"
 
-	u "github.com/araddon/gou"
+	u "github.com/avabot/ava/Godeps/_workspace/src/github.com/araddon/gou"
 )
 
 var (

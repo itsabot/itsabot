@@ -17,7 +17,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/jwt"
-	"google.golang.org/cloud/compute/metadata"
+	"github.com/avabot/ava/Godeps/_workspace/src/google.golang.org/cloud/compute/metadata"
 )
 
 // DefaultClient returns an HTTP Client that uses the
