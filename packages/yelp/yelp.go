@@ -282,10 +282,15 @@ func (t *Yelp) searchYelp(resp *dt.Resp) error {
 	var data yelpResp
 	err := c.get("http://api.yelp.com/v2/search", form, &data)
 	if err != nil {
-		resp.Sentence = "I can't find that for you now. " +
-			"Let's try again later."
-		l.WithField("fn", "get").Errorln(err)
-		return err
+		/*
+			resp.Sentence = "I can't find that for you now. " +
+				"Let's try again later."
+			l.WithField("fn", "get").Errorln(err)
+			return err
+		*/
+		// return for confused response, given Yelp errors are rare, but
+		// unintentional runs of Yelp queries are much more common
+		return nil
 	}
 	resp.State["businesses"] = data.Businesses
 	if len(data.Businesses) == 0 {
