@@ -25,6 +25,7 @@ var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var vocab dt.Vocab
 var p *pkg.Pkg
+var stateHandler *dt.State
 var ctx *dt.Ctx
 var l *log.Entry
 var tskAddr *task.Task
@@ -163,6 +164,150 @@ func main() {
 			Words:    []string{"stop"},
 		},
 	)
+	stateHandler = dt.NewState{
+		dt.StateHandler{
+			// Question asks the user for information
+			Question: func() string {
+				return "Are you looking for a red or white? We can also find sparkling wines or rose."
+			},
+			// Answer sets the category in the cache/DB. Note that
+			// if invalid, this state's Complete function will
+			// return false, preventing the user from continuing.
+			// User messages will continue to hit this Answer func
+			// until Complete returns true.
+			//
+			// A note on error handling: errors should be logged but
+			// are not propogated up to the user. Due to the
+			// preferred style of thin StateHandlers, you should
+			// generally avoid logging errors directly in the Answer
+			// function and instead log them within the called
+			// function (e.g. setCategory, setPreference).
+			Answer: func(in *dt.Input) {
+				c := extractWineCategory(in.Sentence)
+				setCategory(c)
+				setPreference(prefs.KeyTaste, c)
+			},
+			// Complete will determine if the state machine
+			// continues. If true, it'll move to the next state. If
+			// false, the user's next response will hit this state's
+			// Answer function again
+			Complete: func() bool {
+				return len(getCategory()) > 0
+			},
+		},
+		dt.StateHandler{
+			// Memory will search through preferences about the
+			// user. If a past preference is found, it'll skip to
+			// the Answer response, with that preference as the
+			// input.
+			Memory: prefs.KeyTaste,
+			Question: func() string {
+				// Conversational things, like "Ok", "got it",
+				// etc. are added automatically questions when
+				// appropriate (TODO)
+				return "What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
+			},
+			Answer: func(in *dt.Input) {
+				setQuery(in.StructuredInput.Objects.String() +
+					" wine")
+			},
+			Complete: func() bool {
+				return len(getQuery()) > 0
+			},
+		},
+		dt.StateHandler{
+			Memory: prefs.KeyBudget,
+			Question: func() string {
+				return "How much do you usually pay for a bottle?"
+			},
+			Answer: func(in *dt.Input) {
+				val := language.ExtractCurrency(m.Input.Sentence)
+				if !val.Valid {
+					return
+				}
+				u := uint64(val.Int64)
+				setBudget(u)
+				setPreference(prefs.KeyBudget, u)
+			},
+			Complete: func() bool {
+				return getBudget() > 0
+			},
+		},
+		dt.StateHandler{
+			// If you need to do something when the state begins,
+			// like run a search or hit an endpoint, do that within
+			// the Question function, since it's only called once.
+			Question: func() string {
+				results := ctx.EC.FindProducts(getQuery(),
+					getCategory(), "alcohol", getBudget())
+				var s string
+				if len(results) == 0 {
+					fixSearchParams()
+					results = ctx.EC.FindProducts(
+						getQuery(), getCategory(),
+						"alcohol", getBudget())
+					s = "Here's the closest I could find. "
+				}
+				setProducts(results)
+				return s + recommendProduct(results[0])
+			},
+			// Functions can also be defined elsewhere, making them
+			// reusable across state and keyword interactions. Here
+			// sProductSelection is moved elsewhere because it's
+			// a little long. The Answer function here keeps track
+			// of the viewed product index and increments based on
+			// user feedback until something is selected
+			Answer: sProductSelection,
+			Complete: func() bool {
+				return len(getSelectedProducts()) > 0
+			},
+		},
+		dt.TaskRequestAddressHandler{
+			// Tasks are handled separately. On completion, they
+			// return some output. In this case, an address.
+			Complete: func(addr *dt.Address) bool {
+				if addr == nil {
+					return false
+				}
+				setShippingAddress(addr)
+				return true
+			},
+		},
+		dt.StateHandler{
+			Question: func() string {
+				prods := getSelectedProducts()
+				addr := getShippingAddress()
+				p := float64(prods.Prices(addr)["total"]) / 100
+				s := fmt.Sprintf("It comes to %2f. ", p)
+				return s + "Should I place the order?"
+			},
+			Answer: func(in *dt.Input) {
+				yes := language.ExtractYesNo(in.Sentence)
+				if yes.Valid && yes.Bool {
+					setPurchaseConfirmed(true)
+				}
+			},
+			// If the user responds with "No" above, Ava determines
+			// whether to reply with confusion or accept the answer,
+			// e.g. "Ok." based on the user's language automatically
+			Complete: func() bool {
+				return getPurchaseConfirmed()
+			},
+		},
+		dt.TaskHandler{
+			Task: task.New(task.RequestPurchase, map[string]string{
+				"auth": strconv.Itoa(task.MethodZip),
+			}),
+			Complete: func(p *dt.Purchase) bool {
+				return p != nil
+			},
+		},
+		dt.StateHandler{
+			Statement: func() string {
+				return "Got it. Should be on its way soon!"
+			},
+		},
+	}
 	purchase := new(Purchase)
 	if err := p.Register(purchase); err != nil {
 		l.Fatalln("registering", err)
@@ -262,44 +407,91 @@ func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	return p.SaveResponse(respMsg, resp)
 }
 
+func sProductSelection(in *dt.Input) {
+	yes := language.ExtractYesNo(m.Input.Sentence)
+	if !yes.Valid {
+		return nil
+	}
+	if !yes.Bool {
+		resp.State["offset"] = getOffset() + 1
+		setState(StateMakeRecommendation)
+		return updateState(m, resp, respMsg)
+	}
+	count := language.ExtractCount(m.Input.Sentence)
+	if count.Valid {
+		if count.Int64 == 0 {
+			// asked to order 0 wines. trigger confused
+			// reply
+			return nil
+		}
+	}
+	selection, err := currentSelection(resp.State)
+	if err == ErrEmptyRecommendations {
+		resp.Sentence = "I couldn't find any wines like that. "
+		if getBudget() < 5000 {
+			resp.Sentence += "Should we look among the more expensive bottles?"
+			setState(StateRecommendationsAlterBudget)
+		} else {
+			resp.Sentence += "Should we expand your search to more wines?"
+			setState(StateRecommendationsAlterQuery)
+		}
+		return updateState(m, resp, respMsg)
+	}
+	if err != nil {
+		return err
+	}
+	if !count.Valid || count.Int64 <= 1 {
+		count.Int64 = 1
+		resp.Sentence = "Ok, I've added it to your cart. Should we look for a few more?"
+	} else if uint(count.Int64) > selection.Stock {
+		resp.Sentence = "I'm sorry, but I don't have that many available. Should we do "
+		return nil
+	} else {
+		resp.Sentence = fmt.Sprintf(
+			"Ok, I'll add %d to your cart. Should we look for a few more?",
+			count.Int64)
+	}
+	prod := dt.ProductSel{
+		Product: selection,
+		Count:   uint(count.Int64),
+	}
+	resp.State["productsSelected"] = append(getSelectedProducts(),
+		prod)
+}
+
+func sRedWhite(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
+	resp.State["category"] = extractWineCategory(m.Input.Sentence)
+	if getCategory() == "" {
+		return nil
+	}
+	l.WithField("cat", getCategory()).Infoln("selected category")
+	return nil
+}
+
+func sPreferencesEntry(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
+	tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
+		prefs.KeyTaste)
+	if err != nil {
+		return err
+	}
+	if len(tastePref) == 0 {
+		resp.Sentence = "Ok. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
+		return nil
+	}
+	resp.State["query"] = tastePref
+	return nil
+}
+
+func sPreferencesFollowup() {
+	resp.State["query"] = getQuery() + " " + m.Input.Sentence
+}
+
 func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	state := getState()
 	switch state {
 	case StateRedWhite:
-		resp.State["category"] = extractWineCategory(m.Input.Sentence)
-		if getCategory() == "" {
-			return nil
-		}
-		l.WithField("cat", getCategory()).Infoln("selected category")
-		setState(StateCheckPastPreferences)
-		return updateState(m, resp, respMsg)
 	case StateCheckPastPreferences:
-		tastePref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
-			prefs.KeyTaste)
-		if err != nil {
-			return err
-		}
-		if len(tastePref) == 0 {
-			setState(StatePreferences)
-			resp.Sentence = "Ok. What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
-			return nil
-		}
-		resp.State["query"] = tastePref
-		setState(StateCheckPastBudget)
-		return updateState(m, resp, respMsg)
 	case StatePreferences:
-		resp.State["query"] = getQuery() + " " + m.Input.Sentence
-		if getBudget() == 0 {
-			setState(StateCheckPastBudget)
-			if err := prefs.Save(ctx.DB, resp.UserID, pkgName,
-				prefs.KeyTaste, getQuery()); err != nil {
-				l.Errorln("saving taste pref", err)
-				return err
-			}
-			return updateState(m, resp, respMsg)
-		}
-		setState(StateSetRecommendations)
-		return updateState(m, resp, respMsg)
 	case StateCheckPastBudget:
 		budgetPref, err := prefs.Get(ctx.DB, resp.UserID, pkgName,
 			prefs.KeyBudget)
@@ -327,6 +519,7 @@ func updateState(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 		if !val.Valid {
 			return nil
 		}
+		val := language.ExtractCurrency(m.Input.Sentence)
 		resp.State["budget"] = uint64(val.Int64)
 		setState(StateSetRecommendations)
 		err := prefs.Save(ctx.DB, resp.UserID, pkgName, prefs.KeyBudget,
@@ -655,12 +848,6 @@ func setRecs(resp *dt.Resp) error {
 	if len(results) == 0 {
 		resp.Sentence = "I'm sorry. I couldn't find anything like that."
 	}
-	/*
-		for i := range results {
-			j := rand.Intn(i + 1)
-			results[i], results[j] = results[j], results[i]
-		}
-	*/
 	// TODO - better recommendations
 	// results = sales.SortByRecommendation(results)
 	resp.State["recommendations"] = results
