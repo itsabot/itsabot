@@ -25,7 +25,7 @@ var ErrEmptyRecommendations = errors.New("empty recommendations")
 var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var vocab dt.Vocab
 var p *pkg.Pkg
-var stateHandler *dt.State
+var stateMachine []dt.State
 var ctx *dt.Ctx
 var l *log.Entry
 var tskAddr *task.Task
@@ -164,50 +164,29 @@ func main() {
 			Words:    []string{"stop"},
 		},
 	)
-	stateHandler = dt.NewState{
-		dt.StateHandler{
-			// Question asks the user for information
-			Question: func() string {
+	stateMachine = dt.NewStateMachine(
+		dt.State{
+			OnEntry: func() string {
 				return "Are you looking for a red or white? We can also find sparkling wines or rose."
 			},
-			// Answer sets the category in the cache/DB. Note that
-			// if invalid, this state's Complete function will
-			// return false, preventing the user from continuing.
-			// User messages will continue to hit this Answer func
-			// until Complete returns true.
-			//
-			// A note on error handling: errors should be logged but
-			// are not propogated up to the user. Due to the
-			// preferred style of thin StateHandlers, you should
-			// generally avoid logging errors directly in the Answer
-			// function and instead log them within the called
-			// function (e.g. setCategory, setPreference).
-			Answer: func(in *dt.Input) {
+			OnInput: func(in *dt.Input) {
 				c := extractWineCategory(in.Sentence)
 				setCategory(c)
 				setPreference(prefs.KeyTaste, c)
 			},
-			// Complete will determine if the state machine
-			// continues. If true, it'll move to the next state. If
-			// false, the user's next response will hit this state's
-			// Answer function again
 			Complete: func() bool {
 				return len(getCategory()) > 0
 			},
 		},
-		dt.StateHandler{
-			// Memory will search through preferences about the
-			// user. If a past preference is found, it'll skip to
-			// the Answer response, with that preference as the
-			// input.
+		dt.State{
 			Memory: prefs.KeyTaste,
-			Question: func() string {
+			OnEntry: func() string {
 				// Conversational things, like "Ok", "got it",
 				// etc. are added automatically questions when
 				// appropriate (TODO)
 				return "What do you usually look for in a wine? (e.g. dry, fruity, sweet, earthy, oak, etc.)"
 			},
-			Answer: func(in *dt.Input) {
+			OnInput: func(in *dt.Input) {
 				setQuery(in.StructuredInput.Objects.String() +
 					" wine")
 			},
@@ -215,12 +194,12 @@ func main() {
 				return len(getQuery()) > 0
 			},
 		},
-		dt.StateHandler{
+		dt.State{
 			Memory: prefs.KeyBudget,
-			Question: func() string {
+			OnEntry: func() string {
 				return "How much do you usually pay for a bottle?"
 			},
-			Answer: func(in *dt.Input) {
+			OnInput: func(in *dt.Input) {
 				val := language.ExtractCurrency(m.Input.Sentence)
 				if !val.Valid {
 					return
@@ -233,11 +212,8 @@ func main() {
 				return getBudget() > 0
 			},
 		},
-		dt.StateHandler{
-			// If you need to do something when the state begins,
-			// like run a search or hit an endpoint, do that within
-			// the Question function, since it's only called once.
-			Question: func() string {
+		dt.State{
+			OnEntry: func() string {
 				results := ctx.EC.FindProducts(getQuery(),
 					getCategory(), "alcohol", getBudget())
 				var s string
@@ -251,37 +227,48 @@ func main() {
 				setProducts(results)
 				return s + recommendProduct(results[0])
 			},
-			// Functions can also be defined elsewhere, making them
-			// reusable across state and keyword interactions. Here
-			// sProductSelection is moved elsewhere because it's
-			// a little long. The Answer function here keeps track
-			// of the viewed product index and increments based on
-			// user feedback until something is selected
-			Answer: sProductSelection,
+			// Here sProductSelection is moved elsewhere because
+			// it's a little long. The OnInput function here keeps
+			// track of the viewed product index and increments
+			// based on user feedback until something is selected
+			OnInput: sProductSelection,
 			Complete: func() bool {
 				return len(getSelectedProducts()) > 0
 			},
 		},
-		dt.TaskRequestAddressHandler{
-			// Tasks are handled separately. On completion, they
-			// return some output. In this case, an address.
-			Complete: func(addr *dt.Address) bool {
-				if addr == nil {
-					return false
+		dt.State{
+			OnEntry: func() string {
+				return task.Run(
+					task.RequestAddress,
+					map[string]string{},
+				)
+			},
+			OnInput: func(in *dt.Input) {
+				setShippingAddress()
+				// TODO change func signature of ExtractAddress
+				// (remove unused "found" bool return).
+				addr, _, err := language.ExtractAddress(db,
+					in.User.ID, in.Sentence)
+				if err != nil {
+					l.Errorln("extracting address", err)
 				}
-				setShippingAddress(addr)
-				return true
+				if addr != nil {
+					setShippingAddress(addr)
+				}
+			},
+			Complete: func() bool {
+				return getShippingAddress() != nil
 			},
 		},
-		dt.StateHandler{
-			Question: func() string {
+		dt.State{
+			OnEntry: func() string {
 				prods := getSelectedProducts()
 				addr := getShippingAddress()
 				p := float64(prods.Prices(addr)["total"]) / 100
 				s := fmt.Sprintf("It comes to %2f. ", p)
 				return s + "Should I place the order?"
 			},
-			Answer: func(in *dt.Input) {
+			OnInput: func(in *dt.Input) {
 				yes := language.ExtractYesNo(in.Sentence)
 				if yes.Valid && yes.Bool {
 					setPurchaseConfirmed(true)
@@ -294,23 +281,57 @@ func main() {
 				return getPurchaseConfirmed()
 			},
 		},
-		dt.TaskHandler{
-			Task: task.New(task.RequestPurchase, map[string]string{
-				"auth": strconv.Itoa(task.MethodZip),
-			}),
-			Complete: func(p *dt.Purchase) bool {
-				return p != nil
+		dt.State{
+			OnEntry: func() string {
+				return task.Run(
+					task.RequestPurchase,
+					map[string]string{
+						"auth": strconv.Itoa(
+							task.MethodZip),
+					},
+				)
+			},
+			OnInput: func(in *dt.Input) {
+				p := sBuildPurchase(in)
+				setPurchase(p)
+			},
+			Complete: func() bool {
+				return getPurchase() != nil
 			},
 		},
-		dt.StateHandler{
-			Statement: func() string {
+		dt.State{
+			OnEntry: func() string {
 				return "Got it. Should be on its way soon!"
 			},
 		},
-	}
+	)
+	stateMachine.OnReset(func() {
+		setQuery("")
+		setCategory("")
+		setBudget(0)
+		setOffset(0)
+		setPurchaseConfirmed(false)
+		setRecommendations(nil)
+		setShippingAddress(nil)
+		setProductsSelected(nil)
+		setPurchase(nil)
+	})
 	purchase := new(Purchase)
 	if err := p.Register(purchase); err != nil {
 		l.Fatalln("registering", err)
+	}
+}
+
+func resetPackageState() {
+	resp.State = map[string]interface{}{
+		"state":            StateNone,        // maintains state
+		"query":            "",               // search query
+		"category":         "",               // red, white, etc.
+		"budget":           "",               // suggested price
+		"recommendations":  dt.ProductSels{}, // search results
+		"offset":           uint(0),          // index in search
+		"shippingAddress":  &dt.Address{},
+		"productsSelected": dt.ProductSels{},
 	}
 }
 
@@ -480,6 +501,21 @@ func sPreferencesEntry(m *dt.Msg, resp *dt.Resp, respMsg *dt.RespMsg) error {
 	}
 	resp.State["query"] = tastePref
 	return nil
+}
+
+func sBuildPurchase(in *dt.Input) *dt.Product {
+	prods := getSelectedProducts()
+	purchase, err := dt.NewPurchase(ctx, &dt.PurchaseConfig{
+		User:            m.User,
+		ShippingAddress: getShippingAddress(),
+		VendorID:        prods[0].VendorID,
+		ProductSels:     prods,
+	})
+	if err != nil {
+		l.Errorln("sBuildPurchase", err)
+		return nil
+	}
+	return purchase
 }
 
 func sPreferencesFollowup() {
