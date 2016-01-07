@@ -385,9 +385,11 @@ func deleteRecentNodes(db *sqlx.DB, u *dt.User) error {
 		return err
 	}
 	q := `DELETE FROM knowledgenodes
-	      WHERE userid=$1
-	      ORDER BY createdat DESC
-	      LIMIT 1`
+	      WHERE id IN (
+		      SELECT id FROM knowledgenodes
+		      WHERE userid=$1
+		      ORDER BY createdat DESC
+		      LIMIT 1)`
 	if _, err := db.Exec(q, u.ID); err != nil && err != sql.ErrNoRows {
 		return err
 	}

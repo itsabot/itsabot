@@ -21,6 +21,25 @@ type Task struct {
 	respMsg  *dt.RespMsg
 }
 
+type Type int
+type Opts map[string]string
+
+const (
+	RequestAddress Type = iota + 1
+	RequestPurchase
+)
+
+func (sm StateMachine) RunTask(t Type, o Opts) {
+	addr, err := getAddress(dest, prodCount)
+	if addr != nil {
+		t.setState(addressStateNone)
+	}
+	if err != nil {
+		l
+	}
+	return done, err
+}
+
 func New(ctx *dt.Ctx, resp *dt.Resp, respMsg *dt.RespMsg) (*Task, error) {
 	if resp.State == nil {
 		return &Task{}, errors.New("state nil in *dt.Resp")

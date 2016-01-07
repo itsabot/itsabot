@@ -11,6 +11,8 @@ const (
 	KeyTaste         = "taste"
 )
 
+type Global bool
+
 func Get(db *sqlx.DB, uid uint64, pkgName, k string) (string, error) {
 	var q string
 	if len(pkgName) == 0 {
