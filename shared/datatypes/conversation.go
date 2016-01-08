@@ -23,6 +23,8 @@ type jsonState json.RawMessage
 
 type Msg struct {
 	ID                uint64
+	FlexID            string
+	FlexIDType        int
 	Sentence          string
 	SentenceAnnotated string
 	User              *User
@@ -76,9 +78,14 @@ func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
 		stems = append(stems, eng.Stem(w))
 	}
 	// TODO handle training here with the _ var
-	si, annotated, _, err := nlp.Classify(bayes, cmd)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
+	var si *nlp.StructuredInput
+	var annotated string
+	var err error
+	if bayes != nil {
+		si, annotated, _, err = nlp.Classify(bayes, cmd)
+		if err != nil {
+			log.Errorln("classifying sentence", err)
+		}
 	}
 	m := &Msg{
 		User:              u,

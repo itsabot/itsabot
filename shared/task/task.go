@@ -7,7 +7,10 @@ import (
 	"log"
 	"reflect"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/sms"
 )
 
 type Task struct {
@@ -16,19 +19,24 @@ type Task struct {
 
 	typ      string
 	resultID sql.NullInt64
-	ctx      *dt.Ctx
+	sg       *dt.MailClient
+	ec       *dt.SearchClient
+	tc       *twilio.Client
+	db       *sqlx.DB
 	msg      *dt.Msg
 	respMsg  *dt.RespMsg
 }
 
-func New(ctx *dt.Ctx, msg *dt.Msg, respMsg *dt.RespMsg) (*Task, error) {
+func New(db *sqlx.DB, msg *dt.Msg, respMsg *dt.RespMsg) (*Task, error) {
 	if msg.State == nil {
 		return &Task{}, errors.New("state nil in *dt.Msg")
 	}
 	return &Task{
-		ctx:     ctx,
 		msg:     msg,
 		respMsg: respMsg,
+		sg:      dt.NewMailClient(),
+		ec:      dt.NewSearchClient(),
+		tc:      sms.NewClient(),
 	}, nil
 }
 
@@ -60,7 +68,7 @@ func (t *Task) setInterimID(id uint64) {
 }
 
 func (t *Task) Key() string {
-	return fmt.Sprintf("__task%s_UserID_%d", t.typ, t.ctx.Msg.User.ID)
+	return fmt.Sprintf("__task%s_UserID_%d", t.typ, t.msg.User.ID)
 }
 
 // getInterimID is useful when you've saved an object, but haven't finished

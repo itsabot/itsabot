@@ -49,8 +49,8 @@ var statesTax = map[string]float64{
 	"CA": 0.0925,
 }
 
-func NewPurchase(ctx *Ctx, pc *PurchaseConfig) (*Purchase, error) {
-	p := &Purchase{db: ctx.DB}
+func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
+	p := &Purchase{db: db}
 	p.ID = uint64(rand.Int63n(8999999999) + 1000000000)
 	p.User = pc.User
 	p.ShippingAddress = pc.ShippingAddress

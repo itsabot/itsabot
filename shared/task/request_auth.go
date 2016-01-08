@@ -55,7 +55,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 	log.Println("REQUESTAUTH")
 	log.Println("state", t.GetState())
 	// check last authentication date and method
-	authenticated, err := t.ctx.Msg.User.IsAuthenticated(m)
+	authenticated, err := t.msg.User.IsAuthenticated(m)
 	if err != nil {
 		log.Println("err checking last authentication")
 		return false, err
@@ -72,13 +72,12 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 		switch m {
 		case MethodZip:
 			log.Println("methodzip")
-			zip5 := []byte(
-				regexNum.FindString(t.ctx.Msg.Input.Sentence))
+			zip5 := []byte(regexNum.FindString(t.msg.Sentence))
 			if len(zip5) != 5 {
 				return false, ErrInvalidAuth
 			}
 			q := `SELECT zip5hash FROM cards WHERE userid=$1`
-			rows, err := t.ctx.DB.Queryx(q, t.ctx.Msg.User.ID)
+			rows, err := t.db.Queryx(q, t.msg.User.ID)
 			if err != nil {
 				return false, err
 			}
@@ -102,8 +101,8 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 						FROM users
 						WHERE id=$1`
 					authID := &sql.NullInt64{}
-					err = t.ctx.DB.Get(authID, q,
-						t.ctx.Msg.User.ID)
+					err = t.db.Get(authID, q,
+						t.msg.User.ID)
 					if err == sql.ErrNoRows {
 						return false, ErrNoAuth
 					}
@@ -113,7 +112,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 					q = `
 						SELECT id FROM authorizations
 						WHERE id=$1 AND authmethod>=$2`
-					err = t.ctx.DB.Get(authID, q, *authID,
+					err = t.db.Get(authID, q, *authID,
 						m)
 					if err == sql.ErrNoRows {
 						log.Println("no authorization")
@@ -139,7 +138,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 		case MethodWebCache, MethodWebLogin:
 			q := `SELECT authorizationid FROM users WHERE id=$1`
 			var authID *sql.NullInt64
-			err := t.ctx.DB.Get(authID, q, t.ctx.Msg.User.ID)
+			err := t.db.Get(authID, q, t.msg.User.ID)
 			if err != nil {
 				return false, err
 			}
@@ -151,7 +150,7 @@ func (t *Task) RequestAuth(m dt.Method) (bool, error) {
 				WHERE id=$1
 					AND authmethod>=$2
 					AND authorizedat<>NULL`
-			err = t.ctx.DB.Get(authID, q, authID.Int64, m)
+			err = t.db.Get(authID, q, authID.Int64, m)
 			if err != nil {
 				return false, err
 			}
@@ -181,29 +180,29 @@ func (t *Task) RequestPurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 
 func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 	log.Println("asking user for auth")
-	cards, err := t.ctx.Msg.User.GetCards(t.ctx.DB)
+	cards, err := t.msg.User.GetCards(t.db)
 	if err != nil {
 		log.Println("err getting cards")
 		return false, err
 	}
 	if len(cards) == 0 {
 		log.Println("user has no cards")
-		t.resp.Sentence = "Great! I'll need you to add your card here, first: https://avabot.co/?/cards/new. Let me know when you're done!"
+		t.msg.Sentence = "Great! I'll need you to add your card here, first: https://avabot.co/?/cards/new. Let me know when you're done!"
 		return false, nil
 	}
 	switch m {
 	case MethodZip:
-		t.resp.Sentence = "To do that, please confirm your billing zip code."
+		t.msg.Sentence = "To do that, please confirm your billing zip code."
 		log.Println("asking user for auth: zip code")
 	case MethodWebCache:
-		t.resp.Sentence = "To do that, please prove you're logged in: https://www.avabot.co/?/profile"
+		t.msg.Sentence = "To do that, please prove you're logged in: https://www.avabot.co/?/profile"
 	case MethodWebLogin:
-		if err := t.ctx.Msg.User.DeleteSessions(t.ctx.DB); err != nil {
+		if err := t.msg.User.DeleteSessions(t.db); err != nil {
 			return false, err
 		}
-		t.resp.Sentence = "To do that, please log in to prove it's you: https://www.avabot.co/?/login"
+		t.msg.Sentence = "To do that, please log in to prove it's you: https://www.avabot.co/?/login"
 	}
-	tx, err := t.ctx.DB.Beginx()
+	tx, err := t.db.Beginx()
 	if err != nil {
 		return false, err
 	}
@@ -214,7 +213,7 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 		return false, err
 	}
 	q = `UPDATE users SET authorizationid=$1 WHERE id=$2`
-	if _, err = tx.Exec(q, aid, t.ctx.Msg.User.ID); err != nil {
+	if _, err = tx.Exec(q, aid, t.msg.User.ID); err != nil {
 		log.Println("err updating")
 		return false, err
 	}
@@ -228,12 +227,12 @@ func (t *Task) askUserForAuth(m dt.Method) (bool, error) {
 }
 
 func (t *Task) setAuthorized(authID *sql.NullInt64) error {
-	tx, err := t.ctx.DB.Beginx()
+	tx, err := t.db.Beginx()
 	if err != nil {
 		return err
 	}
 	q := `UPDATE users SET authorizationid=NULL WHERE id=$1`
-	if _, err = tx.Exec(q, t.ctx.Msg.User.ID); err != nil {
+	if _, err = tx.Exec(q, t.msg.User.ID); err != nil {
 		return err
 	}
 	q = `
@@ -263,15 +262,17 @@ func (t *Task) makePurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 		Amount:   p.Total,
 		Currency: "usd",
 		Desc:     desc,
-		Customer: t.ctx.Msg.User.StripeCustomerID,
+		Customer: t.msg.User.StripeCustomerID,
 	}
 	if _, err := charge.New(chargeParams); err != nil {
 		return false, err
 	}
-	if err := t.ctx.SG.SendVendorRequest(p); err != nil {
+	// TODO move functionality like sending emails to Ava core. Should pkgs
+	// should request content be sent to users through Ava core?
+	if err := t.sg.SendVendorRequest(p); err != nil {
 		return false, err
 	}
-	if err := t.ctx.SG.SendPurchaseConfirmation(p); err != nil {
+	if err := t.sg.SendPurchaseConfirmation(p); err != nil {
 		return false, err
 	}
 	if err := p.UpdateEmailsSent(); err != nil {
