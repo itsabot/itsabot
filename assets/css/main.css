@@ -356,6 +356,154 @@ input.form-control {
 	border: 1px solid #E8E8E8;
 	border-top: 1px solid #DDD;
 }
+.chat-container {
+	width: 300px;
+	margin: 20px auto;
+}
+.top-header {
+	background: #666;
+	color: white;
+	padding: 0.2rem;
+	position: relative;
+	overflow: hidden;
+	border-bottom: 4px solid #35ac19;
+}
+.top-header:hover {
+	background-color: #35ac19;
+}
+.top-header-tit {
+	display: inline;
+	font-size: 14px;
+}
+.top-header .typicons-message {
+	display: inline-block;
+	padding: 2px 5px 2px 5px;
+	font-size: 20px;
+	position: relative;
+	top: 5px;
+}
+.top-header .typicons-minus {
+	position: relative;
+	top: 3px;
+	font-size: 15px;
+	cursor: pointer;
+}
+.top-header .typicons-times {
+	position: relative;
+	top: 3px;
+	font-size: 15px;
+	cursor: pointer;
+}
+.top-header .left {
+	float: left;
+}
+.top-header .right {
+	float: right;
+	padding-top: 5px;
+}
+.top-header > * {
+	position: relative;
+}
+.top-header::before {
+	content: '';
+	position: absolute;
+	top: -100%;
+	left: 0;
+	right: 0;
+	bottom: -100%;
+	opacity: 0.25;
+	background-color: #404040
+}
+.chat-box {
+	list-style: none;
+	background: #e5e5e5;
+	margin: 0;
+	padding: 0 0 50px 0;
+	height: 280px;
+	overflow-y: auto;
+}
+.chat-box li {
+	padding: 0.5rem;
+	overflow: hidden;
+	display: flex;
+}
+.chat-box .avatar-icon {
+	width: 40px;
+	position: relative;
+}
+.chat-box .avatar-icon img {
+	display: block;
+	width: 100%;
+	background-color: #1469A6;
+}
+.chat-user .avatar-icon:after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	width: 0;
+	height: 0;
+	border: 5px solid white;
+	border-left-color: transparent;
+	border-bottom-color: transparent;
+}
+.chat-ava {
+	justify-content: flex-end;
+	align-items: flex-end;
+}
+.chat-ava .messages {
+	order: 1;
+	border-bottom-right-radius: 0;
+}
+.chat-ava .avatar-icon {
+	order: 2;
+}
+.chat-ava .avatar-icon:after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	width: 0;
+	height: 0;
+	border: 5px solid white;
+	border-right-color: transparent;
+	border-top-color: transparent;
+	box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+}
+.messages {
+	background: white;
+	padding: 10px;
+	border-radius: 2px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.messages p {
+	font-size: 0.8rem;
+	margin: 0 0 0.2rem 0;
+}
+.messages time {
+	font-size: 0.7rem;
+	color: #ccc;
+}
+.setting {
+	background-color: #e5e5e5;
+	height: 32px;
+	padding-top: 2px;
+	border-bottom: 1px solid rgba(0, 0, 0, .1);
+}
+.setting .left {
+	float: left;
+}
+.setting .right {
+	float: right;
+}
+.iconicstroke-user {
+	font-size: 22px;
+	position: relative;
+	top: 4px;
+	left: 10px;
+	color: #414141;
+	cursor: pointer;
+}
 a,
 div,
 span,

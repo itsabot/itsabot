@@ -10,9 +10,7 @@ import (
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/nlp"
 )
 
 var (
@@ -22,24 +20,29 @@ var (
 type jsonState json.RawMessage
 
 type Msg struct {
-	ID                uint64
-	Sentence          string
-	SentenceAnnotated string
-	User              *User
-	StructuredInput   *nlp.StructuredInput
-	Stems             []string
-	Route             string
-	Package           string
-	State             map[string]interface{}
-	// SentenceFields breaks the sentence into words. Tokens like ,.' are
-	// treated as individual words.
-	SentenceFields []string
+	User         *User
+	Input        *Input
+	LastInput    *Input
+	LastResponse *Resp
+	Stems        []string
+	Route        string
 }
 
-// RespMsg is used to pass results from packages to Ava
+// ResponseMsg is used to pass results from packages to Ava
 type RespMsg struct {
-	MsgID    uint64
-	Sentence string
+	ResponseID uint64
+	Sentence   string
+}
+
+type Resp struct {
+	ID         uint64
+	UserID     uint64
+	InputID    uint64
+	FeedbackID uint64
+	Sentence   string
+	Route      string
+	State      map[string]interface{}
+	CreatedAt  time.Time
 }
 
 type Feedback struct {
@@ -55,6 +58,28 @@ const (
 	SentimentPositive = 1
 )
 
+type Input struct {
+	ID                uint64
+	UserID            uint64
+	FlexID            string
+	FlexIDType        int
+	Sentence          string
+	SentenceNorm      string
+	SentenceAnnotated string
+	// SentenceFields breaks the sentence into words. Tokens like ,.' are
+	// treated as individual words.
+	SentenceFields  []string
+	ResponseID      uint64
+	KnowledgeFilled bool
+	StructuredInput *StructuredInput
+}
+
+func (in *Input) Save(db *sqlx.DB) error {
+	q := `UPDATE inputs SET knowledgefilled=TRUE WHERE id=$1`
+	_, err := db.Exec(q, in.ID)
+	return err
+}
+
 func (j *jsonState) Scan(value interface{}) error {
 	if err := json.Unmarshal(value.([]byte), *j); err != nil {
 		log.Println("unmarshal jsonState: ", err)
@@ -67,27 +92,26 @@ func (j *jsonState) Value() (driver.Value, error) {
 	return j, nil
 }
 
-func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
-	words := strings.Fields(cmd)
+func NewInput(si *StructuredInput, uid uint64, fid string, fidT int) *Input {
+	in := Input{
+		StructuredInput: si,
+		UserID:          uid,
+		FlexID:          fid,
+		FlexIDType:      fidT,
+	}
+	return &in
+}
+
+func NewMessage(db *sqlx.DB, u *User, in *Input) *Msg {
+	words := strings.Fields(in.Sentence)
 	eng := porter2.Stemmer
 	stems := []string{}
 	for _, w := range words {
 		w = strings.TrimRight(w, ",.?;:!-/")
 		stems = append(stems, eng.Stem(w))
 	}
-	// TODO handle training here with the _ var
-	si, annotated, _, err := nlp.Classify(bayes, cmd)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
-	}
-	m := &Msg{
-		User:              u,
-		Sentence:          cmd,
-		SentenceFields:    SentenceFields(cmd),
-		Stems:             stems,
-		StructuredInput:   si,
-		SentenceAnnotated: annotated,
-	}
+	var err error
+	m := &Msg{User: u, Input: in, Stems: stems}
 	m, err = addContext(db, m)
 	if err != nil {
 		log.WithField("fn", "addContext").Errorln(err)
@@ -95,28 +119,16 @@ func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
 	return m
 }
 
-func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
-	var route string
-	q := `SELECT route FROM messages
+func (m *Msg) GetLastInput(db *sqlx.DB) error {
+	log.Debugln("getting last input")
+	q := `SELECT id, sentence, knowledgefilled FROM inputs
 	      WHERE userid=$1
 	      ORDER BY createdat DESC`
-	err := db.Get(&route, q, m.User.ID)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-	return route, nil
-}
-
-/*
-func (m *Msg) GetLastUserMessage(db *sqlx.DB) error {
-	log.Debugln("getting last input")
-	q := `SELECT id, sentence FROM messages
-	      WHERE userid=$1 AND avasent IS FALSE
-	      ORDER BY createdat DESC`
-	if err := db.Get(&m.LastUserMsg, q, m.User.ID); err != nil {
+	var tmp Input
+	if err := db.Get(&tmp, q, m.User.ID); err != nil {
 		return err
 	}
-	m.LastUserMsg.SentenceFields = SentenceFields(m.LastUserMsg.Sentence)
+	tmp.SentenceFields = SentenceFields(tmp.Sentence)
 	m.LastInput = &tmp
 	return nil
 }
@@ -127,8 +139,8 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 		return ErrMissingUser
 	}
 	q := `SELECT id, stateid, route, sentence, userid
-	      FROM messages
-	      WHERE userid=$1 AND avasent IS TRUE
+	      FROM responses
+	      WHERE userid=$1
 	      ORDER BY createdat DESC`
 	row := db.QueryRowx(q, m.User.ID)
 	var tmp struct {
@@ -151,7 +163,7 @@ func (m *Msg) GetLastResponse(db *sqlx.DB) error {
 	if !tmp.StateID.Valid {
 		return errors.New("invalid stateid")
 	}
-	m.LastResponse = &Msg{
+	m.LastResponse = &Resp{
 		ID:       tmp.ID,
 		Route:    tmp.Route,
 		Sentence: tmp.Sentence,
@@ -180,83 +192,83 @@ func (m *Msg) NewResponse() *Resp {
 		uid = m.User.ID
 	}
 	res := &Resp{
-		MsgID:  m.ID,
-		UserID: uid,
-		Route:  m.Route,
+		UserID:  uid,
+		InputID: m.Input.ID,
+		Route:   m.Route,
 	}
 	if m.LastResponse != nil {
 		res.State = m.LastResponse.State
 	}
 	return res
 }
-*/
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
 // they refer. TODO refactor
 func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
-	for _, w := range m.StructuredInput.Pronouns() {
+	for _, w := range m.Input.StructuredInput.Pronouns() {
 		var ctx string
 		var err error
-		switch nlp.Pronouns[w] {
-		case nlp.ObjectI:
+		switch Pronouns[w] {
+		case ObjectI:
 			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "objects")
+				m.Input.StructuredInput,
+				"objects")
 			if err != nil {
 				return m, err
 			}
 			if ctx == "" {
 				return m, nil
 			}
-			for i, o := range m.StructuredInput.Objects {
+			for i, o := range m.Input.StructuredInput.Objects {
 				if o != w {
 					continue
 				}
-				m.StructuredInput.Objects[i] = ctx
+				m.Input.StructuredInput.Objects[i] = ctx
 			}
-		case nlp.ActorI:
+		case ActorI:
 			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "actors")
+				m.Input.StructuredInput, "actors")
 			if err != nil {
 				return m, err
 			}
 			if ctx == "" {
 				return m, nil
 			}
-			for i, o := range m.StructuredInput.Actors {
+			for i, o := range m.Input.StructuredInput.Actors {
 				if o != w {
 					continue
 				}
-				m.StructuredInput.Actors[i] = ctx
+				m.Input.StructuredInput.Actors[i] = ctx
 			}
-		case nlp.TimeI:
+		case TimeI:
 			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "times")
+				m.Input.StructuredInput, "times")
 			if err != nil {
 				return m, err
 			}
 			if ctx == "" {
 				return m, nil
 			}
-			for i, o := range m.StructuredInput.Times {
+			for i, o := range m.Input.StructuredInput.Times {
 				if o != w {
 					continue
 				}
-				m.StructuredInput.Times[i] = ctx
+				m.Input.StructuredInput.Times[i] = ctx
 			}
-		case nlp.PlaceI:
+		case PlaceI:
 			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "places")
+				m.Input.StructuredInput, "places")
 			if err != nil {
 				return m, err
 			}
 			if ctx == "" {
 				return m, nil
 			}
-			for i, o := range m.StructuredInput.Places {
+			for i, o := range m.Input.StructuredInput.Places {
 				if o != w {
 					continue
 				}
-				m.StructuredInput.Places[i] = ctx
+				m.Input.StructuredInput.Places[i] = ctx
 			}
 		default:
 			return m, errors.New("unknown type found for pronoun")
@@ -269,17 +281,18 @@ func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
 	return m, nil
 }
 
-func getContextObject(db *sqlx.DB, u *User, si *nlp.StructuredInput,
+func getContextObject(db *sqlx.DB, u *User, si *StructuredInput,
 	datatype string) (string, error) {
 	log.Debugln("getting object context")
-	var tmp *nlp.StringSlice
+	var tmp *StringSlice
 	if u == nil {
 		return "", ErrMissingUser
 	}
 	if u != nil {
-		q := `SELECT ` + datatype + `
-		      FROM inputs
-		      WHERE userid=$1 AND array_length(objects, 1) > 0`
+		q := `
+			SELECT ` + datatype + `
+			FROM inputs
+			WHERE userid=$1 AND array_length(objects, 1) > 0`
 		if err := db.Get(&tmp, q, u.ID); err != nil {
 			return "", err
 		}

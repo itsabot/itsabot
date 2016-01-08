@@ -11,7 +11,7 @@ var TrainIndex = {
 	}
 };
 
-TrainIndex.ctrl = function() {
+TrainIndex.controller = function() {
 	var userId = cookie.getItem("id");
 	return {
 		// [
@@ -29,6 +29,7 @@ TrainIndex.ctrl = function() {
 };
 
 TrainIndex.view = function(ctrl) {
+	console.log(ctrl);
 	return m("div", {
 		class: "body"
 	}, [
@@ -63,7 +64,7 @@ TrainIndex.viewFull = function(ctrl) {
 				}, [
 					ctrl.data.map(function(converation) {
 						return m.component(TrainIndexItem, conversation);
-					});
+					})
 				])
 			])
 		])
@@ -77,7 +78,7 @@ var TrainIndexItem = {
 	},
 	view: function(ctrl) {
 		return m("tr", {
-			key: ctrl.conversation.ID
+			key: ctrl.conversation.ID,
 			onclick: TrainIndex.route
 		}, [
 				m("td", ctrl.conversation.ID),
@@ -111,7 +112,7 @@ TrainShow.controller = function() {
 	var id = m.route.param("id");
 	var userId = cookie.getItem("id");
 	// {
-	//		
+	//		ID, []Chats (sorted), []Packages, []UserPreferences
 	// }
 	return { data: TrainShow.loadConversation(id, userId) }
 };
@@ -147,10 +148,8 @@ TrainShow.viewFull = function(ctrl) {
 				class: "col-md-7 margin-top-sm"
 			}, [
 				m("h3", "Conversation"),
-				m("div", {
-					class: "card"
-				}, [
-					return m.component(Chatbox, ctrl.data);
+				m("div", [
+					m.component(Chatbox, ctrl.data)
 				])
 			])
 			/*
@@ -165,5 +164,40 @@ TrainShow.viewFull = function(ctrl) {
 	]);
 };
 
-// TODO Chatbox
+var Chatbox = {
+	controller: function(args) {
+		//		ID, []Chats (sorted), []Packages, []UserPreferences
+		return { data: args };
+	},
+	view: function(ctrl) {
+		return m("div", { class: "chat-container" }, [
+			m("ol", { class: "chat-box" }, [
+				m("li", { class: "chat-user" }, [
+					m("div", { class: "messages" }, [
+						m("p", "Hi how are you?"),
+						m("time datetime='2009-11-13T20:00'", "Timothy • 51 mins")
+					])
+				]),
+				m("li", { class: "chat-ava" }, [
+					m("div", { class: "messages" }, [
+						m("p", "Bro. I'm chillin"),
+						m("time datetime='2009-11-13T20:00'", "37 mins")
+					])
+				]),
+				m("li", { class: "chat-user" }, [
+					m("div", { class: "messages" }, [
+						m("p", "Yeah man!"),
+						m("time datetime='2009-11-13T20:00'", "Timothy • 32 mins")
+					])
+				]),
+				m("li", { class: "chat-user" }, [
+					m("div", { class: "messages" }, [
+						m("p", "Cool...")
+					])
+				])
+			])
+		]);
+	}
+};
+
 // TODO Suggestion

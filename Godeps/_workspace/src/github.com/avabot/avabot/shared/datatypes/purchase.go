@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/nlp"
 )
 
 type Purchase struct {
@@ -108,9 +107,8 @@ func (p *Purchase) Create() error {
 	log.Println("creditcardfee", p.CreditCardFee)
 	log.Println("vendorpayout", p.VendorPayout)
 	_, err := p.db.Exec(q, p.ID, p.User.ID, p.Vendor.ID,
-		p.ShippingAddressID, nlp.StringSlice(p.Products),
-		p.Tax, p.Shipping, p.Total, p.AvaFee, p.CreditCardFee,
-		p.VendorPayout)
+		p.ShippingAddressID, StringSlice(p.Products), p.Tax, p.Shipping,
+		p.Total, p.AvaFee, p.CreditCardFee, p.VendorPayout)
 	if err != nil {
 		log.Println("ERR HERE")
 		return err

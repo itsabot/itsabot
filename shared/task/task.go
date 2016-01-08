@@ -17,23 +17,23 @@ type Task struct {
 	typ      string
 	resultID sql.NullInt64
 	ctx      *dt.Ctx
-	resp     *dt.Resp
+	msg      *dt.Msg
 	respMsg  *dt.RespMsg
 }
 
-func New(ctx *dt.Ctx, resp *dt.Resp, respMsg *dt.RespMsg) (*Task, error) {
-	if resp.State == nil {
-		return &Task{}, errors.New("state nil in *dt.Resp")
+func New(ctx *dt.Ctx, msg *dt.Msg, respMsg *dt.RespMsg) (*Task, error) {
+	if msg.State == nil {
+		return &Task{}, errors.New("state nil in *dt.Msg")
 	}
 	return &Task{
 		ctx:     ctx,
-		resp:    resp,
+		msg:     msg,
 		respMsg: respMsg,
 	}, nil
 }
 
 func (t *Task) GetState() float64 {
-	tmp := t.resp.State[t.Key()]
+	tmp := t.msg.State[t.Key()]
 	if tmp == nil {
 		return addressStateNone
 	}
@@ -48,15 +48,15 @@ func (t *Task) GetState() float64 {
 }
 
 func (t *Task) setState(s float64) {
-	t.resp.State[t.Key()] = s
+	t.msg.State[t.Key()] = s
 }
 
 func (t *Task) ResetState() {
-	t.resp.State[t.Key()] = 0.0
+	t.msg.State[t.Key()] = 0.0
 }
 
 func (t *Task) setInterimID(id uint64) {
-	t.resp.State[t.Key()] = id
+	t.msg.State[t.Key()] = id
 }
 
 func (t *Task) Key() string {
@@ -66,20 +66,20 @@ func (t *Task) Key() string {
 // getInterimID is useful when you've saved an object, but haven't finished
 // modifying it, yet. For example, addresses are saved, but named after the
 // fact. If we save the resultID into the task table, the task will cede control
-// back to its calling package. As a result, we save the interimID in the resp
+// back to its calling package. As a result, we save the interimID in the msg
 // state to keep task control.
 func (t *Task) getInterimID() uint64 {
 	if len(t.typ) == 0 {
 		log.Println("warn: t.typ should be set but was \"\"")
 	}
-	switch t.resp.State[t.Key()].(type) {
+	switch t.msg.State[t.Key()].(type) {
 	case uint64:
-		return t.resp.State[t.Key()].(uint64)
+		return t.msg.State[t.Key()].(uint64)
 	case float64:
-		return uint64(t.resp.State[t.Key()].(float64))
+		return uint64(t.msg.State[t.Key()].(float64))
 	default:
 		log.Println("warn: couldn't get interim ID: invalid type",
-			reflect.TypeOf(t.resp.State[t.Key()]))
+			reflect.TypeOf(t.msg.State[t.Key()]))
 	}
 	return uint64(0)
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/aws"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/goamz/goamz/exp/mturk"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/nlp"
 )
 
 var mt *mturk.MTurk
@@ -30,8 +31,8 @@ type TrainingData struct {
 	MaxAssignments int
 }
 
-func supervisedTrain(in *dt.Input) error {
-	_, err := saveTrainingSentence(in)
+func supervisedTrain(msg *dt.Msg) error {
+	_, err := saveTrainingSentence(msg)
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func supervisedTrain(in *dt.Input) error {
 	return nil
 }
 
-func aidedTrain(in *dt.Input, trainID int) error {
+func aidedTrain(msg *dt.Msg, trainID int) error {
 	if err := loadMT(); err != nil {
 		return err
 	}
@@ -124,14 +125,14 @@ func captchaConsensus(inputID int, as *mturk.Assignment) (bool, string, error) {
 			errors.New("answer wordcount doesn't match expectations")
 	}
 	for i := range wordsAnswer {
-		_, entityKnown, err := extractEntity(wordsKnown[i])
+		_, entityKnown, err := nlp.ExtractEntity(wordsKnown[i])
 		if err != nil {
 			return false, "", err
 		}
-		if entityKnown == Unsure {
+		if entityKnown == nlp.Unsure {
 			continue
 		}
-		_, entityAnswer, err := extractEntity(wordsAnswer[i])
+		_, entityAnswer, err := nlp.ExtractEntity(wordsAnswer[i])
 		if err != nil {
 			return false, "", err
 		}

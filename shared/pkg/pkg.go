@@ -12,6 +12,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/nlp"
 )
 
 type PkgWrapper struct {
@@ -25,7 +26,7 @@ type PkgWrapper struct {
 type Pkg struct {
 	Config  PkgConfig
 	Vocab   *dt.Vocab
-	Trigger *dt.StructuredInput
+	Trigger *nlp.StructuredInput
 }
 
 type PkgConfig struct {
@@ -45,13 +46,13 @@ var (
 	ErrMissingTrigger     = errors.New("missing package trigger")
 )
 
-func NewPackage(name string, port int, trigger *dt.StructuredInput) (
+func NewPackage(name string, port int, trigger *nlp.StructuredInput) (
 	*Pkg, error) {
 	return NewPackageWithServer(name, "", port, trigger)
 }
 
 func NewPackageWithServer(name, serverAddr string, port int,
-	trigger *dt.StructuredInput) (*Pkg, error) {
+	trigger *nlp.StructuredInput) (*Pkg, error) {
 	if len(name) == 0 {
 		return &Pkg{}, ErrMissingPackageName
 	}
@@ -112,23 +113,23 @@ func (p *Pkg) Register(pkgT interface{}) error {
 	return nil
 }
 
-// SaveResponse is handled in shared/pkg because rpc gob encoding doesn't work
-// well with arbitrary interface{} types. Since a Response had a nested
+// SaveMsg is handled in shared/pkg because rpc gob encoding doesn't work
+// well with arbitrary interface{} types. Since a Message has a nested
 // map[string]interface{} type, jsonrpc wouldn't work either. Since it's not
 // easy to transfer the data from the package back to Ava for saving, the
-// packages will be responsible for saving their own responses. This is not
+// packages will be responsible for saving their own messages. This is not
 // ideal, but it'll work for now.
-func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
-	if len(r.Sentence) == 0 {
+func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
+	if len(m.Sentence) == 0 {
 		log.Warnln("response sentence empty. skipping save")
 		return nil
 	}
-	log.Debugln("RECEIVED ROUTE", r.Route)
-	state, err := json.Marshal(r.State)
+	log.Debugln("RECEIVED ROUTE", m.Route)
+	state, err := json.Marshal(m.State)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
-			"fn":  "SaveResponse",
+			"fn":  "SaveMsg",
 		}).Errorln(err)
 		return err
 	}
@@ -136,68 +137,64 @@ func (p *Pkg) SaveResponse(respMsg *dt.RespMsg, r *dt.Resp) error {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
-			"fn":  "SaveResponse",
+			"fn":  "SaveMsg",
 		}).Errorln(err)
 		return err
 	}
+	// TODO change to use PG 9.5's UPSERT
 	q := `SELECT COUNT(*) FROM states WHERE userid=$1 AND pkgname=$2`
 	var tmp uint64
-	if err = tx.Get(&tmp, q, r.UserID, p.Config.Name); err != nil {
+	if err = tx.Get(&tmp, q, m.User.ID, p.Config.Name); err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
-			"fn":  "SaveResponse",
+			"fn":  "SaveMsg",
 		}).Errorln(err)
 		return err
 	}
 	if tmp == 0 {
-		q = `
-			INSERT INTO states (userid, state, pkgname)
-			VALUES ($1, $2, $3) RETURNING id`
-		row := tx.QueryRowx(q, r.UserID, state, p.Config.Name)
+		q = `INSERT INTO states (userid, state, pkgname)
+		     VALUES ($1, $2, $3) RETURNING id`
+		row := tx.QueryRowx(q, m.User.ID, state, p.Config.Name)
 		if err = row.Scan(&tmp); err != nil {
 			log.WithFields(log.Fields{
 				"pkg": p.Config.Name,
-				"fn":  "SaveResponse",
+				"fn":  "SaveMsg",
 			}).Errorln(err)
 			return err
 		}
 	} else {
-		q = `
-			UPDATE states
-			SET state=$1, updatedat=CURRENT_TIMESTAMP 
-			WHERE userid=$2 AND pkgname=$3 RETURNING id`
-		err = tx.QueryRowx(q, state, r.UserID, p.Config.Name).Scan(&tmp)
+		q = `UPDATE states
+		     SET state=$1, updatedat=CURRENT_TIMESTAMP 
+		     WHERE userid=$2 AND pkgname=$3 RETURNING id`
+		err = tx.QueryRowx(q, state, m.User.ID, p.Config.Name).Scan(&tmp)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"pkg": p.Config.Name,
-				"fn":  "SaveResponse",
+				"fn":  "SaveMsg",
 			}).Errorln(err)
 			return err
 		}
 	}
-	q = `
-		INSERT INTO responses (userid, inputid, sentence, route,
-			stateid)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id`
-	err = tx.QueryRowx(q, r.UserID, r.InputID, r.Sentence, r.Route, tmp).
-		Scan(&tmp)
+	q = `INSERT INTO messages (userid, sentence, route, stateid)
+	     VALUES ($1, $2, $3, $4)
+	     RETURNING id`
+	err = tx.QueryRowx(q, m.User.ID, m.Sentence, m.Route, tmp).Scan(&tmp)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
-			"fn":  "SaveResponse",
+			"fn":  "SaveMsg",
 		}).Errorln(err)
 		return err
 	}
 	if err = tx.Commit(); err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
-			"fn":  "SaveResponse",
+			"fn":  "SaveMsg",
 		}).Errorln(err)
 		return err
 	}
-	respMsg.ResponseID = tmp
-	respMsg.Sentence = r.Sentence
+	respMsg.MsgID = tmp
+	respMsg.Sentence = m.Sentence
 	return nil
 }
 

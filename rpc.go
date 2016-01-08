@@ -79,20 +79,14 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 			return p, "onboard_onboard", false, ErrMissingPackage
 		}
 	}
-	err := m.GetLastResponse(db)
-	if err != nil && err != sql.ErrNoRows {
-		return p, "", false, err
-	} else if err == sql.ErrNoRows {
-		log.Errorln("no rows for last response")
-	}
+	si := m.StructuredInput
 	var route string
-	si := m.Input.StructuredInput
 Loop:
 	for _, c := range si.Commands {
 		for _, o := range si.Objects {
-			route = strings.ToLower(c + "_" + o)
-			log.Debugln("searching route", route)
-			p = regPkgs.Get(route)
+			tmp := strings.ToLower(c + "_" + o)
+			log.Debugln("searching route", tmp)
+			p = regPkgs.Get(tmp)
 			if p != nil {
 				break Loop
 			}
@@ -101,11 +95,19 @@ Loop:
 	if p != nil {
 		return p, route, false, nil
 	}
-	if m.LastResponse == nil {
+	if len(route) == 0 {
+		var err error
+		route, err = m.GetLastRoute(db)
+		if err == sql.ErrNoRows {
+			log.Errorln("no rows for last response")
+		} else if err != nil {
+			return p, "", false, err
+		}
+	}
+	if len(route) == 0 {
 		log.Warnln("no last response")
 		return p, route, false, nil
 	}
-	route = m.LastResponse.Route
 	p = regPkgs.Get(route)
 	if p == nil {
 		log.Debugln("route", route)
@@ -122,8 +124,6 @@ func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (*dt.RespMsg,
 	}
 	log.WithField("pkg", pw.P.Config.Name).Infoln("sending input")
 	c := strings.Title(pw.P.Config.Name)
-	// with fixed gob encoding this will not be necessary
-	m.LastResponse = nil
 	// TODO is this OR condition really necessary?
 	if followup {
 		log.WithField("pkg", pw.P.Config.Name).Infoln("follow up")
@@ -132,10 +132,6 @@ func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (*dt.RespMsg,
 		log.WithField("pkg", pw.P.Config.Name).Infoln("first run")
 		c += ".Run"
 	}
-	// TODO pass LastResponse directly to packages via rpc gob encoding,
-	// removing the need to nil this out and then look it up again in the
-	// package
-	m.LastResponse = nil
 	if err := pw.RPCClient.Call(c, m, reply); err != nil {
 		log.WithField("pkg", pw.P.Config.Name).Errorln(
 			"invalid response", err)

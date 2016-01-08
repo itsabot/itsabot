@@ -44,16 +44,16 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 	return &v
 }
 
-func (v *Vocab) HandleKeywords(ctx *Ctx, m *Msg, stems []string) error {
+func (v *Vocab) HandleKeywords(ctx *Ctx, resp *Resp, stems []string) error {
 	var err error
 	mod := 1
-	if len(m.Sentence) == 0 {
+	if len(resp.Sentence) == 0 {
 		for _, w := range stems {
 			if v.dict[w] == nil {
 				continue
 			}
 			log.Println("found fn in stems", w, v.dict[w])
-			m.Sentence, err = (v.dict[w])(ctx, mod)
+			resp.Sentence, err = (v.dict[w])(ctx, mod)
 			break
 		}
 	}

@@ -5,7 +5,7 @@ window.onload = function() {
 		"/": Index,
 		"/tour": Tour,
 		"/train": TrainIndex,
-		"/train/:id": TrainIndexShow
+		"/train/:id": TrainShow,
 		//"/train": Train,
 		//"/train/:sentenceID": Train,
 		"/signup": Signup,

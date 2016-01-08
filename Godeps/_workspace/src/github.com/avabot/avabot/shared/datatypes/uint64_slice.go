@@ -6,8 +6,6 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-
-	"github.com/avabot/ava/shared/nlp"
 )
 
 type Uint64_Slice []uint64
@@ -18,7 +16,7 @@ func (s *Uint64_Slice) Scan(src interface{}) error {
 		return error(errors.New("scan source was not []bytes"))
 	}
 	str := string(asBytes)
-	str = nlp.QuoteEscapeRegex.ReplaceAllString(str, `$1""`)
+	str = quoteEscapeRegex.ReplaceAllString(str, `$1""`)
 	str = strings.Replace(str, `\\`, `\`, -1)
 	csvReader := csv.NewReader(strings.NewReader(str))
 	slice, err := csvReader.Read()
