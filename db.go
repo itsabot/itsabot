@@ -11,21 +11,6 @@ var (
 	ErrMissingFlexID = errors.New("missing flexid")
 )
 
-func saveMsg(m *dt.Msg) error {
-	q := `INSERT INTO messages (
-		  userid,
-		  sentence,
-		  sentenceannotated,
-		  package,
-		  route
-		) VALUES ($1, $2, $3, $4, $5)`
-	si := m.StructuredInput
-	_, err := db.Exec(q, m.User.ID, m.Sentence, m.SentenceAnnotated,
-		si.Commands, si.Objects, si.Actors, si.Times, si.Places,
-		m.Package, m.Route)
-	return err
-}
-
 func saveTrainingSentence(msg *dt.Msg) (int, error) {
 	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
 	var id int

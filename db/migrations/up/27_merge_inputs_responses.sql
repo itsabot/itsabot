@@ -8,5 +8,6 @@ ALTER TABLE inputs DROP COLUMN times;
 ALTER TABLE inputs DROP COLUMN places;
 ALTER TABLE inputs DROP COLUMN knowledgefilled;
 ALTER TABLE inputs DROP COLUMN responseid;
+ALTER TABLE inputs ADD COLUMN stateid INTEGER;
 ALTER TABLE inputs ADD COLUMN avasent BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE inputs RENAME TO messages;

@@ -20,7 +20,7 @@ type PkgWrapper struct {
 	RPCClient *rpc.Client
 }
 
-// Pkg holds config options for any Ava package. Name must be globally unique
+// Pkg holds config options for any Ava package. Name must be globally unique.
 // Port takes the format of ":1234". Note that the colon is significant.
 // ServerAddress will default to localhost if left blank.
 type Pkg struct {
@@ -124,7 +124,6 @@ func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
 		log.Warnln("response sentence empty. skipping save")
 		return nil
 	}
-	log.Debugln("RECEIVED ROUTE", m.Route)
 	state, err := json.Marshal(m.State)
 	if err != nil {
 		log.WithFields(log.Fields{
@@ -175,8 +174,8 @@ func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
 			return err
 		}
 	}
-	q = `INSERT INTO messages (userid, sentence, route, stateid)
-	     VALUES ($1, $2, $3, $4)
+	q = `INSERT INTO messages (userid, sentence, route, stateid, avasent)
+	     VALUES ($1, $2, $3, $4, TRUE)
 	     RETURNING id`
 	err = tx.QueryRowx(q, m.User.ID, m.Sentence, m.Route, tmp).Scan(&tmp)
 	if err != nil {

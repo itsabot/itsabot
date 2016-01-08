@@ -38,11 +38,6 @@ var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
 
-type Ctx struct {
-	Msg           *dt.Msg
-	NeedsTraining bool
-}
-
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetLevel(log.DebugLevel)
@@ -166,6 +161,9 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 		return nil, err
 	}
 	msg := dt.NewMsg(db, bayes, u, cmd)
+	if err = msg.Update(db); err != nil {
+		return nil, err
+	}
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
 }
@@ -309,22 +307,45 @@ func processText(c *echo.Context) (string, error) {
 			return "", err
 		}
 	}
+	var m *dt.Msg
 	if len(ret.Sentence) == 0 {
-		ret.Sentence = language.Confused()
+		m = &dt.Msg{}
+		m.Sentence = language.Confused()
+		m.AvaSent = true
+		m.User = msg.User
+		if err = m.Save(db); err != nil {
+			log.Errorln(err, "saving response message")
+			return "", nil
+		}
 		log.Debugln("confused. node?", n)
 		if changed {
 			log.Debugln("confused with node. deleting unused and last knowledgequeries")
-			err := deleteRecentNodes(db, msg.User)
+			err = deleteRecentNodes(db, msg.User)
 			if err != nil {
 				return "", err
 			}
 		}
 	}
-	if pkg != nil {
-		msg.Package = pkg.P.Config.Name
+	if m == nil {
+		m, err = dt.GetMsg(db, ret.MsgID)
+		if err != nil {
+			log.Debugln("HERE msgid", ret.MsgID)
+			return "", err
+		}
 	}
-	if err = saveMsg(msg); err != nil {
-		return "", err
+	if pkg != nil {
+		m.Package = pkg.P.Config.Name
+	}
+	if m.ID > 0 {
+		if err = m.Update(db); err != nil {
+			log.Debugln("UPDATING")
+			return "", err
+		}
+	} else {
+		if err = m.Save(db); err != nil {
+			log.Debugln("SAVING")
+			return "", err
+		}
 	}
 	/*
 		// TODO handle earlier when classifying
@@ -335,7 +356,7 @@ func processText(c *echo.Context) (string, error) {
 			}
 		}
 	*/
-	return ret.Sentence, nil
+	return m.Sentence, nil
 }
 
 func validateParams(c *echo.Context) (uint64, string, int) {

@@ -173,7 +173,8 @@ func main() {
 	}
 }
 
-func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
+	m = tmp
 	m.State = map[string]interface{}{
 		"state":            StateNone,        // maintains state
 		"query":            "",               // search query
@@ -184,6 +185,7 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		"shippingAddress":  &dt.Address{},
 		"productsSelected": dt.ProductSels{},
 	}
+	log.Debugln("state", m.State)
 	si := m.StructuredInput
 	query := ""
 	for _, o := range si.Objects {
@@ -192,9 +194,11 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	cat := extractWineCategory(m.Sentence)
 	if len(cat) == 0 {
 		m.Sentence = "Sure. Are you looking for a red or white?"
+		log.Debugln("setting state", StateRedWhite)
 		setState(StateRedWhite)
 		return p.SaveMsg(respMsg, m)
 	}
+	l.Errorln("made it this far")
 	m.State["query"] = query
 	m.State["category"] = cat
 	if len(query) <= 8 {
@@ -220,21 +224,30 @@ func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 			setState(StatePreferences)
 		}
 	}
+	l.Errorln("here too..")
 	if err := updateState(m, respMsg); err != nil {
+		l.Errorln("err updating state")
 		l.Errorln(err)
 	}
 	return p.SaveMsg(respMsg, m)
 }
 
-func (t *Purchase) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
-	/*
-		if resp == nil {
-			if err := m.GetLastResponse(db); err != nil {
-				return err
-			}
-			resp = m.LastResponse
+func (t *Purchase) FollowUp(tmp *dt.Msg, respMsg *dt.RespMsg) error {
+	m = tmp
+	l.Errorln("called followup")
+	if m == nil {
+		var err error
+		m, err = m.GetLastMsg(db)
+		if err != nil {
+			return err
 		}
-	*/
+	}
+	l.Errorln("made it here")
+	l.Debugln("")
+	if err := m.GetLastState(db); err != nil {
+		return err
+	}
+	l.Debugf("HERe STATE: %+v\n", m.State)
 	m.Sentence = ""
 	l.Debugln("starting state", getState())
 	// have we already made the purchase?

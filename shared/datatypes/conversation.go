@@ -32,7 +32,10 @@ type Msg struct {
 	Stems             []string
 	Route             string
 	Package           string
+	StateID           uint64
 	State             map[string]interface{}
+	// AvaSent determines if msg is from the user or Ava
+	AvaSent bool
 	// SentenceFields breaks the sentence into words. Tokens like ,.' are
 	// treated as individual words.
 	SentenceFields []string
@@ -102,6 +105,37 @@ func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
 	return m
 }
 
+func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
+	q := `SELECT id, sentence, stateid, avasent
+	      FROM messages
+	      WHERE id=$1`
+	m := &Msg{}
+	if err := db.Get(m, q, id); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (m *Msg) Update(db *sqlx.DB) error {
+	q := `UPDATE messages
+	      SET sentence=$1, package=$2
+	      WHERE id=$3`
+	_, err := db.Exec(q, m.Sentence, m.Package, m.ID)
+	return err
+}
+
+func (m *Msg) Save(db *sqlx.DB) error {
+	q := `INSERT INTO messages
+	      (userid, sentence, package, route, sentenceannotated, stateid, avasent)
+	      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
+		m.SentenceAnnotated, m.StateID, m.AvaSent)
+	if err := row.Scan(&m.ID); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 	var route string
 	q := `SELECT route FROM messages
@@ -128,59 +162,6 @@ func (m *Msg) GetLastUserMessage(db *sqlx.DB) error {
 	return nil
 }
 
-func (m *Msg) GetLastResponse(db *sqlx.DB) error {
-	log.Debugln("getting last response")
-	if m.User == nil {
-		return ErrMissingUser
-	}
-	q := `SELECT id, stateid, route, sentence, userid
-	      FROM messages
-	      WHERE userid=$1 AND avasent IS TRUE
-	      ORDER BY createdat DESC`
-	row := db.QueryRowx(q, m.User.ID)
-	var tmp struct {
-		ID       uint64
-		Route    string
-		Sentence string
-		StateID  sql.NullInt64
-		UserID   uint64
-	}
-	log.Debugln("scanning into response")
-	err := row.StructScan(&tmp)
-	if err == sql.ErrNoRows {
-		m.LastResponse = &Resp{}
-		return nil
-	}
-	if err != nil {
-		log.Println("structscan row ", err)
-		return err
-	}
-	if !tmp.StateID.Valid {
-		return errors.New("invalid stateid")
-	}
-	m.LastResponse = &Msg{
-		ID:       tmp.ID,
-		Route:    tmp.Route,
-		Sentence: tmp.Sentence,
-		UserID:   tmp.UserID,
-	}
-	var state []byte
-	q = `SELECT state FROM states WHERE id=$1`
-	err = db.Get(&state, q, tmp.StateID)
-	if err == sql.ErrNoRows {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(state, &m.LastResponse.State)
-	if err != nil {
-		log.Println("unmarshaling state", err)
-		return err
-	}
-	return nil
-}
-
 func (m *Msg) NewResponse() *Resp {
 	var uid uint64
 	if m.User != nil {
@@ -197,6 +178,60 @@ func (m *Msg) NewResponse() *Resp {
 	return res
 }
 */
+
+func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
+	log.Debugln("getting last response")
+	if m.User == nil {
+		return nil, ErrMissingUser
+	}
+	q := `SELECT id, route, sentence
+	      FROM messages
+	      WHERE userid=$1 AND avasent IS TRUE
+	      ORDER BY createdat DESC`
+	row := db.QueryRowx(q, m.User.ID)
+	var msg Msg
+	log.Debugln("scanning into response")
+	err := row.StructScan(&msg)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		log.Println("structscan row ", err)
+		return nil, err
+	}
+	msg.User = m.User
+	return &msg, nil
+}
+
+func (m *Msg) GetLastState(db *sqlx.DB) error {
+	var stateID sql.NullInt64
+	q := `SELECT stateid FROM messages WHERE id=$1`
+	if err := db.Get(&stateID, q, m.ID); err != nil {
+		log.Errorln("WTF NO STATE FOUND for id", m.ID)
+		return err
+	}
+	if !stateID.Valid {
+		return errors.New("invalid stateid")
+	}
+	var state []byte
+	q = `SELECT state FROM states WHERE id=$1`
+	err := db.Get(&state, q, stateID)
+	if err == sql.ErrNoRows {
+		log.Errorln("WTF NO STATE FOUND for id", stateID)
+		return nil
+	}
+	if err != nil {
+		log.Errorln(err, "WTF", stateID)
+		return err
+	}
+	err = json.Unmarshal(state, &m.State)
+	if err != nil {
+		log.Println("unmarshaling state", err)
+		return err
+	}
+	log.Errorln("got the state...", m.State)
+	return nil
+}
 
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
 // they refer. TODO refactor
