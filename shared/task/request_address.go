@@ -32,30 +32,30 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 	}
 	switch t.GetState() {
 	case addressStateNone:
-		t.resp.Sentence = "Ok. Where should I ship " + pro + "?"
+		t.msg.Sentence = "Ok. Where should I ship " + pro + "?"
 		t.setState(addressStateAskUser)
 	case addressStateAskUser:
-		addr, remembered, err := language.ExtractAddress(t.ctx.DB,
-			t.ctx.Msg.User, t.ctx.Msg.Input.Sentence)
+		addr, remembered, err := language.ExtractAddress(t.db,
+			t.msg.User, t.msg.Sentence)
 		if err == dt.ErrNoAddress {
-			t.resp.Sentence = "I'm sorry. I don't have any record of that place. Where would you like " + pro + " shipped?"
+			t.msg.Sentence = "I'm sorry. I don't have any record of that place. Where would you like " + pro + " shipped?"
 			return false, nil
 		}
 		if err != nil {
-			t.resp.Sentence = "I'm sorry, but something went wrong. Please try sending that to me again later."
+			t.msg.Sentence = "I'm sorry, but something went wrong. Please try sending that to me again later."
 			return false, err
 		}
 		if addr == nil || addr.Line1 == "" || addr.City == "" ||
 			addr.State == "" {
-			t.resp.Sentence = "I'm sorry. I couldn't understand that address. Could you try typing it in this format? 1400 Evergreen Ave, Apt 200, Los Angeles, CA"
+			t.msg.Sentence = "I'm sorry. I couldn't understand that address. Could you try typing it in this format? 1400 Evergreen Ave, Apt 200, Los Angeles, CA"
 			return false, nil
 		}
 		addr.Country = "USA"
 		var id uint64
 		if !remembered {
 			log.Println("address was new")
-			t.resp.Sentence = "Is that your home or office?"
-			id, err = t.ctx.Msg.User.SaveAddress(t.ctx.DB, addr)
+			t.msg.Sentence = "Is that your home or office?"
+			id, err = t.msg.User.SaveAddress(t.db, addr)
 			if err != nil {
 				return false, err
 			}
@@ -70,7 +70,7 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 		return true, nil
 	case addressStateGetName:
 		var location string
-		tmp := strings.Fields(strings.ToLower(t.ctx.Msg.Input.Sentence))
+		tmp := strings.Fields(strings.ToLower(t.msg.Sentence))
 		for _, w := range tmp {
 			if w == "home" {
 				location = w
@@ -83,7 +83,7 @@ func (t *Task) getAddress(dest **dt.Address, prodCount int) (bool, error) {
 		if len(location) == 0 {
 			return true, nil
 		}
-		addr, err := t.ctx.Msg.User.UpdateAddressName(t.ctx.DB,
+		addr, err := t.msg.User.UpdateAddressName(t.db,
 			t.getInterimID(), location)
 		if err != nil {
 			return false, err

@@ -12,6 +12,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
+	"github.com/avabot/ava/shared/nlp"
 )
 
 type nodeTermT int
@@ -113,7 +114,7 @@ func searchNodes(term string, edgesFound int64) ([]*node, error) {
 	return nodes, nil
 }
 
-func (n *node) updateRelation(db *sqlx.DB, si *dt.StructuredInput) error {
+func (n *node) updateRelation(db *sqlx.DB, si *nlp.StructuredInput) error {
 	var rel string
 	if n.TermType == nodeTermObject {
 		rel = si.Objects.String()
@@ -204,18 +205,17 @@ func upToBigrams(s string) []string {
 }
 
 func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
-	msg.LastInput = msg.Input
 	tmp := []string{}
 	// TODO move comparison to stemmed versions
 	trm := strings.Fields(g.Trm())
-	for i := 0; i < len(msg.LastInput.SentenceFields); i++ {
-		if i+len(trm) > len(msg.LastInput.SentenceFields) {
-			sf := msg.LastInput.SentenceFields
+	for i := 0; i < len(msg.SentenceFields); i++ {
+		if i+len(trm) > len(msg.SentenceFields) {
+			sf := msg.SentenceFields
 			tmp = append(tmp, sf[i:len(sf)]...)
 			log.Debugln("reached end. stopping")
 			break
 		}
-		wSlice := msg.LastInput.SentenceFields[i : i+len(trm)]
+		wSlice := msg.SentenceFields[i : i+len(trm)]
 		ws := strings.Join(wSlice, " ")
 		log.Debugln("comparing", ws, "=?", trm)
 		if ws == g.Trm() {
@@ -265,12 +265,12 @@ func getActiveNode(db *sqlx.DB, u *dt.User) (*node, error) {
 
 func newNodes(db *sqlx.DB, av dt.AtomicMap, m *dt.Msg) ([]*node, error) {
 	log.Debugln("creating new knowledge nodes")
-	words := strings.Fields(m.Input.Sentence)
+	words := strings.Fields(m.Sentence)
 	if usesOffensiveLanguage(words) {
 		return nil, errors.New("I'm sorry, but I don't respond to foul language.")
 	}
-	ssc := m.Input.StructuredInput.Commands.StringSlice()
-	sso := m.Input.StructuredInput.Objects.StringSlice()
+	ssc := m.StructuredInput.Commands.StringSlice()
+	sso := m.StructuredInput.Objects.StringSlice()
 	log.Debugln("sso", sso)
 	cmd := extractCommand(av, m, words, ssc)
 	obj := extractObject(av, m, words, sso)
@@ -358,7 +358,7 @@ func extractCommand(av dt.AtomicMap, m *dt.Msg, words,
 func extractObject(av dt.AtomicMap, m *dt.Msg, words, ssc []string) *language.WordT {
 	var obj *language.WordT
 	seen := map[string]bool{}
-	for _, w := range m.Input.StructuredInput.Objects.StringSlice() {
+	for _, w := range m.StructuredInput.Objects.StringSlice() {
 		if !av.Get(w) {
 			// this can and should be done much more efficiently
 			for i, wrd := range language.RemoveStopWords(words) {
@@ -385,9 +385,12 @@ func deleteRecentNodes(db *sqlx.DB, u *dt.User) error {
 		return err
 	}
 	q := `DELETE FROM knowledgenodes
-	      WHERE userid=$1
-	      ORDER BY createdat DESC
-	      LIMIT 1`
+	      WHERE id IN (
+		      SELECT id FROM knowledgenodes
+		      WHERE userid=$1
+		      ORDER BY createdat DESC
+		      LIMIT 1
+	      )`
 	if _, err := db.Exec(q, u.ID); err != nil && err != sql.ErrNoRows {
 		return err
 	}

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/nlp"
 )
 
 type Purchase struct {
@@ -49,8 +48,8 @@ var statesTax = map[string]float64{
 	"CA": 0.0925,
 }
 
-func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
-	p := &Purchase{db: db}
+func NewPurchase(ctx *Ctx, pc *PurchaseConfig) (*Purchase, error) {
+	p := &Purchase{db: ctx.DB}
 	p.ID = uint64(rand.Int63n(8999999999) + 1000000000)
 	p.User = pc.User
 	p.ShippingAddress = pc.ShippingAddress
@@ -108,9 +107,8 @@ func (p *Purchase) Create() error {
 	log.Println("creditcardfee", p.CreditCardFee)
 	log.Println("vendorpayout", p.VendorPayout)
 	_, err := p.db.Exec(q, p.ID, p.User.ID, p.Vendor.ID,
-		p.ShippingAddressID, nlp.StringSlice(p.Products),
-		p.Tax, p.Shipping, p.Total, p.AvaFee, p.CreditCardFee,
-		p.VendorPayout)
+		p.ShippingAddressID, StringSlice(p.Products), p.Tax, p.Shipping,
+		p.Total, p.AvaFee, p.CreditCardFee, p.VendorPayout)
 	if err != nil {
 		log.Println("ERR HERE")
 		return err
