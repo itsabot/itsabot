@@ -19,7 +19,7 @@ type VocabHandler struct {
 	Words    []string
 }
 
-type VocabFn func(m *Msg, mod int) (string, error)
+type VocabFn func(m *Msg, mod int) error
 
 var ErrNoFn = errors.New("no function")
 
@@ -53,7 +53,7 @@ func (v *Vocab) HandleKeywords(m *Msg) error {
 				continue
 			}
 			log.Println("found fn in stems", w, v.dict[w])
-			m.Sentence, err = (v.dict[w])(m, mod)
+			err = (v.dict[w])(m, mod)
 			break
 		}
 	}

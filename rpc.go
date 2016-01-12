@@ -84,9 +84,9 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 Loop:
 	for _, c := range si.Commands {
 		for _, o := range si.Objects {
-			tmp := strings.ToLower(c + "_" + o)
-			log.Debugln("searching route", tmp)
-			p = regPkgs.Get(tmp)
+			route = strings.ToLower(c + "_" + o)
+			log.Debugln("searching route", route)
+			p = regPkgs.Get(route)
 			if p != nil {
 				break Loop
 			}
@@ -97,12 +97,14 @@ Loop:
 	}
 	if len(route) == 0 {
 		var err error
+		log.Debugln("getting last route")
 		route, err = m.GetLastRoute(db)
 		if err == sql.ErrNoRows {
 			log.Errorln("no rows for last response")
 		} else if err != nil {
 			return p, "", false, err
 		}
+		log.Debugln("got last route, ", route)
 	}
 	if len(route) == 0 {
 		log.Warnln("no last response")

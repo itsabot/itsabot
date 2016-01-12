@@ -32,7 +32,6 @@ type Msg struct {
 	Stems             []string
 	Route             string
 	Package           string
-	StateID           uint64
 	State             map[string]interface{}
 	// AvaSent determines if msg is from the user or Ava
 	AvaSent bool
@@ -106,7 +105,7 @@ func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
 }
 
 func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
-	q := `SELECT id, sentence, stateid, avasent
+	q := `SELECT id, sentence, avasent
 	      FROM messages
 	      WHERE id=$1`
 	m := &Msg{}
@@ -126,10 +125,10 @@ func (m *Msg) Update(db *sqlx.DB) error {
 
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, package, route, sentenceannotated, stateid, avasent)
-	      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	      (userid, sentence, package, route, sentenceannotated, avasent)
+	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
-		m.SentenceAnnotated, m.StateID, m.AvaSent)
+		m.SentenceAnnotated, m.AvaSent)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}
@@ -139,7 +138,7 @@ func (m *Msg) Save(db *sqlx.DB) error {
 func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 	var route string
 	q := `SELECT route FROM messages
-	      WHERE userid=$1
+	      WHERE userid=$1 AND avasent IS FALSE
 	      ORDER BY createdat DESC`
 	err := db.Get(&route, q, m.User.ID)
 	if err != nil && err != sql.ErrNoRows {
@@ -204,24 +203,15 @@ func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
 }
 
 func (m *Msg) GetLastState(db *sqlx.DB) error {
-	var stateID sql.NullInt64
-	q := `SELECT stateid FROM messages WHERE id=$1`
-	if err := db.Get(&stateID, q, m.ID); err != nil {
-		log.Errorln("WTF NO STATE FOUND for id", m.ID)
-		return err
-	}
-	if !stateID.Valid {
-		return errors.New("invalid stateid")
-	}
 	var state []byte
-	q = `SELECT state FROM states WHERE id=$1`
-	err := db.Get(&state, q, stateID)
+	q := `SELECT state FROM states WHERE pkgname=$1`
+	err := db.Get(&state, q, m.Package)
 	if err == sql.ErrNoRows {
-		log.Errorln("WTF NO STATE FOUND for id", stateID)
+		log.Errorln("WTF NO STATE FOUND for pkg", m.Package)
 		return nil
 	}
 	if err != nil {
-		log.Errorln(err, "WTF", stateID)
+		log.Errorln(err, "WTF", m.Package)
 		return err
 	}
 	err = json.Unmarshal(state, &m.State)
@@ -229,7 +219,6 @@ func (m *Msg) GetLastState(db *sqlx.DB) error {
 		log.Println("unmarshaling state", err)
 		return err
 	}
-	log.Errorln("got the state...", m.State)
 	return nil
 }
 

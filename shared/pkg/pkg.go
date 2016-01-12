@@ -150,6 +150,7 @@ func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
 		}).Errorln(err)
 		return err
 	}
+	// TODO remove RETURNING id, since it's now unused
 	if tmp == 0 {
 		q = `INSERT INTO states (userid, state, pkgname)
 		     VALUES ($1, $2, $3) RETURNING id`
@@ -174,10 +175,10 @@ func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
 			return err
 		}
 	}
-	q = `INSERT INTO messages (userid, sentence, route, stateid, avasent)
-	     VALUES ($1, $2, $3, $4, TRUE)
+	q = `INSERT INTO messages (userid, sentence, route, avasent)
+	     VALUES ($1, $2, $3, TRUE)
 	     RETURNING id`
-	err = tx.QueryRowx(q, m.User.ID, m.Sentence, m.Route, tmp).Scan(&tmp)
+	err = tx.QueryRowx(q, m.User.ID, m.Sentence, m.Route).Scan(&tmp)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"pkg": p.Config.Name,
@@ -192,8 +193,9 @@ func (p *Pkg) SaveMsg(respMsg *dt.RespMsg, m *dt.Msg) error {
 		}).Errorln(err)
 		return err
 	}
-	respMsg.MsgID = tmp
-	respMsg.Sentence = m.Sentence
+	(*respMsg).MsgID = tmp
+	log.Debugln("respMsg msgid", tmp)
+	(*respMsg).Sentence = m.Sentence
 	return nil
 }
 

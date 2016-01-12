@@ -35,7 +35,7 @@ var tskPurch *task.Task
 
 // m enables the Run() function to skip to the FollowUp function if basic
 // requirements are met.
-var m *dt.Msg
+var m *dt.Msg = &dt.Msg{}
 
 const (
 	StateNone float64 = iota
@@ -126,8 +126,8 @@ func main() {
 		dt.VocabHandler{
 			Fn:       kwMoreExpensive,
 			WordType: "Object",
-			Words: []string{"more expensive", "event", "nice",
-				"nicer"},
+			Words: []string{"more expensive", "too expensive",
+				"event", "nice"},
 		},
 		dt.VocabHandler{
 			Fn:       kwLessExpensive,
@@ -173,8 +173,8 @@ func main() {
 	}
 }
 
-func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
-	m = tmp
+func (t *Purchase) Run(in *dt.Msg, out *dt.RespMsg) error {
+	*m = *in
 	m.State = map[string]interface{}{
 		"state":            StateNone,        // maintains state
 		"query":            "",               // search query
@@ -185,7 +185,7 @@ func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
 		"shippingAddress":  &dt.Address{},
 		"productsSelected": dt.ProductSels{},
 	}
-	log.Debugln("state", m.State)
+	l.Debugln("state", m.State)
 	si := m.StructuredInput
 	query := ""
 	for _, o := range si.Objects {
@@ -194,9 +194,9 @@ func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
 	cat := extractWineCategory(m.Sentence)
 	if len(cat) == 0 {
 		m.Sentence = "Sure. Are you looking for a red or white?"
-		log.Debugln("setting state", StateRedWhite)
+		l.Debugln("setting state", StateRedWhite)
 		setState(StateRedWhite)
-		return p.SaveMsg(respMsg, m)
+		return p.SaveMsg(out, m)
 	}
 	l.Errorln("made it this far")
 	m.State["query"] = query
@@ -208,7 +208,7 @@ func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
 		if err != nil {
 			l.Errorln("saving taste pref", err)
 		}
-		currency := language.ExtractCurrency(m.Sentence)
+		currency := language.ExtractCurrency(in.Sentence)
 		if currency.Valid && currency.Int64 > 0 {
 			l.WithField("value", currency.Int64).Debugln(
 				"currency valid and > 0")
@@ -225,69 +225,56 @@ func (t *Purchase) Run(tmp *dt.Msg, respMsg *dt.RespMsg) error {
 		}
 	}
 	l.Errorln("here too..")
-	if err := updateState(m, respMsg); err != nil {
+	if err := updateState(in, out); err != nil {
 		l.Errorln("err updating state")
 		l.Errorln(err)
 	}
-	return p.SaveMsg(respMsg, m)
+	return p.SaveMsg(out, m)
 }
 
-func (t *Purchase) FollowUp(tmp *dt.Msg, respMsg *dt.RespMsg) error {
-	m = tmp
-	l.Errorln("called followup")
-	if m == nil {
-		var err error
-		m, err = m.GetLastMsg(db)
-		if err != nil {
-			return err
-		}
-	}
-	l.Errorln("made it here")
-	l.Debugln("")
+func (t *Purchase) FollowUp(in *dt.Msg, out *dt.RespMsg) error {
+	*m = *in
+	m.Sentence = ""
 	if err := m.GetLastState(db); err != nil {
 		return err
 	}
-	l.Debugf("HERe STATE: %+v\n", m.State)
-	m.Sentence = ""
-	l.Debugln("starting state", getState())
 	// have we already made the purchase?
 	if getState() == StateComplete {
 		// if so, reset state to allow for other purchases
-		return t.Run(m, respMsg)
+		return t.Run(m, out)
 	}
 	// allow the user to direct the conversation, e.g. say "something more
 	// expensive" and have Ava respond appropriately
 	// TODO implement better state rules like a proper state machine
-	var kw bool
 	var err error
 	if getState() > StateSetRecommendations {
-		kw, err = handleKeywords(m)
+		err = handleKeywords(in)
 		if err != nil {
 			return err
 		}
 	}
-	l.WithField("found", kw).Debugln("keywords handled")
-	if !kw {
+	if len(m.Sentence) == 0 {
 		// if purchase has not been made, move user through the
 		// package's states
-		if err := updateState(m, respMsg); err != nil {
+		l.Debugln("updating state")
+		if err := updateState(in, out); err != nil {
 			return err
 		}
 	}
-	return p.SaveMsg(respMsg, m)
+	return p.SaveMsg(out, m)
 }
 
-func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
+func updateState(in *dt.Msg, out *dt.RespMsg) error {
 	state := getState()
 	switch state {
 	case StateRedWhite:
-		m.State["category"] = extractWineCategory(m.Sentence)
+		m.State["category"] = extractWineCategory(in.Sentence)
 		if getCategory() == "" {
 			return nil
 		}
 		l.WithField("cat", getCategory()).Infoln("selected category")
 		setState(StateCheckPastPreferences)
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateCheckPastPreferences:
 		tastePref, err := prefs.Get(db, m.User.ID, pkgName,
 			prefs.KeyTaste)
@@ -301,7 +288,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		}
 		m.State["query"] = tastePref
 		setState(StateCheckPastBudget)
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StatePreferences:
 		m.State["query"] = getQuery() + " " + m.Sentence
 		if getBudget() == 0 {
@@ -311,10 +298,10 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 				l.Errorln("saving taste pref", err)
 				return err
 			}
-			return updateState(m, respMsg)
+			return updateState(in, out)
 		}
 		setState(StateSetRecommendations)
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateCheckPastBudget:
 		budgetPref, err := prefs.Get(db, m.User.ID, pkgName,
 			prefs.KeyBudget)
@@ -331,14 +318,14 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 			l.WithField("budget", getBudget()).Debugln("got budget")
 			if getBudget() > 0 {
 				setState(StateSetRecommendations)
-				return updateState(m, respMsg)
+				return updateState(in, out)
 			}
 		}
 		l.Debugln("updating state to StateBudget")
 		setState(StateBudget)
 		m.Sentence = "Ok. How much do you usually pay for a bottle?"
 	case StateBudget:
-		val := language.ExtractCurrency(m.Sentence)
+		val := language.ExtractCurrency(in.Sentence)
 		if !val.Valid {
 			return nil
 		}
@@ -358,9 +345,9 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 			return err
 		}
 		setState(StateMakeRecommendation)
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateRecommendationsAlterBudget:
-		yes := language.ExtractYesNo(m.Sentence)
+		yes := language.ExtractYesNo(in.Sentence)
 		if !yes.Valid {
 			return nil
 		}
@@ -379,9 +366,9 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateRecommendationsAlterQuery:
-		yes := language.ExtractYesNo(m.Sentence)
+		yes := language.ExtractYesNo(in.Sentence)
 		if !yes.Valid {
 			return nil
 		}
@@ -400,23 +387,23 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateMakeRecommendation:
 		if err := recommendProduct(m); err != nil {
 			return err
 		}
 	case StateProductSelection:
 		// was the recommendation Ava made good?
-		yes := language.ExtractYesNo(m.Sentence)
+		yes := language.ExtractYesNo(in.Sentence)
 		if !yes.Valid {
 			return nil
 		}
 		if !yes.Bool {
 			m.State["offset"] = getOffset() + 1
 			setState(StateMakeRecommendation)
-			return updateState(m, respMsg)
+			return updateState(in, out)
 		}
-		count := language.ExtractCount(m.Sentence)
+		count := language.ExtractCount(in.Sentence)
 		if count.Valid {
 			if count.Int64 == 0 {
 				// asked to order 0 wines. trigger confused
@@ -434,7 +421,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 				m.Sentence += "Should we expand your search to more wines?"
 				setState(StateRecommendationsAlterQuery)
 			}
-			return updateState(m, respMsg)
+			return updateState(in, out)
 		}
 		if err != nil {
 			return err
@@ -458,7 +445,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 			prod)
 		setState(StateContinueShopping)
 	case StateContinueShopping:
-		yes := language.ExtractYesNo(m.Sentence)
+		yes := language.ExtractYesNo(in.Sentence)
 		if !yes.Valid {
 			return nil
 		}
@@ -468,7 +455,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		} else {
 			setState(StateShippingAddress)
 		}
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateShippingAddress:
 		prods := getSelectedProducts()
 		if len(prods) == 0 {
@@ -480,7 +467,8 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		// packages
 		var addr *dt.Address
 		var err error
-		tskAddr, err = task.New(db, m, respMsg)
+		in.State = m.State
+		tskAddr, err = task.New(db, in, out)
 		if err != nil {
 			return err
 		}
@@ -505,7 +493,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		m.Sentence = fmt.Sprintf("Ok. It comes to %s", tmp)
 		setState(StatePurchase)
 	case StatePurchase:
-		yes := language.ExtractYesNo(m.Sentence)
+		yes := language.ExtractYesNo(in.Sentence)
 		if !yes.Valid {
 			return nil
 		}
@@ -517,7 +505,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 			tskPurch.ResetState()
 		}
 		setState(StateAuth)
-		return updateState(m, respMsg)
+		return updateState(in, out)
 	case StateAuth:
 		// TODO ensure Ava follows up to ensure the delivery occured,
 		// get feedback, etc.
@@ -531,7 +519,7 @@ func updateState(m *dt.Msg, respMsg *dt.RespMsg) error {
 		if err != nil {
 			return err
 		}
-		tskPurch, err = task.New(db, m, respMsg)
+		tskPurch, err = task.New(db, in, out)
 		if err != nil {
 			return err
 		}
@@ -564,7 +552,12 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 			"budget":   getBudget(),
 			"selProds": len(getSelectedProducts()),
 		}).Warnln("empty recs")
-		return nil, ErrEmptyRecommendations
+		if getBudget() < 5000 {
+			setState(StateRecommendationsAlterBudget)
+		} else {
+			setState(StateRecommendationsAlterQuery)
+		}
+		return nil, nil
 	}
 	offset := getOffset()
 	if ln <= offset {
@@ -574,19 +567,19 @@ func currentSelection(state map[string]interface{}) (*dt.Product, error) {
 	return &recs[offset], nil
 }
 
-func handleKeywords(m *dt.Msg) (bool, error) {
+func handleKeywords(in *dt.Msg) error {
 	// TODO move thanks, thank you to Ava core
-	err := p.Vocab.HandleKeywords(m)
+	err := p.Vocab.HandleKeywords(in)
 	if err == dt.ErrNoFn {
 		if getState() != StateProductSelection {
-			currency := language.ExtractCurrency(m.Sentence)
+			currency := language.ExtractCurrency(in.Sentence)
 			if currency.Valid && currency.Int64 > 0 {
 				setBudget(uint64(currency.Int64))
 				setState(StateSetRecommendations)
 			}
 		}
 	}
-	return len(m.Sentence) > 0, err
+	return err
 }
 
 func recommendProduct(m *dt.Msg) error {
@@ -725,29 +718,27 @@ func extractWineCategory(s string) string {
 	return category
 }
 
-func kwDetail(_ *dt.Msg, _ int) (string, error) {
-	var s string
+func kwDetail(_ *dt.Msg, _ int) error {
 	r := rand.Intn(3)
 	switch r {
 	case 0:
-		s = "Every wine I recommend is at the top of its craft."
+		m.Sentence = "Every wine I recommend is at the top of its craft."
 	case 1:
-		s = "I only recommend the best."
+		m.Sentence = "I only recommend the best."
 	case 2:
-		s = "This wine has been personally selected by leading wine experts."
+		m.Sentence = "This wine has been personally selected by leading wine experts."
 	}
-	return s, nil
+	return nil
 }
 
-func kwPrice(_ *dt.Msg, _ int) (string, error) {
-	var s string
+func kwPrice(_ *dt.Msg, _ int) error {
 	prods := getSelectedProducts()
 	if len(prods) == 0 {
-		s = "Shipping is around $12 for the first bottle + $1.20 for every bottle after."
-		return s, nil
+		m.Sentence = "Shipping is around $12 for the first bottle + $1.20 for every bottle after."
+		return nil
 	}
 	prices := prods.Prices(getShippingAddress())
-	s = fmt.Sprintf("The items cost $%.2f, ",
+	s := fmt.Sprintf("The items cost $%.2f, ",
 		float64(prices["products"])/100)
 	s += fmt.Sprintf("shipping is $%.2f, ", float64(prices["shipping"])/100)
 	if prices["tax"] > 0.0 {
@@ -755,40 +746,41 @@ func kwPrice(_ *dt.Msg, _ int) (string, error) {
 			float64(prices["tax"])/100)
 	}
 	s += fmt.Sprintf("totaling $%.2f.", float64(prices["total"])/100)
-	return s, nil
+	m.Sentence = s
+	return nil
 }
 
-func kwSearch(m *dt.Msg, _ int) (string, error) {
+func kwSearch(in *dt.Msg, _ int) error {
 	l.Debugln("hit kwSearch")
 	setOffset(0)
-	setQuery(m.StructuredInput.Objects.String())
-	err := prefs.Save(db, m.User.ID, pkgName, prefs.KeyTaste,
-		m.StructuredInput.Objects.String())
+	setQuery(in.StructuredInput.Objects.String())
+	err := prefs.Save(db, in.User.ID, pkgName, prefs.KeyTaste,
+		in.StructuredInput.Objects.String())
 	if err != nil {
-		return "", err
+		return err
 	}
-	cat := extractWineCategory(m.Sentence)
+	cat := extractWineCategory(in.Sentence)
 	if len(cat) == 0 {
 		setState(StateRedWhite)
 	} else {
 		setCategory(cat)
 		setState(StateSetRecommendations)
 	}
-	return "", nil
+	return nil
 }
 
-func kwNextProduct(_ *dt.Msg, _ int) (string, error) {
+func kwNextProduct(_ *dt.Msg, _ int) error {
 	setOffset(float64(getOffset() + 1))
 	setState(StateMakeRecommendation)
-	return "", nil
+	return nil
 }
 
-func kwLessExpensive(m *dt.Msg, mod int) (string, error) {
+func kwLessExpensive(in *dt.Msg, mod int) error {
 	mod *= -1
-	return kwMoreExpensive(m, mod)
+	return kwMoreExpensive(in, mod)
 }
 
-func kwMoreExpensive(m *dt.Msg, mod int) (string, error) {
+func kwMoreExpensive(in *dt.Msg, mod int) error {
 	budg := getBudget()
 	var tmp int
 	if budg >= 10000 {
@@ -803,12 +795,12 @@ func kwMoreExpensive(m *dt.Msg, mod int) (string, error) {
 	}
 	setBudget(uint64(tmp))
 	setState(StateSetRecommendations)
-	err := prefs.Save(db, m.User.ID, pkgName, prefs.KeyBudget,
+	err := prefs.Save(db, in.User.ID, pkgName, prefs.KeyBudget,
 		strconv.Itoa(tmp))
-	return "", err
+	return err
 }
 
-func kwCart(_ *dt.Msg, _ int) (string, error) {
+func kwCart(_ *dt.Msg, _ int) error {
 	var s string
 	prods := getSelectedProducts()
 	var prodNames []string
@@ -841,10 +833,12 @@ func kwCart(_ *dt.Msg, _ int) (string, error) {
 		}
 		s += tmp
 	}
-	return s, nil
+	m.Sentence = s
+	return nil
 }
 
-func kwCheckout(_ *dt.Msg, _ int) (string, error) {
+func kwCheckout(_ *dt.Msg, _ int) error {
+	l.Debugln("here...")
 	if tskAddr != nil {
 		tskAddr.ResetState()
 	}
@@ -852,10 +846,10 @@ func kwCheckout(_ *dt.Msg, _ int) (string, error) {
 		tskPurch.ResetState()
 	}
 	setState(StateShippingAddress)
-	return "", nil
+	return nil
 }
 
-func kwRemoveFromCart(m *dt.Msg, _ int) (string, error) {
+func kwRemoveFromCart(in *dt.Msg, _ int) error {
 	var s string
 	prods := getSelectedProducts()
 	var prodNames []string
@@ -891,15 +885,17 @@ func kwRemoveFromCart(m *dt.Msg, _ int) (string, error) {
 		s += " Would you like to find another?"
 	}
 	setState(StateContinueShopping)
-	return s, nil
+	m.Sentence = s
+	return nil
 }
 
-func kwHelp(_ *dt.Msg, _ int) (string, error) {
-	s := "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
-	return s, nil
+func kwHelp(_ *dt.Msg, _ int) error {
+	m.Sentence = "At any time you can ask to see your cart, checkout, find something different (dry, fruity, earthy, etc.), or find something more or less expensive."
+	return nil
 }
 
-func kwStop(_ *dt.Msg, _ int) (string, error) {
+func kwStop(_ *dt.Msg, _ int) error {
 	l.Debugln("hit kwStop")
-	return "Ok.", nil
+	m.Sentence = "Ok."
+	return nil
 }
