@@ -135,7 +135,7 @@ func connectDB() *sqlx.DB {
 		d, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
 		d, err = sqlx.Connect("postgres",
-			"user=egtann dbname=ava sslmode=disable")
+			"user=postgres dbname=ava sslmode=disable")
 	}
 	if err != nil {
 		log.Errorln("connecting to db", err)
