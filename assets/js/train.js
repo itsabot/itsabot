@@ -7,7 +7,8 @@ var TrainIndex = {
 	},
 	route: function(ev) {
 		ev.preventDefault();
-		m.route("/train/" + ev.currentTarget.attr("key"));
+		var id = ev.target.parentNode.getAttribute("data-id");
+		m.route("/train/" + id);
 	}
 };
 
@@ -29,7 +30,6 @@ TrainIndex.controller = function() {
 };
 
 TrainIndex.view = function(ctrl) {
-	console.log(ctrl);
 	return m("div", {
 		class: "body"
 	}, [
@@ -62,16 +62,11 @@ TrainIndex.viewFull = function(ctrl) {
 				m("table", {
 					class: "table table-bordered table-hover"
 				}, [
-					ctrl.data.then(function(list) {
-						if (list === null) {
-							return;
-						}
-						return list.map(function(conversation) {
-							console.log("conversation hits here...");
-							m.redraw();
+					m("tbody", [
+						ctrl.data().map(function(conversation) {
 							return m.component(TrainIndexItem, conversation);
-						});
-					})
+						})
+					])
 				])
 			])
 		])
@@ -80,18 +75,17 @@ TrainIndex.viewFull = function(ctrl) {
 
 var TrainIndexItem = {
 	controller: function(args) {
-		console.log("building trainindexitem ctrl");
-		args.CreatedAt = Date.parse(args.CreatedAt);
 		return { conversation: args };
 	},
 	view: function(ctrl) {
-		console.log("building trainindexitem view");
+		var t = prettyDate(ctrl.conversation.CreatedAt);
 		return m("tr", {
+			"data-id": ctrl.conversation.ID,
 			key: ctrl.conversation.ID,
 			onclick: TrainIndex.route
 		}, [
-				m("td", ctrl.conversation.ID),
-				m("td", ctrl.conversation.CreatedAt)
+				m("td", ctrl.conversation.Sentence),
+				m("td", t)
 		]);
 	}
 };
@@ -154,11 +148,10 @@ TrainShow.viewFull = function(ctrl) {
 			class: "row"
 		}, [
 			m("div", {
-				class: "col-md-7 margin-top-sm"
+				class: "col-md-4 margin-top-sm"
 			}, [
-				m("h3", "Conversation"),
 				m("div", [
-					m.component(Chatbox, ctrl.data)
+					m.component(new Chatbox(), ctrl.data)
 				])
 			])
 			/*
@@ -173,40 +166,69 @@ TrainShow.viewFull = function(ctrl) {
 	]);
 };
 
-var Chatbox = {
-	controller: function(args) {
-		//		ID, []Chats (sorted), []Packages, []UserPreferences
-		return { data: args };
-	},
-	view: function(ctrl) {
-		return m("div", { class: "chat-container" }, [
-			m("ol", { class: "chat-box" }, [
-				m("li", { class: "chat-user" }, [
-					m("div", { class: "messages" }, [
-						m("p", "Hi how are you?"),
-						m("time datetime='2009-11-13T20:00'", "Timothy • 51 mins")
-					])
-				]),
-				m("li", { class: "chat-ava" }, [
-					m("div", { class: "messages" }, [
-						m("p", "Bro. I'm chillin"),
-						m("time datetime='2009-11-13T20:00'", "37 mins")
-					])
-				]),
-				m("li", { class: "chat-user" }, [
-					m("div", { class: "messages" }, [
-						m("p", "Yeah man!"),
-						m("time datetime='2009-11-13T20:00'", "Timothy • 32 mins")
-					])
-				]),
-				m("li", { class: "chat-user" }, [
-					m("div", { class: "messages" }, [
-						m("p", "Cool...")
-					])
+var Chatbox = function() {
+	var _this = this;
+	_this.shiftPressed = m.prop(false);
+	return _this;
+}
+Chatbox.prototype.controller = function(args) {
+	//		ID, []Chats (sorted), []Packages, []UserPreferences
+	return { data: args };
+};
+Chatbox.prototype.view = function(ctrl) {
+	return m("div", { class: "chat-container" }, [
+		m("ol", { class: "chat-box" }, [
+			m("li", { class: "chat-user" }, [
+				m("div", { class: "messages" }, [
+					m("p", "Hi how are you?"),
+					m("time", {
+						datetime: '2009-11-13T20:00'
+					}, "Timothy • 51 mins")
+				])
+			]),
+			m("li", { class: "chat-ava" }, [
+				m("div", { class: "messages" }, [
+					m("p", "Bro. I'm chillin"),
+					m("time", {
+						datetime: '2009-11-13T20:00'
+					}, "37 mins")
+				])
+			]),
+			m("li", { class: "chat-user" }, [
+				m("div", { class: "messages" }, [
+					m("p", "Yeah man!"),
+					m("time", {
+						datetime: '2009-11-13T20:00'
+					}, "Timothy • 32 mins")
+				])
+			]),
+			m("li", { class: "chat-user" }, [
+				m("div", { class: "messages" }, [
+					m("p", "Cool...")
 				])
 			])
-		]);
+		]),
+		m("textarea", {
+			class: "chat-textarea",
+			rows: 4,
+			onkeydown: this.handleSend
+		}, "Hi")
+	]);
+};
+Chatbox.prototype.handleSend = function(ev) {
+	if (ev.keyCode === 16 /* shift */) {
+		this.shiftPressed(true);
+		return;
 	}
+	if (ev.keyCode === 13 /* enter */) {
+		// TODO send message
+		if (!this.shiftPressed) {
+			ev.preventDefault();
+			ev.srcElement.value = "";
+			return;
+		}
+	}
+	this.shiftPressed(false);
 };
 
 // TODO Suggestion

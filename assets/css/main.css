@@ -357,8 +357,14 @@ input.form-control {
 	border-top: 1px solid #DDD;
 }
 .chat-container {
-	width: 300px;
-	margin: 20px auto;
+	width: 100%;
+	border: 1px solid #ccc;
+	border-radius: 2px;
+}
+.chat-textarea {
+	width: 100%;
+	border: none;
+	border-top: 1px solid #ccc;
 }
 .top-header {
 	background: #666;
@@ -419,8 +425,6 @@ input.form-control {
 	background: #e5e5e5;
 	margin: 0;
 	padding: 0 0 50px 0;
-	height: 280px;
-	overflow-y: auto;
 }
 .chat-box li {
 	padding: 0.5rem;
@@ -477,11 +481,10 @@ input.form-control {
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 .messages p {
-	font-size: 0.8rem;
 	margin: 0 0 0.2rem 0;
 }
 .messages time {
-	font-size: 0.7rem;
+	font-size: 0.8em;
 	color: #ccc;
 }
 .setting {

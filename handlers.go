@@ -596,10 +596,11 @@ func handlerAPIConversations(c *echo.Context) error {
 	      WHERE needstraining IS TRUE
 	      ORDER BY userid, createdat ASC
 	      LIMIT 25`
-	if err := db.Select(&msgs, q); err != nil {
+	err := db.Select(&msgs, q)
+	if err != nil && err != sql.ErrNoRows {
 		return jsonError(err)
 	}
-	if err := c.JSON(http.StatusOK, msgs); err != nil {
+	if err = c.JSON(http.StatusOK, msgs); err != nil {
 		return jsonError(err)
 	}
 	return nil
