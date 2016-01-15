@@ -33,6 +33,7 @@ type Msg struct {
 	Route             string
 	Package           string
 	State             map[string]interface{}
+	CreatedAt         *time.Time
 	// AvaSent determines if msg is from the user or Ava
 	AvaSent bool
 	// SentenceFields breaks the sentence into words. Tokens like ,.' are

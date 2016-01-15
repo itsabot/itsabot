@@ -2998,7 +2998,7 @@ Tour.view = function() {
 	]);
 };
 var TrainIndex = {
-	loadConversations: function(uid) {
+	loadConversations: function() {
 		return m.request({
 			method: "GET",
 			url: "/api/conversations.json"
@@ -3023,7 +3023,7 @@ TrainIndex.controller = function() {
 		//			...
 		//		}
 		// ]
-		data: TrainIndex.loadConversations(userId)
+		data: TrainIndex.loadConversations()
 	};
 };
 
@@ -3061,8 +3061,15 @@ TrainIndex.viewFull = function(ctrl) {
 				m("table", {
 					class: "table table-bordered table-hover"
 				}, [
-					ctrl.data.map(function(converation) {
-						return m.component(TrainIndexItem, conversation);
+					ctrl.data.then(function(list) {
+						if (list === null) {
+							return;
+						}
+						return list.map(function(conversation) {
+							console.log("conversation hits here...");
+							m.redraw();
+							return m.component(TrainIndexItem, conversation);
+						});
 					})
 				])
 			])
@@ -3072,10 +3079,12 @@ TrainIndex.viewFull = function(ctrl) {
 
 var TrainIndexItem = {
 	controller: function(args) {
+		console.log("building trainindexitem ctrl");
 		args.CreatedAt = Date.parse(args.CreatedAt);
 		return { conversation: args };
 	},
 	view: function(ctrl) {
+		console.log("building trainindexitem view");
 		return m("tr", {
 			key: ctrl.conversation.ID,
 			onclick: TrainIndex.route

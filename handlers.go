@@ -46,14 +46,15 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
-	e.Get("/api/sentence.json", handlerAPISentence)
-	e.Put("/api/sentence.json", handlerAPITrainSentence)
+	//e.Get("/api/sentence.json", handlerAPISentence)
+	//e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
+	e.Get("/api/conversations.json", handlerAPIConversations)
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -577,6 +578,28 @@ func handlerAPICardDelete(c *echo.Context) error {
 	}
 	err = c.JSON(http.StatusOK, nil)
 	if err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIConversations(c *echo.Context) error {
+	var msgs []struct {
+		ID        uint64
+		Sentence  string
+		UserID    uint64
+		CreatedAt *time.Time
+	}
+	q := `SELECT DISTINCT ON (userid)
+	          id, sentence, createdat, userid
+	      FROM messages
+	      WHERE needstraining IS TRUE
+	      ORDER BY userid, createdat ASC
+	      LIMIT 25`
+	if err := db.Select(&msgs, q); err != nil {
+		return jsonError(err)
+	}
+	if err := c.JSON(http.StatusOK, msgs); err != nil {
 		return jsonError(err)
 	}
 	return nil
