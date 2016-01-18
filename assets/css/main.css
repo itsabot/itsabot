@@ -141,6 +141,13 @@ footer .de-emphasized a {
 	letter-spacing: 8px;
 	background-color: white;
 }
+.btn-xs {
+	margin-top: 0.5em;
+	letter-spacing: 2px;
+	border-radius: 10px;
+	padding: 0.5em 1em;
+	font-size: 10px;
+}
 .gradient .btn {
 	color: white;
 	background-color: transparent;
@@ -241,6 +248,13 @@ a.bold {
 .margin-top-xs {
 	margin-top: 0.5em;
 }
+.margin-sm {
+	margin-top: 1em;
+	margin-bottom: 1em;
+}
+.margin-left {
+	margin-left: 1em;
+}
 .margin-top-sm {
 	margin-top: 2em;
 }
@@ -295,6 +309,15 @@ span.heading {
 }
 .pink {
 	background-color: rgba(208, 16, 211, 0.28);
+}
+.gray {
+	background-color: rgba(0, 0, 0, 0.04);
+}
+.green-text {
+	color: #3AC459;
+}
+.red-text {
+	color: #E74C3C;
 }
 .dialog-left {
 	color: #70B7BA;
@@ -356,6 +379,28 @@ input.form-control {
 	border: 1px solid #E8E8E8;
 	border-top: 1px solid #DDD;
 }
+input.form-control.form-white {
+	background-color: white;
+}
+.calendar-selector {
+	margin-bottom: 0;
+}
+.calendar-selector td {
+	border-right: 1px solid #ddd;
+	text-align: center;
+}
+.calendar-row {
+	font-size: 9.5px;
+	padding: 0.25em 0;
+	border-bottom: 1px solid #eee;
+	width: 17px;
+}
+.calendar-time {
+	height: 50px;
+}
+.calendar-time:hover {
+	background-color: rgba(16, 60, 211, 0.18);
+}
 .chat-container {
 	width: 100%;
 	border: 1px solid #ccc;
@@ -365,6 +410,8 @@ input.form-control {
 	width: 100%;
 	border: none;
 	border-top: 1px solid #ccc;
+	font-family: 'PT Serif', serif;
+	font-size: 16px;
 }
 .top-header {
 	background: #666;
@@ -420,16 +467,30 @@ input.form-control {
 	opacity: 0.25;
 	background-color: #404040
 }
+.chat-container input {
+	width: 100%;
+	border: none;
+	border-bottom: 1px solid #ccc;
+}
+.chat-container input, .chat-container textarea {
+	padding: 0.25em;
+}
 .chat-box {
 	list-style: none;
 	background: #e5e5e5;
 	margin: 0;
-	padding: 0 0 50px 0;
+	padding: 0 0 0.25em 0;
+	height: 400px;
+	overflow-y: auto;
 }
 .chat-box li {
-	padding: 0.5rem;
+	font-size: 14px;
+	padding: 0.25rem;
 	overflow: hidden;
 	display: flex;
+}
+.chat-box p {
+	font-size: 16px;
 }
 .chat-box .avatar-icon {
 	width: 40px;
@@ -519,6 +580,12 @@ input.form-control {
 .subtle {
 	font-style: italic;
 	color: #AAA;
+}
+.subtle-sm {
+	font-size: 10px;
+}
+.centered {
+	text-align: center;
 }
 @media (max-width: 320px) {
 	#btns .btn {

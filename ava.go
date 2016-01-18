@@ -276,44 +276,10 @@ func processText(c *echo.Context) (string, error) {
 	if err = msg.Save(db); err != nil {
 		return "", err
 	}
-	/*
-		n, err := getActiveNode(db, msg.User)
-		if err != nil {
-			return "", err
-		}
-		var ret *dt.RespMsg
-		if n != nil {
-			err = n.updateRelation(db, msg.StructuredInput)
-			if err == ErrRelEqTerm {
-				s := "I didn't understand that. What's " + n.Term +
-					" again?"
-				return s, nil
-			}
-			if err != nil {
-				return "", err
-			}
-		}
-		if !followup {
-			log.Debugln("conversation change. deleting unused knowledgequeries")
-			if err := deleteNodes(db, msg.User); err != nil {
-				return "", err
-			}
-		}
-	*/
 	ret, err := callPkg(pkg, msg, followup)
 	if err != nil {
 		return "", err
 	}
-	/*
-		var changed bool
-		if len(ret.Sentence) == 0 {
-			ret, changed, err = processKnowledge(msg, ret, followup)
-			if err != nil {
-				log.WithField("fn", "callPkg").Errorln(err)
-				return "", err
-			}
-		}
-	*/
 	var m *dt.Msg
 	if len(ret.Sentence) == 0 {
 		m = &dt.Msg{}
@@ -323,16 +289,6 @@ func processText(c *echo.Context) (string, error) {
 		if err = m.Save(db); err != nil {
 			return "", err
 		}
-		/*
-			log.Debugln("confused. node?", n)
-			if changed {
-				log.Debugln("confused with node. deleting unused and last knowledgequeries")
-				err = deleteRecentNodes(db, msg.User)
-				if err != nil {
-					return "", err
-				}
-			}
-		*/
 	}
 	if m == nil {
 		m, err = dt.GetMsg(db, ret.MsgID)
