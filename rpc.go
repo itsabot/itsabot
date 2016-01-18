@@ -68,54 +68,57 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	return nil
 }
 
+// getPkg attempts to find a package and route for the given msg input
+// if none can be found, it checks the database for the last route used and
+// gets the package for that. if there is no previously used package, we return
+// ErrMissingPackage
+// the bool value return indicates whether this package is different from the
+// last package used by the user
 func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
-	var p *pkg.PkgWrapper
+	// first check if the user is missing. aka, needs to be onboarded
 	if m.User == nil {
-		p = regPkgs.Get("onboard_onboard")
-		if p != nil {
-			return p, "onboard_onboard", false, nil
-		} else {
+		p := regPkgs.Get("onboard_onboard")
+		if p == nil {
 			log.Errorln("missing required onboard package")
-			return p, "onboard_onboard", false, ErrMissingPackage
+			return nil, "onboard_onboard", false, ErrMissingPackage
 		}
+		return p, "onboard_onboard", true, nil
 	}
-	si := m.StructuredInput
-	var route string
-Loop:
-	for _, c := range si.Commands {
-		for _, o := range si.Objects {
-			route = strings.ToLower(c + "_" + o)
+
+	// first we look for a previously used route. we have to do this in
+	// any case, to check if the users pkg/route has changed. so why not now!
+	log.Debugln("getting last route")
+	prevRoute, err := m.GetLastRoute(db)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, "", false, err
+	}
+	log.Debugf("user's last route: %q\n", prevRoute)
+
+	// iterate over all command/object pairs and see if any package has
+	// been registered for the resulting route
+	for _, c := range m.StructuredInput.Commands {
+		for _, o := range m.StructuredInput.Objects {
+			route := strings.ToLower(c + "_" + o)
 			log.Debugln("searching route", route)
-			p = regPkgs.Get(route)
-			if p != nil {
-				break Loop
+			if p := regPkgs.Get(route); p != nil {
+				// found route. return it
+				return p, route, route == prevRoute, nil
 			}
 		}
 	}
-	if p != nil {
-		return p, route, false, nil
-	}
-	if len(route) == 0 {
-		var err error
-		log.Debugln("getting last route")
-		route, err = m.GetLastRoute(db)
-		if err == sql.ErrNoRows {
-			log.Errorln("no rows for last response")
-		} else if err != nil {
-			return p, "", false, err
+
+	// the user input didnt match any packages. lets see if the prevRoute does
+	if prevRoute != "" {
+		log.Debugln("checking prevRoute for pkg")
+		if p := regPkgs.Get(prevRoute); p != nil {
+			// prev route matches a pkg! return it
+			return p, prevRoute, false, nil
 		}
-		log.Debugln("got last route, ", route)
 	}
-	if len(route) == 0 {
-		log.Warnln("no last response")
-		return p, route, false, nil
-	}
-	p = regPkgs.Get(route)
-	if p == nil {
-		log.Debugln("route", route)
-		return p, route, false, ErrMissingPackage
-	}
-	return p, route, true, nil
+
+	// sadly, if we've reached this point, we are at a lose.
+	log.Warnln("could not match user input to any package")
+	return nil, "", false, ErrMissingPackage
 }
 
 func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (*dt.RespMsg,

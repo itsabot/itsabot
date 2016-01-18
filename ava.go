@@ -156,7 +156,7 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 		return nil, nil
 	}
 	uid, fid, fidT := validateParams(c)
-	u, err := getUser(uid, fid, fidT)
+	u, err := getUser(uid, fid, flexIDType(fidT))
 	if err != nil {
 		return nil, err
 	}
@@ -266,8 +266,16 @@ func processText(c *echo.Context) (string, error) {
 		log.WithField("fn", "preprocessForMessage").Error(err)
 		return "", err
 	}
+
+	log.Debugln("processed input into message...")
+	log.Debugln("commands:", msg.StructuredInput.Commands)
+	log.Debugln(" objects:", msg.StructuredInput.Objects)
+	log.Debugln("  actors:", msg.StructuredInput.Actors)
+	log.Debugln("   times:", msg.StructuredInput.Times)
+	log.Debugln("  places:", msg.StructuredInput.Places)
+
 	pkg, route, followup, err := getPkg(msg)
-	if err != nil && err != ErrMissingPackage {
+	if err != nil {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
