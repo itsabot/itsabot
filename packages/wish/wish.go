@@ -12,20 +12,24 @@ import (
 	"github.com/avabot/ava/shared/pkg"
 )
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var db *sqlx.DB
 var p *pkg.Pkg
 
 type Wish string
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
+
 	trigger := &nlp.StructuredInput{
 		Commands: []string{"wish"},
 	}
+
 	db = connectDB()
 	var err error
-	p, err = pkg.NewPackage("wish", *port, trigger)
+	p, err = pkg.NewPackage("wish", coreaddr, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}

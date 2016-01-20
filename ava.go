@@ -33,7 +33,7 @@ var db *sqlx.DB
 var tc *twilio.Client
 var mc *dt.MailClient
 var bayes *bayesian.Classifier
-var phoneRegex *regexp.Regexp
+var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
@@ -67,7 +67,7 @@ func main() {
 		}
 		if c.Bool("server") {
 			db = connectDB()
-			startServer(os.Getenv("PORT"))
+			startServer()
 			showHelp = false
 		}
 		if showHelp {
@@ -77,54 +77,61 @@ func main() {
 	app.Run(os.Args)
 }
 
-func startServer(port string) {
-	var err error
-	phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
-	if err = checkRequiredEnvVars(); err != nil {
+func startServer() {
+	if err := checkRequiredEnvVars(); err != nil {
 		log.Errorln("checking env vars", err)
 	}
+
+	addr, err := bootRPCServer()
+	if err != nil {
+		log.Fatalln("unable to boot rpc server:", err)
+	}
+	go bootDependencies(addr)
+
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
 		log.Errorln("loading classifier", err)
 	}
-	bootRPCServer(port)
+
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
+
 	appVocab = dt.NewAtomicMap()
-	bootDependencies()
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
+
+	log.Infoln("booting ava http server")
 	e := echo.New()
 	initRoutes(e)
-	log.Infoln("booted ava")
-	e.Run(":" + port)
+	e.Run(":" + os.Getenv("PORT"))
 }
 
-func bootRPCServer(port string) {
+// bootRPCServer starts the rpc for ava core in a go routine and returns
+// the server address
+func bootRPCServer() (addr string, err error) {
+	log.Debugln("booting ava core rpc server")
+
 	ava := new(Ava)
-	if err := rpc.Register(ava); err != nil {
-		log.Errorln("register ava in rpc", err)
+	if err = rpc.Register(ava); err != nil {
+		return
 	}
-	p, err := strconv.Atoi(port)
-	if err != nil {
-		log.Errorln("convert port to int", err)
+
+	var ln net.Listener
+	if ln, err = net.Listen("tcp", ":0"); err != nil {
+		return
 	}
-	pt := strconv.Itoa(p + 1)
-	l, err := net.Listen("tcp", ":"+pt)
-	log.WithFields(log.Fields{
-		"port": pt,
-	}).Debugln("booting rpc server")
-	if err != nil {
-		log.Errorln("rpc listen", err)
-	}
+	addr = ln.Addr().String()
+
 	go func() {
 		for {
-			conn, err := l.Accept()
+			conn, err := ln.Accept()
 			if err != nil {
 				log.Errorln("rpc accept", err)
 			}
 			go rpc.ServeConn(conn)
 		}
 	}()
+
+	return // using named return params
 }
 
 func connectDB() *sqlx.DB {

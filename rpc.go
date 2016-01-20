@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/rpc"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -27,19 +26,15 @@ var regPkgs = pkgMap{
 
 var appVocab dt.AtomicMap
 
-var client *rpc.Client
-
 // RegisterPackage enables Ava to notify packages when specific StructuredInput
 // is encountered. Note that packages will only listen when ALL criteria are met
 func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
-	pt := p.Config.Port + 1
 	log.WithFields(log.Fields{
 		"pkg":  p.Config.Name,
-		"port": pt,
+		"addr": p.Config.PkgRPCAddr,
 	}).Debugln("registering")
-	port := ":" + strconv.Itoa(pt)
-	addr := p.Config.ServerAddress + port
-	cl, err := rpc.Dial("tcp", addr)
+
+	client, err := rpc.Dial("tcp", p.Config.PkgRPCAddr)
 	if err != nil {
 		return err
 	}
@@ -54,7 +49,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 					"route": s,
 				}).Warnln("duplicate package or trigger")
 			}
-			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: cl})
+			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: client})
 		}
 	}
 	if p.Vocab != nil {

@@ -41,7 +41,6 @@ type yelpResp struct {
 	}
 }
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
@@ -50,10 +49,12 @@ var db *sqlx.DB
 var l *log.Entry
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
-	l = log.WithFields(log.Fields{
-		"pkg": "mechanic",
-	})
+	l = log.WithFields(log.Fields{"pkg": "mechanic"})
+
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
@@ -75,7 +76,7 @@ func main() {
 			language.AutomotiveBrands(),
 		),
 	}
-	p, err = pkg.NewPackage("mechanic", *port, trigger)
+	p, err = pkg.NewPackage("mechanic", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}

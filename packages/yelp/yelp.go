@@ -41,7 +41,6 @@ type yelpResp struct {
 	}
 }
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
@@ -50,19 +49,22 @@ var p *pkg.Pkg
 var l *log.Entry
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
-	l = log.WithFields(log.Fields{
-		"pkg": "yelp",
-	})
+
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
+
 	var err error
 	db, err = pkg.ConnectDB()
 	if err != nil {
 		l.Fatalln(err)
 	}
+
 	trigger := &nlp.StructuredInput{
 		Commands: []string{
 			"find",
@@ -74,7 +76,7 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err = pkg.NewPackage("yelp", *port, trigger)
+	p, err = pkg.NewPackage("yelp", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}
