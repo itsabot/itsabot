@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"text/template"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	mw "github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo/middleware"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/satori/go.uuid"
@@ -46,14 +46,18 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
-	e.Get("/api/sentence.json", handlerAPISentence)
-	e.Put("/api/sentence.json", handlerAPITrainSentence)
+	//e.Get("/api/sentence.json", handlerAPISentence)
+	//e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
+	e.Get("/api/conversation.json", handlerAPIConversationsShow)
+	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
+	e.Get("/api/conversations.json", handlerAPIConversations)
+	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -578,6 +582,159 @@ func handlerAPICardDelete(c *echo.Context) error {
 	err = c.JSON(http.StatusOK, nil)
 	if err != nil {
 		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIConversations(c *echo.Context) error {
+	var msgs []struct {
+		ID        uint64
+		Sentence  string
+		UserID    uint64
+		CreatedAt *time.Time
+	}
+	q := `SELECT DISTINCT ON (userid)
+	          id, sentence, createdat, userid
+	      FROM messages
+	      WHERE needstraining IS TRUE
+	      ORDER BY userid, createdat ASC
+	      LIMIT 25`
+	err := db.Select(&msgs, q)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+	if err = c.JSON(http.StatusOK, msgs); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIConversationsShow(c *echo.Context) error {
+	uid, err := strconv.Atoi(c.Query("uid"))
+	if err != nil {
+		return jsonError(err)
+	}
+	id, err := strconv.Atoi(c.Query("id"))
+	if err != nil {
+		return jsonError(err)
+	}
+	var ret []struct {
+		Sentence  string
+		AvaSent   bool
+		CreatedAt time.Time
+	}
+	q := `SELECT sentence, avasent, createdat
+	      FROM messages
+	      WHERE userid=$1 AND id>=$2
+	      ORDER BY createdat DESC`
+	if err := db.Select(&ret, q, uid, id); err != nil {
+		return jsonError(err)
+	}
+	var username string
+	q = `SELECT name FROM users WHERE id=$1`
+	if err := db.Get(&username, q, uid); err != nil {
+		return jsonError(err)
+	}
+	// reverse order of messages for display
+	for i, j := 0, len(ret)-1; i < j; i, j = i+1, j-1 {
+		ret[i], ret[j] = ret[j], ret[i]
+	}
+	q = `SELECT DISTINCT ON (key) key, value
+	     FROM preferences
+	     WHERE userid=$1
+	     ORDER BY key, createdat DESC
+	     LIMIT 25`
+	var prefsTmp []struct {
+		Key   string
+		Value string
+	}
+	err = db.Select(&prefsTmp, q, uid)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+	var prefs []string
+	for _, p := range prefsTmp {
+		prefs = append(prefs, p.Key+": "+
+			strings.ToUpper(p.Value[:1])+p.Value[1:])
+	}
+	resp := struct {
+		Username      string
+		Conversations []struct {
+			Sentence  string
+			AvaSent   bool
+			CreatedAt time.Time
+		}
+		Preferences []string
+	}{
+		Username:      username,
+		Conversations: ret,
+		Preferences:   prefs,
+	}
+	if err := c.JSON(http.StatusOK, resp); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIConversationsCreate(c *echo.Context) error {
+	var req struct {
+		Sentence string
+		UserID   uint64
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	// TODO record the last flextype used and send the user a response via
+	// that. e.g. if message was received from a secondary phone number,
+	// respond to the user via that secondary phone number. For now, simply
+	// get the first flexid available
+	var fid string
+	q := `SELECT flexid FROM userflexids WHERE flexidtype=2 AND userid=$1`
+	if err := db.Get(&fid, q, req.UserID); err != nil {
+		return jsonError(err)
+	}
+	var id uint64
+	q = `INSERT INTO messages
+	     (userid, sentence, avasent) VALUES ($1, $2, TRUE) RETURNING id`
+	err := db.QueryRowx(q, req.UserID, req.Sentence).Scan(&id)
+	if err != nil {
+		return jsonError(err)
+	}
+	/*
+		if err = sms.SendMessage(tc, fid, req.Sentence); err != nil {
+			q = `DELETE FROM messages WHERE id=$1`
+			if _, err = db.Exec(q, id); err != nil {
+				return jsonError(err)
+			}
+			return jsonError(err)
+		}
+	*/
+	if err := c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIPreviewCmd(c *echo.Context) error {
+	msg, err := preprocess(c)
+	if err != nil || msg == nil /* trained */ {
+		log.WithField("fn", "preprocessForMessage").Error(err)
+		return err
+	}
+	pkg, route, followup, err := getPkg(msg)
+	if err != nil && err != ErrMissingPackage {
+		log.WithField("fn", "getPkg").Error(err)
+		return err
+	}
+	msg.Route = route
+	msg.Package = pkg.P.Config.Name
+	if err = msg.Save(db); err != nil {
+		return err
+	}
+	// TODO use ret.Sentence
+	_, err = callPkg(pkg, msg, followup)
+	if err != nil {
+		return err
 	}
 	return nil
 }

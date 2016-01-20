@@ -8,6 +8,7 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
+	"github.com/avabot/ava/shared/nlp"
 	"github.com/avabot/ava/shared/pkg"
 )
 
@@ -19,7 +20,7 @@ type Wish string
 
 func main() {
 	flag.Parse()
-	trigger := &dt.StructuredInput{
+	trigger := &nlp.StructuredInput{
 		Commands: []string{"wish"},
 	}
 	db = connectDB()
@@ -35,31 +36,30 @@ func main() {
 }
 
 func (pt *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
-	resp := m.NewResponse()
 	q := `INSERT INTO wishes (userid, sentence) VALUES ($1, $2)`
-	_, err := db.Exec(q, m.User.ID, m.Input.Sentence)
+	_, err := db.Exec(q, m.User.ID, m.Sentence)
 	if err != nil {
 		return err
 	}
 	n := rand.Intn(5)
 	switch n {
 	case 0:
-		resp.Sentence = "Your wish is my command!"
+		m.Sentence = "Your wish is my command!"
 	case 1:
-		resp.Sentence = "I'll make some calls."
+		m.Sentence = "I'll make some calls."
 	case 2:
-		resp.Sentence = "I hope to start doing that soon, too."
+		m.Sentence = "I hope to start doing that soon, too."
 	case 3:
-		resp.Sentence = "Roger that!"
+		m.Sentence = "Roger that!"
 	case 4:
-		resp.Sentence = "I wish I could do that now, too. Soon, I hope."
+		m.Sentence = "I wish I could do that now, too. Soon, I hope."
 	}
-	return p.SaveResponse(respMsg, resp)
+	return p.SaveMsg(respMsg, m)
 }
 
-func (pt *Wish) FollowUp(m *dt.Msg,
-	respMsg *dt.RespMsg) error {
-	return p.SaveResponse(respMsg, m.NewResponse())
+func (pt *Wish) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+	m = dt.NewMsg(db, nil, m.User, "")
+	return p.SaveMsg(respMsg, m)
 }
 
 func connectDB() *sqlx.DB {
@@ -70,7 +70,7 @@ func connectDB() *sqlx.DB {
 		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
 		db, err = sqlx.Connect("postgres",
-			"user=egtann dbname=ava sslmode=disable")
+			"user=postgres dbname=ava sslmode=disable")
 	}
 	if err != nil {
 		log.Println("err: could not connect to db", err)

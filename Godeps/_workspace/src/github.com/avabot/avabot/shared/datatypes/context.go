@@ -36,7 +36,7 @@ func NewDatabaseConn() (*sqlx.DB, error) {
 		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
 		db, err = sqlx.Connect("postgres",
-			"user=postgres dbname=ava sslmode=disable")
+			"user=egtann dbname=ava sslmode=disable")
 	}
 	return db, err
 }

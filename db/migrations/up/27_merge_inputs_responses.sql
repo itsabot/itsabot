@@ -1,0 +1,12 @@
+DROP TABLE responses;
+ALTER TABLE inputs DROP COLUMN flexid;
+ALTER TABLE inputs DROP COLUMN flexidtype;
+ALTER TABLE inputs DROP COLUMN commands;
+ALTER TABLE inputs DROP COLUMN objects;
+ALTER TABLE inputs DROP COLUMN actors;
+ALTER TABLE inputs DROP COLUMN times;
+ALTER TABLE inputs DROP COLUMN places;
+ALTER TABLE inputs DROP COLUMN knowledgefilled;
+ALTER TABLE inputs DROP COLUMN responseid;
+ALTER TABLE inputs ADD COLUMN avasent BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE inputs RENAME TO messages;

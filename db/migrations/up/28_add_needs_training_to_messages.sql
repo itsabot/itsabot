@@ -1,0 +1,1 @@
+ALTER TABLE messages ADD COLUMN needstraining BOOLEAN DEFAULT FALSE;

@@ -5,17 +5,16 @@ import (
 	"encoding/gob"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/jmoiron/sqlx"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 )
 
 type StateMachine struct {
-	State     int
-	Handlers  []State
-	Reset     func()
-	SetMemory func(string, interface{})
-	pkgName   string
-	logger    *log.Entry
-	db        *sqlx.DB
+	State    int
+	Handlers []State
+	pkgName  string
+	logger   *log.Entry
+	db       *sqlx.DB
+	resetFn  func()
 }
 
 type State struct {
@@ -23,7 +22,7 @@ type State struct {
 	// to do something when the state begins, like run a search or hit an
 	// endpoint, do that within the OnEntry function, since it's only called
 	// once.
-	OnEntry func() string
+	OnEntry func(*Msg) string
 
 	// OnInput sets the category in the cache/DB. Note that if invalid, this
 	// state's Complete function will return false, preventing the user from
@@ -35,12 +34,12 @@ type State struct {
 	// States, you should generally avoid logging errors directly in
 	// the OnInput function and instead log them within any called functions
 	// (e.g. setPreference).
-	OnInput func(*Input)
+	OnInput func(*Msg)
 
 	// Complete will determine if the state machine continues. If true,
 	// it'll move to the next state. If false, the user's next response will
 	// hit this state's OnInput function again.
-	Complete func(*Input) bool
+	Complete func(*Msg) bool
 
 	// Memory will search through preferences about the user. If a past
 	// preference is found, it'll skip to the OnInput response, with that
@@ -48,17 +47,21 @@ type State struct {
 	Memory string
 }
 
-func NewStateMachine(ss ...State) *StateMachine {
+func NewStateMachine(pkgName string) (*StateMachine, error) {
 	sm := StateMachine{State: 0}
-	sm.Handlers = ss
-	sm.Reset = func() {}
-	sm.Logger = log.WithFields(log.Fields{
+	// TODO load state from DB
+	sm.resetFn = func() {}
+	sm.logger = log.WithFields(log.Fields{
 		"pkg": pkgName,
 	})
-	return &sm
+	return &sm, nil
 }
 
-func (sm StateMachine) SetLogger(l *log.Entry) {
+func (sm *StateMachine) SetStates(ss ...State) {
+	sm.Handlers = ss
+}
+
+func (sm *StateMachine) SetLogger(l *log.Entry) {
 	sm.logger = l
 }
 
@@ -70,7 +73,7 @@ func (sm StateMachine) SetPkgName(n string) {
 	sm.pkgName = n
 }
 
-func (sm StateMachine) Next(in *Input) string {
+func (sm StateMachine) Next(in *Msg) string {
 	if sm.State+1 >= len(sm.Handlers) {
 		sm.Reset()
 		return sm.Handlers[sm.State].OnEntry(in)
@@ -80,7 +83,7 @@ func (sm StateMachine) Next(in *Input) string {
 		sm.State++
 		s := sm.Handlers[sm.State].OnEntry(in)
 		if len(s) == 0 {
-			sm.Logger.WithField("state", sm.State).
+			sm.logger.WithField("state", sm.State).
 				Warnln("OnEntry returned \"\"")
 		}
 		return s
@@ -96,47 +99,47 @@ func (sm StateMachine) Next(in *Input) string {
 	return ""
 }
 
-func (sm StateMachine) OnInput(in *Input) {
+func (sm StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.State].OnInput(in)
 }
 
 func (sm StateMachine) SetOnReset(reset func()) {
-	sm.Reset = reset
+	sm.resetFn = reset
 }
 
-func (sm StateMachine) SetMemory(in *Input, k string, v interface{}) {
+func (sm StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(v); err != nil {
-		sm.Logger.Errorln(err, "setting memory at", k, "to", v)
+		sm.logger.Errorln(err, "setting memory at", k, "to", v)
 		return
 	}
 	// the `||` upserts the key into postgres jsonb
 	q := `SELECT state FROM states WHERE userid=$1 AND pkgname=$2
 	      || jsonb_build_object('%s', '%b')`
-	_, err := sm.db.Exec(q, sm.PkgName, in.UserID, k, buf.Bytes())
+	_, err := sm.db.Exec(q, sm.pkgName, in.User.ID, k, buf.Bytes())
 	if err != nil {
-		sm.Logger.Errorln(err, "setting memory at", k, "to", v)
+		sm.logger.Errorln(err, "setting memory at", k, "to", v)
 		return
 	}
 	// TODO set preference here as well
 }
 
-func (sm StateMachine) GetMemory(in *Input, k string) Memory {
+func (sm StateMachine) GetMemory(in *Msg, k string) Memory {
 	q := `SELECT state FROM states WHERE userid=$1 AND pkgname=$2`
 	var buf bytes.Buffer
-	if err := sm.db.Get(&buf, q, in.UserID, sm.pkgName); err != nil {
+	if err := sm.db.Get(&buf, q, in.User.ID, sm.pkgName); err != nil {
 		sm.logger.Errorln(err, "getMemory for key", k)
-		return []byte{}
+		return Memory{Key: k, Val: []byte{}, logger: sm.logger}
 	}
 	return Memory{Key: k, Val: buf.Bytes(), logger: sm.logger}
 }
 
-func (sm StateMachine) HasMemory(in *Input, k string) bool {
-	return len(sm.GetMemory(in, k)) > 0
+func (sm StateMachine) HasMemory(in *Msg, k string) bool {
+	return len(sm.GetMemory(in, k).Val) > 0
 }
 
 func (sm StateMachine) Reset() {
 	sm.State = 0
-	sm.Reset()
+	sm.resetFn()
 }

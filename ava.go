@@ -21,6 +21,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
+	"github.com/avabot/ava/shared/nlp"
 	"github.com/avabot/ava/shared/sms"
 )
 
@@ -36,11 +37,6 @@ var phoneRegex *regexp.Regexp
 var ErrInvalidCommand = errors.New("invalid command")
 var ErrMissingPackage = errors.New("missing package")
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
-
-type Ctx struct {
-	Msg           *dt.Msg
-	NeedsTraining bool
-}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -139,7 +135,7 @@ func connectDB() *sqlx.DB {
 		d, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
 	} else {
 		d, err = sqlx.Connect("postgres",
-			"user=egtann dbname=ava sslmode=disable")
+			"user=postgres dbname=ava sslmode=disable")
 	}
 	if err != nil {
 		log.Errorln("connecting to db", err)
@@ -148,7 +144,7 @@ func connectDB() *sqlx.DB {
 	return d
 }
 
-func preprocess(c *echo.Context) (*Ctx, error) {
+func preprocess(c *echo.Context) (*dt.Msg, error) {
 	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
 		return nil, ErrInvalidCommand
@@ -160,54 +156,29 @@ func preprocess(c *echo.Context) (*Ctx, error) {
 		return nil, nil
 	}
 	uid, fid, fidT := validateParams(c)
-	in, u, needsTraining, err := buildInput(cmd, fid, uid, fidT)
+	u, err := getUser(uid, fid, fidT)
 	if err != nil {
 		return nil, err
 	}
-	ctx := &Ctx{
-		Msg:           dt.NewMessage(db, u, in),
-		NeedsTraining: needsTraining,
+	msg := dt.NewMsg(db, bayes, u, cmd)
+	if err = msg.Update(db); err != nil {
+		return nil, err
 	}
-	return ctx, nil
+	// TODO trigger training if needed (see buildInput)
+	return msg, nil
 }
 
-func buildInput(cmd, fid string, uid uint64, fidT int) (*dt.Input, *dt.User,
-	bool, error) {
-	si, annotated, needsTraining, err := classify(bayes, cmd)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
-	}
-	in := &dt.Input{
-		Sentence:          cmd,
-		SentenceFields:    dt.SentenceFields(cmd),
-		StructuredInput:   si,
-		FlexID:            fid,
-		FlexIDType:        fidT,
-		UserID:            uid,
-		SentenceAnnotated: annotated,
-	}
-	u, err := getUser(in)
-	if err == dt.ErrMissingUser {
-		log.Infoln("missing user", err)
-	} else if err != nil {
-		log.WithField("fn", "getUser").Errorln(err)
-		return nil, u, needsTraining, err
-	}
-	in.UserID = u.ID
-	return in, u, needsTraining, nil
-}
-
-func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
+func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	bool, error) {
 	var edges []*edge
 	var err error
 	if len(ret.Sentence) == 0 {
-		edges, err = searchEdgesForTerm(ctx.Msg.Input.Sentence)
+		edges, err = searchEdgesForTerm(msg.Sentence)
 		if err != nil {
 			return nil, false, err
 		}
 		for _, e := range edges {
-			ctx, ret, err = processAgain(ctx, e, followup)
+			msg, ret, err = processAgain(msg, e, followup)
 			if err != nil {
 				return nil, false, err
 			}
@@ -220,8 +191,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	}
 	var nodes []*node
 	if len(ret.Sentence) == 0 {
-		nodes, err = searchNodes(ctx.Msg.Input.Sentence,
-			int64(len(edges)))
+		nodes, err = searchNodes(msg.Sentence, int64(len(edges)))
 		if err != nil {
 			return nil, false, err
 		}
@@ -229,7 +199,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 			if len(n.Rel()) == 0 {
 				break
 			}
-			ctx, ret, err = processAgain(ctx, n, followup)
+			msg, ret, err = processAgain(msg, n, followup)
 			if err != nil {
 				return nil, false, err
 			}
@@ -243,7 +213,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	log.Debugln("nodes found", nodes)
 	log.Debugln("ret.Sentence", ret.Sentence)
 	if len(ret.Sentence) == 0 && len(nodes) == 0 {
-		nodes, err := newNodes(db, appVocab, ctx.Msg)
+		nodes, err := newNodes(db, appVocab, msg)
 		if err != nil {
 			return nil, false, err
 		}
@@ -255,7 +225,7 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	}
 	var changed bool
 	if len(nodes) > 0 {
-		ctx, ret, err = processAgain(ctx, nodes[0], followup)
+		msg, ret, err = processAgain(msg, nodes[0], followup)
 		if err != nil {
 			return nil, false, err
 		}
@@ -264,108 +234,90 @@ func processKnowledge(ctx *Ctx, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	return ret, changed, nil
 }
 
-func processAgain(ctx *Ctx, g graphObj, followup bool) (*Ctx, *dt.RespMsg,
+func processAgain(msg *dt.Msg, g graphObj, followup bool) (*dt.Msg, *dt.RespMsg,
 	error) {
 	var err error
-	ctx.Msg.Input.Sentence, err = replaceSentence(db, ctx.Msg, g)
+	msg.Sentence, err = replaceSentence(db, msg, g)
 	if err != nil {
-		return ctx, nil, err
+		return msg, nil, err
 	}
-	si, _, _, err := classify(bayes, ctx.Msg.Input.Sentence)
+	si, _, _, err := nlp.Classify(bayes, msg.Sentence)
 	if err != nil {
 		log.Errorln("classifying sentence", err)
 	}
-	pkg, route, _, err := getPkg(ctx.Msg)
+	pkg, route, _, err := getPkg(msg)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "getPkg").Error(err)
-		return ctx, nil, err
+		return msg, nil, err
 	}
-	ctx.Msg = dt.NewMessage(db, ctx.Msg.User, ctx.Msg.Input)
-	ctx.Msg.Input.StructuredInput = si
-	ctx.Msg.Route = route
-	ret, err := callPkg(pkg, ctx.Msg, followup)
+	msg = dt.NewMsg(db, bayes, msg.User, msg.Sentence)
+	msg.StructuredInput = si
+	msg.Route = route
+	ret, err := callPkg(pkg, msg, followup)
 	if err != nil {
-		return ctx, nil, err
+		return msg, nil, err
 	}
-	return ctx, ret, nil
+	return msg, ret, nil
 }
 
 func processText(c *echo.Context) (string, error) {
-	ctx, err := preprocess(c)
-	if err != nil || ctx == nil /* trained */ {
+	msg, err := preprocess(c)
+	if err != nil || msg == nil /* trained */ {
 		log.WithField("fn", "preprocessForMessage").Error(err)
 		return "", err
 	}
-	pkg, route, followup, err := getPkg(ctx.Msg)
+	pkg, route, followup, err := getPkg(msg)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "getPkg").Error(err)
 		return "", err
 	}
-	ctx.Msg.Route = route
-	log.Debugln("followup?", followup)
-	n, err := getActiveNode(db, ctx.Msg.User)
+	msg.Route = route
+	msg.Package = pkg.P.Config.Name
+	if err = msg.Save(db); err != nil {
+		return "", err
+	}
+	ret, err := callPkg(pkg, msg, followup)
 	if err != nil {
 		return "", err
 	}
-	var ret *dt.RespMsg
-	if n != nil {
-		err = n.updateRelation(db, ctx.Msg.Input.StructuredInput)
-		if err == ErrRelEqTerm {
-			s := "I didn't understand that. What's " + n.Term +
-				" again?"
-			return s, nil
+	var m *dt.Msg
+	if len(ret.Sentence) == 0 {
+		m = &dt.Msg{}
+		m.Sentence = language.Confused()
+		m.AvaSent = true
+		m.User = msg.User
+		if err = m.Save(db); err != nil {
+			return "", err
 		}
+	}
+	if m == nil {
+		m, err = dt.GetMsg(db, ret.MsgID)
 		if err != nil {
 			return "", err
 		}
 	}
-	if !followup {
-		log.Debugln("conversation change. deleting unused knowledgequeries")
-		if err := deleteNodes(db, ctx.Msg.User); err != nil {
+	if pkg != nil {
+		m.Package = pkg.P.Config.Name
+	}
+	if m.ID > 0 {
+		if err = m.Update(db); err != nil {
+			return "", err
+		}
+	} else {
+		if err = m.Save(db); err != nil {
 			return "", err
 		}
 	}
-	ret, err = callPkg(pkg, ctx.Msg, followup)
-	if err != nil {
-		return "", err
-	}
-	var changed bool
-	if len(ret.Sentence) == 0 {
-		ret, changed, err = processKnowledge(ctx, ret, followup)
-		if err != nil {
-			log.WithField("fn", "callPkg").Errorln(err)
-			return "", err
-		}
-	}
-	if len(ret.Sentence) == 0 {
-		ret.Sentence = language.Confused()
-		log.Debugln("confused. node?", n)
-		if changed {
-			log.Debugln("confused with node. deleting unused and last knowledgequeries")
-			err := deleteRecentNodes(db, ctx.Msg.User)
-			if err != nil {
-				return "", err
+	/*
+		// TODO handle earlier when classifying
+		if ctx.NeedsTraining {
+			log.WithField("inputID", id).Infoln("needed training")
+			if err = supervisedTrain(ctx.Msg); err != nil {
+				return ret.Sentence, err
 			}
 		}
-	}
-	var pkgName string
-	if pkg != nil {
-		pkgName = pkg.P.Config.Name
-	} else {
-		pkgName = ""
-	}
-	id, err := saveStructuredInput(ctx.Msg, ret.ResponseID, pkgName, route)
-	if err != nil {
-		return "", err
-	}
-	ctx.Msg.Input.ID = id
-	if ctx.NeedsTraining {
-		log.WithField("inputID", id).Infoln("needed training")
-		if err = supervisedTrain(ctx.Msg.Input); err != nil {
-			return ret.Sentence, err
-		}
-	}
-	return ret.Sentence, nil
+	*/
+	return m.Sentence, nil
 }
 
 func validateParams(c *echo.Context) (uint64, string, int) {

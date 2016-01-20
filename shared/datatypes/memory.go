@@ -1,6 +1,7 @@
 package dt
 
 import (
+	"encoding/json"
 	"strconv"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
@@ -8,7 +9,7 @@ import (
 
 type Memory struct {
 	Key    string
-	Val    []byte
+	Val    json.RawMessage
 	logger *log.Entry
 }
 

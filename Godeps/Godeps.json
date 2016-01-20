@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/avabot/ava",
-	"GoVersion": "go1.5.2",
+	"GoVersion": "go1.5.3",
 	"Packages": [
 		"./..."
 	],
@@ -31,6 +31,10 @@
 		{
 			"ImportPath": "github.com/araddon/gou",
 			"Rev": "0c2ab7394d785afff14c983fedce4be70ccc431f"
+		},
+		{
+			"ImportPath": "github.com/avabot/avabot/shared/datatypes",
+			"Rev": "2866104442d17d8931883af3c6e5dffeb12af57c"
 		},
 		{
 			"ImportPath": "github.com/bitly/go-hostpool",

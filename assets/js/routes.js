@@ -4,13 +4,15 @@ window.onload = function() {
 	m.route(document.body, "/", {
 		"/": Index,
 		"/tour": Tour,
-		"/train": Train,
-		"/train/:sentenceID": Train,
+		"/train": TrainIndex,
+		"/train/:id": TrainShow,
+		//"/train": Train,
+		//"/train/:sentenceID": Train,
 		"/signup": Signup,
 		"/login": Login,
 		"/forgot_password": ForgotPassword,
 		"/reset_password": ResetPassword,
 		"/profile": Profile,
-		"/cards/new": Card
+		"/cards/new": Card,
 	});
 };
