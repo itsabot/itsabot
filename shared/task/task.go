@@ -30,12 +30,15 @@ type Opts map[string]string
 
 const (
 	RequestAddress Type = iota + 1
-	RequestPurchase
+	RequestPurchaseAuthZip
 )
 
-func Run(db *sqlx.DB, in *dt.Msg, t Type, o Opts) (string, error) {
-	str, err := getAddress(db, in)
-	return str, err
+func New(sm *dt.StateMachine, t Type) []dt.State {
+	switch t {
+	case RequestAddress:
+		return getAddress(sm)
+	}
+	return []dt.State{}
 }
 
 /*

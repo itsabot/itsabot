@@ -5,7 +5,6 @@ import (
 	"log"
 	"strings"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 )
@@ -16,10 +15,10 @@ const (
 	addressStateGetName
 )
 
-func getAddress(db *sqlx.DB, in *dt.Msg) (string, error) {
-	sm, err := dt.NewStateMachine("task_address")
-	sm.SetStates(
-		dt.State{
+func getAddress(sm *dt.StateMachine) []dt.State {
+	db := sm.GetDBConn()
+	return []dt.State{
+		{
 			OnEntry: func(in *dt.Msg) string {
 				return "Ok. Where should I ship this?"
 			},
@@ -35,11 +34,11 @@ func getAddress(db *sqlx.DB, in *dt.Msg) (string, error) {
 			// TODO consider adding a string to Complete's response
 			// and passing in an error from OnInput to customize err
 			// responses.
-			Complete: func(in *dt.Msg) bool {
-				return sm.HasMemory(in, "shipping_address")
+			Complete: func(in *dt.Msg) (bool, string) {
+				return sm.HasMemory(in, "shipping_address"), ""
 			},
 		},
-		dt.State{
+		{
 			Memory: "__remembered",
 			OnEntry: func(in *dt.Msg) string {
 				return "Is that your home or office?"
@@ -67,15 +66,11 @@ func getAddress(db *sqlx.DB, in *dt.Msg) (string, error) {
 				addr.Name = location
 				sm.SetMemory(in, "shipping_address", addr)
 			},
-			Complete: func(in *dt.Msg) bool {
-				return sm.HasMemory(in, "shipping_address")
+			Complete: func(in *dt.Msg) (bool, string) {
+				return sm.HasMemory(in, "shipping_address"), ""
 			},
 		},
-	)
-	if err != nil {
-		return "", err
 	}
-	return sm.Next(in), nil
 }
 
 func (t *Task) RequestAddress(dest **dt.Address, prodCount int) (bool, error) {

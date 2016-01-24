@@ -14,7 +14,7 @@ type StateMachine struct {
 	pkgName  string
 	logger   *log.Entry
 	db       *sqlx.DB
-	resetFn  func()
+	resetFn  func(*Msg)
 }
 
 type State struct {
@@ -39,7 +39,7 @@ type State struct {
 	// Complete will determine if the state machine continues. If true,
 	// it'll move to the next state. If false, the user's next response will
 	// hit this state's OnInput function again.
-	Complete func(*Msg) bool
+	Complete func(*Msg) (bool, string)
 
 	// Memory will search through preferences about the user. If a past
 	// preference is found, it'll skip to the OnInput response, with that
@@ -50,15 +50,19 @@ type State struct {
 func NewStateMachine(pkgName string) (*StateMachine, error) {
 	sm := StateMachine{State: 0}
 	// TODO load state from DB
-	sm.resetFn = func() {}
+	sm.resetFn = func(*Msg) {}
 	sm.logger = log.WithFields(log.Fields{
 		"pkg": pkgName,
 	})
 	return &sm, nil
 }
 
-func (sm *StateMachine) SetStates(ss ...State) {
-	sm.Handlers = ss
+func (sm *StateMachine) SetStates(sss ...[]State) {
+	for _, ss := range sss {
+		for _, s := range ss {
+			sm.Handlers = append(sm.Handlers, s)
+		}
+	}
 }
 
 func (sm *StateMachine) SetLogger(l *log.Entry) {
@@ -69,17 +73,22 @@ func (sm StateMachine) SetDBConn(s *sqlx.DB) {
 	sm.db = s
 }
 
+func (sm StateMachine) GetDBConn() *sqlx.DB {
+	return sm.db
+}
+
 func (sm StateMachine) SetPkgName(n string) {
 	sm.pkgName = n
 }
 
 func (sm StateMachine) Next(in *Msg) string {
 	if sm.State+1 >= len(sm.Handlers) {
-		sm.Reset()
+		sm.Reset(in)
 		return sm.Handlers[sm.State].OnEntry(in)
 	}
 	// check completion of current state
-	if sm.Handlers[sm.State].Complete(in) {
+	done, str := sm.Handlers[sm.State].Complete(in)
+	if done {
 		sm.State++
 		s := sm.Handlers[sm.State].OnEntry(in)
 		if len(s) == 0 {
@@ -87,6 +96,8 @@ func (sm StateMachine) Next(in *Msg) string {
 				Warnln("OnEntry returned \"\"")
 		}
 		return s
+	} else if len(str) > 0 {
+		return str
 	}
 	// check memory to determine if Ava should skip this state
 	mem := sm.Handlers[sm.State].Memory
@@ -103,7 +114,7 @@ func (sm StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.State].OnInput(in)
 }
 
-func (sm StateMachine) SetOnReset(reset func()) {
+func (sm StateMachine) SetOnReset(reset func(in *Msg)) {
 	sm.resetFn = reset
 }
 
@@ -139,7 +150,7 @@ func (sm StateMachine) HasMemory(in *Msg, k string) bool {
 	return len(sm.GetMemory(in, k).Val) > 0
 }
 
-func (sm StateMachine) Reset() {
+func (sm StateMachine) Reset(in *Msg) {
 	sm.State = 0
-	sm.resetFn()
+	sm.resetFn(in)
 }
