@@ -1,20 +1,22 @@
 package dt
 
 import (
-	"bytes"
-	"encoding/gob"
+	"database/sql"
+	"encoding/json"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 )
 
 type StateMachine struct {
-	State    int
-	Handlers []State
-	pkgName  string
-	logger   *log.Entry
-	db       *sqlx.DB
-	resetFn  func(*Msg)
+	State        int
+	StateEntered bool
+	Handlers     []State
+	keys         []string
+	pkgName      string
+	logger       *log.Entry
+	db           *sqlx.DB
+	resetFn      func(*Msg)
 }
 
 type State struct {
@@ -48,7 +50,7 @@ type State struct {
 }
 
 func NewStateMachine(pkgName string) (*StateMachine, error) {
-	sm := StateMachine{State: 0}
+	sm := StateMachine{State: 0, pkgName: pkgName}
 	// TODO load state from DB
 	sm.resetFn = func(*Msg) {}
 	sm.logger = log.WithFields(log.Fields{
@@ -69,21 +71,25 @@ func (sm *StateMachine) SetLogger(l *log.Entry) {
 	sm.logger = l
 }
 
-func (sm StateMachine) SetDBConn(s *sqlx.DB) {
+func (sm *StateMachine) SetDBConn(s *sqlx.DB) {
 	sm.db = s
 }
 
-func (sm StateMachine) GetDBConn() *sqlx.DB {
+func (sm *StateMachine) GetDBConn() *sqlx.DB {
 	return sm.db
 }
 
-func (sm StateMachine) SetPkgName(n string) {
+func (sm *StateMachine) SetPkgName(n string) {
 	sm.pkgName = n
 }
 
-func (sm StateMachine) Next(in *Msg) string {
+func (sm *StateMachine) Next(in *Msg) string {
 	if sm.State+1 >= len(sm.Handlers) {
 		sm.Reset(in)
+		return sm.Handlers[sm.State].OnEntry(in)
+	}
+	if !sm.StateEntered {
+		sm.StateEntered = true
 		return sm.Handlers[sm.State].OnEntry(in)
 	}
 	// check completion of current state
@@ -110,25 +116,24 @@ func (sm StateMachine) Next(in *Msg) string {
 	return ""
 }
 
-func (sm StateMachine) OnInput(in *Msg) {
+func (sm *StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.State].OnInput(in)
 }
 
-func (sm StateMachine) SetOnReset(reset func(in *Msg)) {
+func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
 	sm.resetFn = reset
 }
 
-func (sm StateMachine) SetMemory(in *Msg, k string, v interface{}) {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(v); err != nil {
-		sm.logger.Errorln(err, "setting memory at", k, "to", v)
+func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		sm.logger.Errorln(err, "marhsalling interface to json", v)
 		return
 	}
-	// the `||` upserts the key into postgres jsonb
-	q := `SELECT state FROM states WHERE userid=$1 AND pkgname=$2
-	      || jsonb_build_object('%s', '%b')`
-	_, err := sm.db.Exec(q, sm.pkgName, in.User.ID, k, buf.Bytes())
+	q := `INSERT INTO states (key, value, pkgname, userid)
+	      VALUES ($1, $2, $3, $4)
+	      ON CONFLICT (userid, pkgname, key) DO UPDATE SET value=$2`
+	_, err := sm.db.Exec(q, k, b, sm.pkgName, in.User.ID)
 	if err != nil {
 		sm.logger.Errorln(err, "setting memory at", k, "to", v)
 		return
@@ -136,21 +141,26 @@ func (sm StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	// TODO set preference here as well
 }
 
-func (sm StateMachine) GetMemory(in *Msg, k string) Memory {
-	q := `SELECT state FROM states WHERE userid=$1 AND pkgname=$2`
-	var buf bytes.Buffer
-	if err := sm.db.Get(&buf, q, in.User.ID, sm.pkgName); err != nil {
-		sm.logger.Errorln(err, "getMemory for key", k)
-		return Memory{Key: k, Val: []byte{}, logger: sm.logger}
+func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
+	q := `SELECT value FROM states WHERE userid=$1 AND pkgname=$2 AND key=$3`
+	var buf []byte
+	err := sm.db.Get(&buf, q, in.User.ID, sm.pkgName, k)
+	if err == sql.ErrNoRows {
+		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
-	return Memory{Key: k, Val: buf.Bytes(), logger: sm.logger}
+	if err != nil {
+		sm.logger.Errorln(err, "getMemory for key", k)
+		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
+	}
+	return Memory{Key: k, Val: buf, logger: sm.logger}
 }
 
-func (sm StateMachine) HasMemory(in *Msg, k string) bool {
+func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
 	return len(sm.GetMemory(in, k).Val) > 0
 }
 
-func (sm StateMachine) Reset(in *Msg) {
+func (sm *StateMachine) Reset(in *Msg) {
 	sm.State = 0
+	sm.StateEntered = false
 	sm.resetFn(in)
 }

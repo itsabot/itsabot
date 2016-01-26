@@ -41,12 +41,6 @@ type Msg struct {
 	SentenceFields []string
 }
 
-// RespMsg is used to pass results from packages to Ava
-type RespMsg struct {
-	MsgID    uint64
-	Sentence string
-}
-
 type Feedback struct {
 	Id        uint64
 	Sentence  string
@@ -98,10 +92,12 @@ func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
 		StructuredInput:   si,
 		SentenceAnnotated: annotated,
 	}
-	m, err = addContext(db, m)
-	if err != nil {
-		log.WithField("fn", "addContext").Errorln(err)
-	}
+	/*
+		m, err = addContext(db, m)
+		if err != nil {
+			log.WithField("fn", "addContext").Errorln(err)
+		}
+	*/
 	return m
 }
 
@@ -223,6 +219,7 @@ func (m *Msg) GetLastState(db *sqlx.DB) error {
 	return nil
 }
 
+/*
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
 // they refer. TODO refactor
 func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
@@ -301,6 +298,7 @@ func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
 	return m, nil
 }
 
+// getContextObject retrieves actors, places, etc. from prior messages
 func getContextObject(db *sqlx.DB, u *User, si *nlp.StructuredInput,
 	datatype string) (string, error) {
 	log.Debugln("getting object context")
@@ -310,7 +308,7 @@ func getContextObject(db *sqlx.DB, u *User, si *nlp.StructuredInput,
 	}
 	if u != nil {
 		q := `SELECT ` + datatype + `
-		      FROM inputs
+		      FROM messages
 		      WHERE userid=$1 AND array_length(objects, 1) > 0`
 		if err := db.Get(&tmp, q, u.ID); err != nil {
 			return "", err
@@ -318,6 +316,7 @@ func getContextObject(db *sqlx.DB, u *User, si *nlp.StructuredInput,
 	}
 	return tmp.Last(), nil
 }
+*/
 
 func SentenceFields(s string) []string {
 	var ret []string

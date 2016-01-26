@@ -14,7 +14,7 @@ package elastigo
 import (
 	"errors"
 	"fmt"
-	hostpool "github.com/avabot/ava/Godeps/_workspace/src/github.com/bitly/go-hostpool"
+	hostpool "github.com/bitly/go-hostpool"
 	"net/http"
 	"net/url"
 	"runtime"

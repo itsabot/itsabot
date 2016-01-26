@@ -7,8 +7,8 @@
 package porter2
 
 import (
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer"
 	"strings"
+	"github.com/dchest/stemmer"
 )
 
 // Stemmer is a global, shared instance of Porter2 English stemmer.

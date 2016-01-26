@@ -168,21 +168,22 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 	return msg, nil
 }
 
-func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
-	bool, error) {
+/*
+func processKnowledge(msg *dt.Msg, resp string, followup bool) (string, bool,
+	error) {
 	var edges []*edge
 	var err error
-	if len(ret.Sentence) == 0 {
+	if len(resp) == 0 {
 		edges, err = searchEdgesForTerm(msg.Sentence)
 		if err != nil {
 			return nil, false, err
 		}
 		for _, e := range edges {
-			msg, ret, err = processAgain(msg, e, followup)
+			msg, resp, err = processAgain(msg, e, followup)
 			if err != nil {
 				return nil, false, err
 			}
-			if len(ret.Sentence) > 0 {
+			if len(resp) > 0 {
 				e.IncrementConfidence(db)
 				break
 			}
@@ -190,7 +191,7 @@ func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 		}
 	}
 	var nodes []*node
-	if len(ret.Sentence) == 0 {
+	if len(resp) == 0 {
 		nodes, err = searchNodes(msg.Sentence, int64(len(edges)))
 		if err != nil {
 			return nil, false, err
@@ -199,11 +200,11 @@ func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 			if len(n.Rel()) == 0 {
 				break
 			}
-			msg, ret, err = processAgain(msg, n, followup)
+			msg, resp, err = processAgain(msg, n, followup)
 			if err != nil {
 				return nil, false, err
 			}
-			if len(ret.Sentence) > 0 {
+			if len(resp) > 0 {
 				n.IncrementConfidence(db)
 				break
 			}
@@ -211,8 +212,8 @@ func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 		}
 	}
 	log.Debugln("nodes found", nodes)
-	log.Debugln("ret.Sentence", ret.Sentence)
-	if len(ret.Sentence) == 0 && len(nodes) == 0 {
+	log.Debugln("response", resp)
+	if len(resp) == 0 && len(nodes) == 0 {
 		nodes, err := newNodes(db, appVocab, msg)
 		if err != nil {
 			return nil, false, err
@@ -233,13 +234,14 @@ func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
 	}
 	return ret, changed, nil
 }
+*/
 
-func processAgain(msg *dt.Msg, g graphObj, followup bool) (*dt.Msg, *dt.RespMsg,
+func processAgain(msg *dt.Msg, g graphObj, followup bool) (*dt.Msg, string,
 	error) {
 	var err error
 	msg.Sentence, err = replaceSentence(db, msg, g)
 	if err != nil {
-		return msg, nil, err
+		return msg, "", err
 	}
 	si, _, _, err := nlp.Classify(bayes, msg.Sentence)
 	if err != nil {
@@ -248,14 +250,14 @@ func processAgain(msg *dt.Msg, g graphObj, followup bool) (*dt.Msg, *dt.RespMsg,
 	pkg, route, _, err := getPkg(msg)
 	if err != nil && err != ErrMissingPackage {
 		log.WithField("fn", "getPkg").Error(err)
-		return msg, nil, err
+		return msg, "", err
 	}
 	msg = dt.NewMsg(db, bayes, msg.User, msg.Sentence)
 	msg.StructuredInput = si
 	msg.Route = route
 	ret, err := callPkg(pkg, msg, followup)
 	if err != nil {
-		return msg, nil, err
+		return msg, "", err
 	}
 	return msg, ret, nil
 }
@@ -272,7 +274,11 @@ func processText(c *echo.Context) (string, error) {
 		return "", err
 	}
 	msg.Route = route
-	msg.Package = pkg.P.Config.Name
+	if pkg == nil {
+		msg.Package = ""
+	} else {
+		msg.Package = pkg.P.Config.Name
+	}
 	if err = msg.Save(db); err != nil {
 		return "", err
 	}
@@ -280,33 +286,20 @@ func processText(c *echo.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var m *dt.Msg
-	if len(ret.Sentence) == 0 {
-		m = &dt.Msg{}
+	log.Debugln("here...", ret)
+	m := &dt.Msg{}
+	m.AvaSent = true
+	m.User = msg.User
+	if len(ret) == 0 {
 		m.Sentence = language.Confused()
-		m.AvaSent = true
-		m.User = msg.User
-		if err = m.Save(db); err != nil {
-			return "", err
-		}
-	}
-	if m == nil {
-		m, err = dt.GetMsg(db, ret.MsgID)
-		if err != nil {
-			return "", err
-		}
+	} else {
+		m.Sentence = ret
 	}
 	if pkg != nil {
 		m.Package = pkg.P.Config.Name
 	}
-	if m.ID > 0 {
-		if err = m.Update(db); err != nil {
-			return "", err
-		}
-	} else {
-		if err = m.Save(db); err != nil {
-			return "", err
-		}
+	if err = m.Save(db); err != nil {
+		return "", err
 	}
 	/*
 		// TODO handle earlier when classifying

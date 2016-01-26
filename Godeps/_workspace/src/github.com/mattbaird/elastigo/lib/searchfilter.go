@@ -14,7 +14,7 @@ package elastigo
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/araddon/gou"
+	"github.com/araddon/gou"
 )
 
 var (
@@ -141,6 +141,7 @@ func (f *FilterWrap) MarshalJSON() ([]byte, error) {
 	}
 
 */
+
 
 // Filter creates a blank FilterOp that can be customized with further function calls
 // This is the starting point for constructing any filter query

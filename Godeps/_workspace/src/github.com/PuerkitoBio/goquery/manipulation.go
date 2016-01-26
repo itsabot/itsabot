@@ -3,8 +3,8 @@ package goquery
 import (
 	"strings"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/andybalholm/cascadia"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/html"
+	"github.com/andybalholm/cascadia"
+	"golang.org/x/net/html"
 )
 
 // After applies the selector from the root document and inserts the matched elements

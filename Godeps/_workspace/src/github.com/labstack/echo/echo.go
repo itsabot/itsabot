@@ -16,9 +16,9 @@ import (
 
 	"encoding/xml"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/gommon/log"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/http2"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+	"github.com/labstack/gommon/log"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/websocket"
 )
 
 type (

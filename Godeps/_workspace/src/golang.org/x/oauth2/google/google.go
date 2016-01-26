@@ -23,7 +23,7 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/jwt"
-	"github.com/avabot/ava/Godeps/_workspace/src/google.golang.org/cloud/compute/metadata"
+	"google.golang.org/cloud/compute/metadata"
 )
 
 // Endpoint is Google's OAuth 2.0 endpoint.

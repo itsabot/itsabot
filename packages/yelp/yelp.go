@@ -84,7 +84,7 @@ func main() {
 	}
 }
 
-func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (t *Yelp) Run(m *dt.Msg, resp *string) error {
 	m.State = map[string]interface{}{
 		"query":      "",
 		"location":   "",
@@ -110,8 +110,8 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 			if loc != nil && len(loc.Name) > 0 {
 				m.State["location"] = loc.Name
 			}
-			m.Sentence = question
-			return p.SaveMsg(respMsg, m)
+			*resp = question
+			return nil
 		}
 		m.State["location"] = loc.Name
 	}
@@ -126,39 +126,39 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 			if loc != nil && len(loc.Name) > 0 {
 				m.State["location"] = loc.Name
 			}
-			m.Sentence = question
-			return p.SaveMsg(respMsg, m)
+			*resp = question
+			return nil
 		}
 		m.State["location"] = loc.Name
 	}
-	if err := t.searchYelp(m); err != nil {
+	if err := t.searchYelp(m, resp); err != nil {
 		l.WithField("fn", "searchYelp").Errorln(err)
 	}
-	return p.SaveMsg(respMsg, m)
+	return nil
 }
 
 // FollowUp handles dialog question/answers and additional user queries
-func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (t *Yelp) FollowUp(m *dt.Msg, resp *string) error {
 	// First we handle dialog. If we asked for a location, use the response
 	if m.State["location"] == "" {
 		loc := m.StructuredInput.All()
 		m.State["location"] = loc
-		if err := t.searchYelp(m); err != nil {
+		if err := t.searchYelp(m, resp); err != nil {
 			l.WithField("fn", "searchYelp").Errorln(err)
 		}
-		return p.SaveMsg(respMsg, m)
+		return nil
 	}
 
 	// If no businesses are returned inform the user now
 	if m.State["businesses"] != nil &&
 		len(m.State["businesses"].([]interface{})) == 0 {
-		m.Sentence = "I couldn't find anything like that"
-		return p.SaveMsg(respMsg, m)
+		*resp = "I couldn't find anything like that"
+		return nil
 	}
 
 	// Responses were returned, and the user has asked this package an
 	// additional query. Handle the query by keyword
-	words := strings.Fields(m.Sentence)
+	words := strings.Fields(*resp)
 	offI := int(m.State["offset"].(float64))
 	var s string
 	for _, w := range words {
@@ -167,48 +167,48 @@ func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 		case "rated", "rating", "review", "recommend", "recommended":
 			s = fmt.Sprintf("It has a %s star review on Yelp",
 				getRating(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "number", "phone":
 			s = getPhone(m, offI)
-			m.Sentence = s
+			*resp = s
 		case "call":
 			s = fmt.Sprintf("You can reach them here: %s",
 				getPhone(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "information", "info":
 			s = fmt.Sprintf("Here's some more info: %s",
 				getURL(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "where", "location", "address", "direction", "directions",
 			"addr":
 			s = fmt.Sprintf("It's at %s", getAddress(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "pictures", "pic", "pics":
 			s = fmt.Sprintf("I found some pics here: %s",
 				getURL(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "menu", "have":
 			s = fmt.Sprintf("Yelp might have a menu... %s",
 				getURL(m, offI))
-			m.Sentence = s
+			*resp = s
 		case "not", "else", "no", "anything", "something":
 			m.State["offset"] = float64(offI + 1)
-			if err := t.searchYelp(m); err != nil {
+			if err := t.searchYelp(m, resp); err != nil {
 				l.WithField("fn", "searchYelp").Errorln(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
 		// with bayesian classification
 		case "good", "great", "yes", "perfect":
 			// TODO feed into learning engine
-			m.Sentence = language.Positive()
+			*resp = language.Positive()
 		case "thanks", "thank":
-			m.Sentence = language.Welcome()
+			*resp = language.Welcome()
 		}
-		if len(m.Sentence) > 0 {
-			return p.SaveMsg(respMsg, m)
+		if len(*resp) > 0 {
+			return nil
 		}
 	}
-	return p.SaveMsg(respMsg, m)
+	return nil
 }
 
 func getRating(r *dt.Msg, offset int) string {
@@ -254,7 +254,7 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func (t *Yelp) searchYelp(m *dt.Msg) error {
+func (t *Yelp) searchYelp(m *dt.Msg, resp *string) error {
 	q := m.State["query"].(string)
 	loc := m.State["location"].(string)
 	offset := m.State["offset"].(float64)
@@ -283,12 +283,12 @@ func (t *Yelp) searchYelp(m *dt.Msg) error {
 	}
 	m.State["businesses"] = data.Businesses
 	if len(data.Businesses) == 0 {
-		m.Sentence = "I couldn't find any places like that nearby."
+		*resp = "I couldn't find any places like that nearby."
 		return nil
 	}
 	offI := int(offset)
 	if len(data.Businesses) <= offI {
-		m.Sentence = "That's all I could find."
+		*resp = "That's all I could find."
 		return nil
 	}
 	b := data.Businesses[offI]
@@ -297,10 +297,10 @@ func (t *Yelp) searchYelp(m *dt.Msg) error {
 		addr = b.Location.DisplayAddress[0]
 	}
 	if offI == 0 {
-		m.Sentence = "Ok. How does this place look? " + b.Name +
+		*resp = "Ok. How does this place look? " + b.Name +
 			" at " + addr
 	} else {
-		m.Sentence = fmt.Sprintf("What about %s instead?", b.Name)
+		*resp = fmt.Sprintf("What about %s instead?", b.Name)
 	}
 	return nil
 }

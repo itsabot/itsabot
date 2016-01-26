@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/avabot/avabot/shared/datatypes"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
+	"github.com/avabot/avabot/shared/datatypes"
 )
 
 func Classify(c *bayesian.Classifier, s string) (*StructuredInput,

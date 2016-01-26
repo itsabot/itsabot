@@ -22,7 +22,6 @@ type Task struct {
 	tc       *twilio.Client
 	db       *sqlx.DB
 	msg      *dt.Msg
-	respMsg  *dt.RespMsg
 }
 
 type Type int

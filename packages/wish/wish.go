@@ -35,7 +35,7 @@ func main() {
 	}
 }
 
-func (pt *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (pt *Wish) Run(m *dt.Msg, resp *string) error {
 	q := `INSERT INTO wishes (userid, sentence) VALUES ($1, $2)`
 	_, err := db.Exec(q, m.User.ID, m.Sentence)
 	if err != nil {
@@ -44,22 +44,22 @@ func (pt *Wish) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	n := rand.Intn(5)
 	switch n {
 	case 0:
-		m.Sentence = "Your wish is my command!"
+		*resp = "Your wish is my command!"
 	case 1:
-		m.Sentence = "I'll make some calls."
+		*resp = "I'll make some calls."
 	case 2:
-		m.Sentence = "I hope to start doing that soon, too."
+		*resp = "I hope to start doing that soon, too."
 	case 3:
-		m.Sentence = "Roger that!"
+		*resp = "Roger that!"
 	case 4:
-		m.Sentence = "I wish I could do that now, too. Soon, I hope."
+		*resp = "I wish I could do that now, too. Soon, I hope."
 	}
-	return p.SaveMsg(respMsg, m)
+	return nil
 }
 
-func (pt *Wish) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (pt *Wish) FollowUp(m *dt.Msg, resp *string) error {
 	m = dt.NewMsg(db, nil, m.User, "")
-	return p.SaveMsg(respMsg, m)
+	return nil
 }
 
 func connectDB() *sqlx.DB {

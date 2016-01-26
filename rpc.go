@@ -118,28 +118,25 @@ Loop:
 	return p, route, true, nil
 }
 
-func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (*dt.RespMsg,
-	error) {
-	reply := &dt.RespMsg{}
+func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (string, error) {
+	tmp := ""
+	reply := &tmp
 	if pw == nil {
-		return reply, nil
+		return *reply, nil
 	}
 	log.WithField("pkg", pw.P.Config.Name).Infoln("sending input")
 	c := strings.Title(pw.P.Config.Name)
-	// TODO is this OR condition really necessary?
 	if followup {
-		log.WithField("pkg", pw.P.Config.Name).Infoln("follow up")
 		c += ".FollowUp"
 	} else {
-		log.WithField("pkg", pw.P.Config.Name).Infoln("first run")
 		c += ".Run"
 	}
 	if err := pw.RPCClient.Call(c, m, reply); err != nil {
 		log.WithField("pkg", pw.P.Config.Name).Errorln(
 			"invalid response", err)
-		return reply, err
+		return *reply, err
 	}
-	return reply, nil
+	return *reply, nil
 }
 
 func (pm pkgMap) Get(k string) *pkg.PkgWrapper {

@@ -39,22 +39,22 @@ func main() {
 	}
 }
 
-func (t *Onboard) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (t *Onboard) Run(m *dt.Msg, resp *string) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
 	}
-	m.Sentence = "Hi, I'm Ava, your new personal assistant. To get started, please sign up here: " + u
-	return p.SaveMsg(respMsg, m)
+	*resp = "Hi, I'm Ava, your new personal assistant. To get started, please sign up here: " + u
+	return nil
 }
 
-func (t *Onboard) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (t *Onboard) FollowUp(m *dt.Msg, resp *string) error {
 	u, err := getURL(m)
 	if err != nil {
 		return err
 	}
-	m.Sentence = "Hi, I'm Ava. To get started, you can sign up here: " + u
-	return p.SaveMsg(respMsg, m)
+	*resp = "Hi, I'm Ava. To get started, you can sign up here: " + u
+	return nil
 }
 
 // TODO fix, passing in flexid to msg

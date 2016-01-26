@@ -174,13 +174,16 @@ func main() {
 		[]dt.State{
 			{
 				OnEntry: func(in *dt.Msg) string {
+					l.Debugln("onentry")
 					return "Are you looking for a red or white? We can also find sparkling wines or rose."
 				},
 				OnInput: func(in *dt.Msg) {
+					l.Debugln("oninput")
 					c := extractWineCategory(in.Sentence)
 					sm.SetMemory(in, "category", c)
 				},
 				Complete: func(in *dt.Msg) (bool, string) {
+					l.Debugln("complete")
 					return sm.HasMemory(in, "category"), ""
 				},
 			},
@@ -299,14 +302,15 @@ func main() {
 	sm.SetDBConn(db)
 	sm.SetLogger(l)
 	sm.SetOnReset(func(in *dt.Msg) {
+		l.Debugln("resetting")
 		sm.SetMemory(in, "query", "")
 		sm.SetMemory(in, "category", "")
 		sm.SetMemory(in, "budget", "")
 		sm.SetMemory(in, "offset", "")
 		sm.SetMemory(in, "purchase_confirmed", "")
-		sm.SetMemory(in, "recommendations", nil)
-		sm.SetMemory(in, "current_shipping_address", nil)
-		sm.SetMemory(in, "selected_products", nil)
+		sm.SetMemory(in, "recommendations", json.RawMessage{})
+		sm.SetMemory(in, "current_shipping_address", json.RawMessage{})
+		sm.SetMemory(in, "selected_products", json.RawMessage{})
 		sm.SetMemory(in, "purchase", false)
 	})
 	purchase := new(Purchase)
@@ -315,9 +319,14 @@ func main() {
 	}
 }
 
-func (t *Purchase) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
-	respMsg.Sentence = sm.Next(m)
-	return p.SaveMsg(respMsg, m)
+func (t *Purchase) Run(m *dt.Msg, resp *string) error {
+	sm.Reset(m)
+	return t.FollowUp(m, resp)
+}
+
+func (t *Purchase) FollowUp(m *dt.Msg, resp *string) error {
+	*resp = sm.Next(m)
+	return nil
 }
 
 func sProductSelection(in *dt.Msg) {
