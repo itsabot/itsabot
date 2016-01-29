@@ -33,7 +33,6 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 		"pkg":  p.Config.Name,
 		"addr": p.Config.PkgRPCAddr,
 	}).Debugln("registering")
-
 	client, err := rpc.Dial("tcp", p.Config.PkgRPCAddr)
 	if err != nil {
 		return err

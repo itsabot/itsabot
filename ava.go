@@ -81,24 +81,19 @@ func startServer() {
 	if err := checkRequiredEnvVars(); err != nil {
 		log.Errorln("checking env vars", err)
 	}
-
 	addr, err := bootRPCServer()
 	if err != nil {
 		log.Fatalln("unable to boot rpc server:", err)
 	}
+	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
+	tc = sms.NewClient()
+	mc = dt.NewMailClient()
+	appVocab = dt.NewAtomicMap()
 	go bootDependencies(addr)
-
 	bayes, err = loadClassifier(bayes)
 	if err != nil {
 		log.Errorln("loading classifier", err)
 	}
-
-	tc = sms.NewClient()
-	mc = dt.NewMailClient()
-
-	appVocab = dt.NewAtomicMap()
-	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
-
 	log.Infoln("booting ava http server")
 	e := echo.New()
 	initRoutes(e)
