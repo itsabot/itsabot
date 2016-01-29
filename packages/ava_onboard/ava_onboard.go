@@ -30,7 +30,7 @@ func main() {
 		Objects:  []string{"onboard"},
 	}
 	var err error
-	p, err = pkg.NewPackage("onboard", coreaddr, trigger)
+	p, err = pkg.NewPackage("ava_onboard", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}

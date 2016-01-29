@@ -19,7 +19,7 @@ import (
 	"github.com/avabot/ava/shared/pkg"
 )
 
-type Yelp string
+type Mechanic string
 
 type client struct {
 	client oauth.Client
@@ -44,8 +44,8 @@ type yelpResp struct {
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
-var db *sqlx.DB
 var p *pkg.Pkg
+var db *sqlx.DB
 var l *log.Entry
 
 func main() {
@@ -53,56 +53,63 @@ func main() {
 	flag.StringVar(&coreaddr, "coreaddr", "",
 		"Port used to communicate with Ava.")
 	flag.Parse()
+	l = log.WithFields(log.Fields{"pkg": "mechanic"})
 
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
-
 	var err error
 	db, err = pkg.ConnectDB()
 	if err != nil {
 		l.Fatalln(err)
 	}
-
 	trigger := &nlp.StructuredInput{
-		Commands: []string{
-			"find",
-			"where",
-			"show",
-			"recommend",
-			"recommendation",
-			"recommendations",
-		},
-		Objects: language.Foods(),
+		Commands: language.Join(
+			language.Recommend(),
+			language.Broken(),
+			language.Repair(),
+			[]string{"tow"},
+		),
+		Objects: language.Join(
+			language.Vehicles(),
+			language.AutomotiveBrands(),
+		),
 	}
-	p, err = pkg.NewPackage("yelp", coreaddr, trigger)
+	p, err = pkg.NewPackage("ava_mechanic", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}
-	yelp := new(Yelp)
-	if err := p.Register(yelp); err != nil {
+	mechanic := new(Mechanic)
+	if err := p.Register(mechanic); err != nil {
 		l.Fatalln("registering", err)
 	}
 }
 
-func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
+func (pt *Mechanic) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	m.State = map[string]interface{}{
 		"query":      "",
 		"location":   "",
 		"offset":     float64(0),
 		"businesses": []interface{}{},
+		"warranty":   "",
+		"preference": "",
+		"brand":      "",
 	}
 	si := m.StructuredInput
 	query := ""
 	for _, o := range si.Objects {
+		for _, b := range language.AutomotiveBrands() {
+			if strings.ToLower(o) == b {
+				m.State["brand"] = b
+				break
+			}
+		}
 		query += o + " "
-	}
-	for _, p := range si.Places {
-		query += p + " "
 	}
 	m.State["query"] = query
 	if len(si.Places) == 0 {
+		// TODO move to task
 		l.Infoln("no place entered, getting location")
 		loc, question, err := knowledge.GetLocation(db, m.User)
 		if err != nil {
@@ -133,20 +140,76 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 		}
 		m.State["location"] = loc.Name
 	}
-	if err := t.searchYelp(m); err != nil {
+	if err := pt.searchYelp(m); err != nil {
 		l.WithField("fn", "searchYelp").Errorln(err)
 	}
 	return p.SaveMsg(respMsg, m)
 }
 
-// FollowUp handles dialog question/answers and additional user queries
-func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
-	// First we handle dialog. If we asked for a location, use the response
+func (pt *Mechanic) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
+	// First we handle dialog, filling out the user's location
 	if m.State["location"] == "" {
 		loc := m.StructuredInput.All()
-		m.State["location"] = loc
-		if err := t.searchYelp(m); err != nil {
-			l.WithField("fn", "searchYelp").Errorln(err)
+		if len(loc) > 0 {
+			m.State["location"] = loc
+			m.Sentence = "Ok. I can help you. " +
+				"What kind of car do you drive?"
+		}
+		return p.SaveMsg(respMsg, m)
+	}
+
+	// Check the automotive brand
+	if m.State["brand"] == "" {
+		var brand string
+		tmp := m.StructuredInput.Objects
+	Loop:
+		for _, w1 := range language.AutomotiveBrands() {
+			for _, w2 := range tmp {
+				if w1 == strings.ToLower(w2) {
+					brand = w2
+					break Loop
+				}
+			}
+		}
+		if len(brand) > 0 {
+			m.State["brand"] = brand
+			m.Sentence = "Is your car still in warranty?"
+		}
+		return p.SaveMsg(respMsg, m)
+	}
+
+	// Check warranty information
+	if m.State["warranty"] == "" {
+		warr := m.StructuredInput.All()
+		if language.Yes(warr) {
+			m.State["warranty"] = "yes"
+			m.State["preference"] = "dealer"
+			if err := pt.searchYelp(m); err != nil {
+				l.WithField("fn", "searchYelp").Errorln(err)
+			}
+		} else if language.No(warr) {
+			m.State["warranty"] = "no"
+			m.Sentence = "Do you prefer the dealership or a recommended mechanic?"
+		}
+		return p.SaveMsg(respMsg, m)
+	}
+
+	// Does the user prefer dealerships or mechanics?
+	if m.State["preference"] == "" {
+		words := strings.Fields(m.Sentence)
+		for _, w := range words {
+			if w == "dealer" || w == "dealers" {
+				m.State["preference"] = "dealer"
+				break
+			} else if w == "mechanic" || w == "mechanics" {
+				m.State["preference"] = "mechanic"
+				break
+			}
+		}
+		if m.State["preference"] != "" {
+			if err := pt.searchYelp(m); err != nil {
+				l.WithField("fn", "searchYelp").Errorln(err)
+			}
 		}
 		return p.SaveMsg(respMsg, m)
 	}
@@ -174,8 +237,7 @@ func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			s = getPhone(m, offI)
 			m.Sentence = s
 		case "call":
-			s = fmt.Sprintf("You can reach them here: %s",
-				getPhone(m, offI))
+			s = fmt.Sprintf("Try this one: %s", getPhone(m, offI))
 			m.Sentence = s
 		case "information", "info":
 			s = fmt.Sprintf("Here's some more info: %s",
@@ -189,13 +251,9 @@ func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 			s = fmt.Sprintf("I found some pics here: %s",
 				getURL(m, offI))
 			m.Sentence = s
-		case "menu", "have":
-			s = fmt.Sprintf("Yelp might have a menu... %s",
-				getURL(m, offI))
-			m.Sentence = s
 		case "not", "else", "no", "anything", "something":
 			m.State["offset"] = float64(offI + 1)
-			if err := t.searchYelp(m); err != nil {
+			if err := pt.searchYelp(m); err != nil {
 				l.WithField("fn", "searchYelp").Errorln(err)
 			}
 		// TODO perhaps handle this case and "thanks" at the AVA level?
@@ -251,15 +309,23 @@ func (c *client) get(urlStr string, params url.Values, v interface{}) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
+		l.WithField("fn", "get").Errorln(resp)
 		return fmt.Errorf("yelp status %d", resp.StatusCode)
 	}
 	return json.NewDecoder(resp.Body).Decode(v)
 }
 
-func (t *Yelp) searchYelp(m *dt.Msg) error {
+func (pt *Mechanic) searchYelp(m *dt.Msg) error {
 	q := m.State["query"].(string)
 	loc := m.State["location"].(string)
+	pref := m.State["preference"].(string)
+	brand := m.State["brand"].(string)
 	offset := m.State["offset"].(float64)
+	if brand != "" {
+		q = fmt.Sprintf("%s %s", brand, pref)
+	} else {
+		q = fmt.Sprintf("%s mechanic", q)
+	}
 	l.WithFields(log.Fields{
 		"q":      q,
 		"loc":    loc,
@@ -273,15 +339,8 @@ func (t *Yelp) searchYelp(m *dt.Msg) error {
 	var data yelpResp
 	err := c.get("http://api.yelp.com/v2/search", form, &data)
 	if err != nil {
-		/*
-			m.Sentence = "I can't find that for you now. " +
-				"Let's try again later."
-			l.WithField("fn", "get").Errorln(err)
-			return err
-		*/
-		// return for confused response, given Yelp errors are rare, but
-		// unintentional runs of Yelp queries are much more common
-		return nil
+		m.Sentence = "I can't find that for you now. Let's try again later."
+		return err
 	}
 	m.State["businesses"] = data.Businesses
 	if len(data.Businesses) == 0 {
