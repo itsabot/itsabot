@@ -76,7 +76,7 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err = pkg.NewPackage("ava_yelp", coreaddr, trigger)
+	p, err = pkg.NewPackage("yelp", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}
@@ -98,25 +98,19 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 	for _, o := range si.Objects {
 		query += o + " "
 	}
-	for _, p := range si.Places {
-		query += p + " "
-	}
 	m.State["query"] = query
-	if len(si.Places) == 0 {
-		l.Infoln("no place entered, getting location")
-		loc, question, err := knowledge.GetLocation(db, m.User)
-		if err != nil {
-			return err
-		}
-		if len(question) > 0 {
-			if loc != nil && len(loc.Name) > 0 {
-				m.State["location"] = loc.Name
-			}
-			m.Sentence = question
-			return p.SaveMsg(respMsg, m)
-		}
-		m.State["location"] = loc.Name
+	loc, question, err := knowledge.GetLocation(db, m.User)
+	if err != nil {
+		return err
 	}
+	if len(question) > 0 {
+		if loc != nil && len(loc.Name) > 0 {
+			m.State["location"] = loc.Name
+		}
+		m.Sentence = question
+		return p.SaveMsg(respMsg, m)
+	}
+	m.State["location"] = loc.Name
 	// Occurs in the case of "nearby" or other contextual place terms, where
 	// no previous context was available to expand it.
 	if len(m.State["location"].(string)) == 0 {
@@ -143,8 +137,8 @@ func (t *Yelp) Run(m *dt.Msg, respMsg *dt.RespMsg) error {
 func (t *Yelp) FollowUp(m *dt.Msg, respMsg *dt.RespMsg) error {
 	// First we handle dialog. If we asked for a location, use the response
 	if m.State["location"] == "" {
-		loc := m.StructuredInput.All()
-		m.State["location"] = loc
+		// TODO smarter location detection, handling
+		m.State["location"] = m.Sentence
 		if err := t.searchYelp(m); err != nil {
 			l.WithField("fn", "searchYelp").Errorln(err)
 		}

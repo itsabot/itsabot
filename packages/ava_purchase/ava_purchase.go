@@ -55,7 +55,7 @@ const (
 	StateComplete
 )
 
-const pkgName string = "ava_purchase"
+const pkgName string = "purchase"
 
 var statesShipping = map[string]bool{
 	"AL": true,

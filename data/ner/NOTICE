@@ -5,12 +5,6 @@ Dictionary. Each word was then lowercased using dd:
 
 	dd if=/input.txt of=/output.txt conv=lcase
 
-and stemmed using the porter2 (snowball) algorithm from the included Go code.
-
-Duplicates were then removed using awk:
-
-	awk '!x[$0]++' oldfile.1 > newfile
-
 At this point in time we DO NOT HAVE PERMISSION from Ashley to use these, so we
 must obtain permission (and ensure licenses are OK from MOBY/UK Advanced
 Cryptics Dictionary) prior to any launch.

@@ -29,7 +29,7 @@ func main() {
 
 	db = connectDB()
 	var err error
-	p, err = pkg.NewPackage("ava_wish", coreaddr, trigger)
+	p, err = pkg.NewPackage("wish", coreaddr, trigger)
 	if err != nil {
 		log.Fatalln("creating package", p.Config.Name, err)
 	}

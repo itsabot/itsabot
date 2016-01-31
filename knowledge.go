@@ -204,6 +204,7 @@ func upToBigrams(s string) []string {
 	return ss
 }
 
+/*
 func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 	tmp := []string{}
 	// TODO move comparison to stemmed versions
@@ -229,6 +230,7 @@ func replaceSentence(db *sqlx.DB, msg *dt.Msg, g graphObj) (string, error) {
 	log.Debugln("updated sentence", s)
 	return s, nil
 }
+*/
 
 func updateSentence(sentenceFields []string) string {
 	if len(sentenceFields) == 0 {

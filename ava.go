@@ -8,12 +8,10 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
 	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
@@ -32,11 +30,14 @@ import (
 var db *sqlx.DB
 var tc *twilio.Client
 var mc *dt.MailClient
-var bayes *bayesian.Classifier
+var ner nlp.Classifier
 var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
-var ErrInvalidCommand = errors.New("invalid command")
-var ErrMissingPackage = errors.New("missing package")
-var ErrInvalidUserPass = errors.New("Invalid username/password combination")
+var (
+	ErrInvalidCommand    = errors.New("invalid command")
+	ErrMissingPackage    = errors.New("missing package")
+	ErrInvalidUserPass   = errors.New("Invalid username/password combination")
+	ErrMissingFlexIdType = errors.New("missing flexidtype")
+)
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -90,7 +91,7 @@ func startServer() {
 	mc = dt.NewMailClient()
 	appVocab = dt.NewAtomicMap()
 	go bootDependencies(addr)
-	bayes, err = loadClassifier(bayes)
+	ner, err = buildClassifier()
 	if err != nil {
 		log.Errorln("loading classifier", err)
 	}
@@ -151,115 +152,17 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 	if len(cmd) == 0 {
 		return nil, ErrInvalidCommand
 	}
-	if len(cmd) >= 5 && strings.ToLower(cmd)[0:5] == "train" {
-		if err := train(bayes, cmd[6:]); err != nil {
-			return nil, err
-		}
-		return nil, nil
-	}
 	uid, fid, fidT := validateParams(c)
 	u, err := getUser(uid, fid, flexIDType(fidT))
 	if err != nil {
 		return nil, err
 	}
-	msg := dt.NewMsg(db, bayes, u, cmd)
+	msg := dt.NewMsg(db, ner, u, cmd)
 	if err = msg.Update(db); err != nil {
 		return nil, err
 	}
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
-}
-
-func processKnowledge(msg *dt.Msg, ret *dt.RespMsg, followup bool) (*dt.RespMsg,
-	bool, error) {
-	var edges []*edge
-	var err error
-	if len(ret.Sentence) == 0 {
-		edges, err = searchEdgesForTerm(msg.Sentence)
-		if err != nil {
-			return nil, false, err
-		}
-		for _, e := range edges {
-			msg, ret, err = processAgain(msg, e, followup)
-			if err != nil {
-				return nil, false, err
-			}
-			if len(ret.Sentence) > 0 {
-				e.IncrementConfidence(db)
-				break
-			}
-			e.DecrementConfidence(db)
-		}
-	}
-	var nodes []*node
-	if len(ret.Sentence) == 0 {
-		nodes, err = searchNodes(msg.Sentence, int64(len(edges)))
-		if err != nil {
-			return nil, false, err
-		}
-		for _, n := range nodes {
-			if len(n.Rel()) == 0 {
-				break
-			}
-			msg, ret, err = processAgain(msg, n, followup)
-			if err != nil {
-				return nil, false, err
-			}
-			if len(ret.Sentence) > 0 {
-				n.IncrementConfidence(db)
-				break
-			}
-			n.DecrementConfidence(db)
-		}
-	}
-	log.Debugln("nodes found", nodes)
-	log.Debugln("ret.Sentence", ret.Sentence)
-	if len(ret.Sentence) == 0 && len(nodes) == 0 {
-		nodes, err := newNodes(db, appVocab, msg)
-		if err != nil {
-			return nil, false, err
-		}
-		if len(nodes) > 0 {
-			log.Debugln("created nodes, still need to save")
-			ret.Sentence = nodes[0].Text()
-			return ret, false, nil
-		}
-	}
-	var changed bool
-	if len(nodes) > 0 {
-		msg, ret, err = processAgain(msg, nodes[0], followup)
-		if err != nil {
-			return nil, false, err
-		}
-		changed = true
-	}
-	return ret, changed, nil
-}
-
-func processAgain(msg *dt.Msg, g graphObj, followup bool) (*dt.Msg, *dt.RespMsg,
-	error) {
-	var err error
-	msg.Sentence, err = replaceSentence(db, msg, g)
-	if err != nil {
-		return msg, nil, err
-	}
-	si, _, _, err := nlp.Classify(bayes, msg.Sentence)
-	if err != nil {
-		log.Errorln("classifying sentence", err)
-	}
-	pkg, route, _, err := getPkg(msg)
-	if err != nil && err != ErrMissingPackage {
-		log.WithField("fn", "getPkg").Error(err)
-		return msg, nil, err
-	}
-	msg = dt.NewMsg(db, bayes, msg.User, msg.Sentence)
-	msg.StructuredInput = si
-	msg.Route = route
-	ret, err := callPkg(pkg, msg, followup)
-	if err != nil {
-		return msg, nil, err
-	}
-	return msg, ret, nil
 }
 
 func processText(c *echo.Context) (string, error) {
@@ -268,14 +171,10 @@ func processText(c *echo.Context) (string, error) {
 		log.WithField("fn", "preprocessForMessage").Error(err)
 		return "", err
 	}
-
 	log.Debugln("processed input into message...")
 	log.Debugln("commands:", msg.StructuredInput.Commands)
 	log.Debugln(" objects:", msg.StructuredInput.Objects)
-	log.Debugln("  actors:", msg.StructuredInput.Actors)
-	log.Debugln("   times:", msg.StructuredInput.Times)
-	log.Debugln("  places:", msg.StructuredInput.Places)
-
+	log.Debugln("  people:", msg.StructuredInput.People)
 	pkg, route, followup, err := getPkg(msg)
 	if err != nil {
 		log.WithField("fn", "getPkg").Error(err)
