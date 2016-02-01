@@ -46,8 +46,6 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
-	//e.Get("/api/sentence.json", handlerAPISentence)
-	//e.Put("/api/sentence.json", handlerAPITrainSentence)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
@@ -132,43 +130,13 @@ func handlerAPISentence(c *echo.Context) error {
 	return nil
 }
 
-func handlerAPITrainSentence(c *echo.Context) error {
-	var data TrainingData
-	if err := c.Bind(&data); err != nil {
-		return jsonError(err)
-	}
-	if err := train(bayes, data.Sentence); err != nil {
-		return jsonError(err)
-	}
-	q := `UPDATE trainings SET trainedcount=trainedcount+1 WHERE id=$1`
-	res, err := db.Exec(q, data.ID)
-	if err != nil {
-		return jsonError(err)
-	}
-	num, err := res.RowsAffected()
-	if err != nil {
-		return jsonError(err)
-	}
-	if num == 0 {
-		return sql.ErrNoRows
-	}
-	/*
-		if err = checkConsensus(&data); err != nil {
-			return jsonError(err)
-		}
-	*/
-	if err = c.JSON(http.StatusOK, nil); err != nil {
-		return err
-	}
-	return nil
-}
-
 func handlerMain(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("flexid", c.Form("flexid"))
 	c.Set("flexidtype", c.Form("flexidtype"))
 	c.Set("uid", c.Form("uid"))
 	ret, err := processText(c)
+
 	if err != nil {
 		return err
 	}
@@ -231,6 +199,8 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return jsonError(err)
 	}
+
+	// validate the request parameters
 	if len(req.Name) == 0 {
 		return jsonError(errors.New("You must enter a name."))
 	}
@@ -245,32 +215,43 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	if err := validatePhone(req.FID); err != nil {
 		return jsonError(err)
 	}
-	// TODO format phone number for Twilio (international format)
+
+	// create the password hash
+	//   TODO format phone number for Twilio (international format)
 	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
 		return jsonError(err)
 	}
-	customerParams := &stripe.CustomerParams{Email: req.Email}
-	cust, err := customer.New(customerParams)
-	if err != nil {
-		var js struct {
-			Message string
-		}
-		err = json.Unmarshal([]byte(err.Error()), &js)
+
+	// XXX temporary to allow dev work w/out stripe
+	var stripeCustomerID string
+	if os.Getenv("AVA_ENV") == "production" {
+		customerParams := &stripe.CustomerParams{Email: req.Email}
+		cust, err := customer.New(customerParams)
 		if err != nil {
-			return jsonError(err)
+			var js struct {
+				Message string
+			}
+			err = json.Unmarshal([]byte(err.Error()), &js)
+			if err != nil {
+				return jsonError(err)
+			}
+			return jsonError(errors.New(js.Message))
 		}
-		return jsonError(errors.New(js.Message))
+		stripeCustomerID = cust.ID
 	}
+
+	// db stuff...
 	tx, err := db.Beginx()
 	if err != nil {
 		return jsonError(errors.New("Something went wrong. Try again."))
 	}
+
 	q := `INSERT INTO users (name, email, password, locationid, stripecustomerid)
-	     VALUES ($1, $2, $3, 0, $4)
-	     RETURNING id`
+	      VALUES ($1, $2, $3, 0, $4)
+	      RETURNING id`
 	var uid int
-	err = tx.QueryRowx(q, req.Name, req.Email, hpw, cust.ID).Scan(&uid)
+	err = tx.QueryRowx(q, req.Name, req.Email, hpw, stripeCustomerID).Scan(&uid)
 	if err != nil && err.Error() ==
 		`pq: duplicate key value violates unique constraint "users_email_key"` {
 		_ = tx.Rollback()
@@ -281,6 +262,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return jsonError(errors.New(
 			"Something went wrong. Please try again."))
 	}
+
 	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
 	     VALUES ($1, $2, $3)`
 	_, err = tx.Exec(q, uid, req.FID, 2)
@@ -293,6 +275,8 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return jsonError(errors.New(
 			"Something went wrong. Please try again."))
 	}
+	// end db stuff
+
 	var resp struct {
 		Id           int
 		SessionToken string

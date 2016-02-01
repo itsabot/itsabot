@@ -25,7 +25,6 @@ import (
 type Purchase string
 
 var ErrEmptyRecommendations = errors.New("empty recommendations")
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var vocab dt.Vocab
 var db *sqlx.DB
 var ec *dt.SearchClient
@@ -84,11 +83,13 @@ var statesShipping = map[string]bool{
 // follow ups
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
+
 	log.SetLevel(log.DebugLevel)
-	l = log.WithFields(log.Fields{
-		"pkg": pkgName,
-	})
+	l = log.WithFields(log.Fields{"pkg": pkgName})
 	rand.Seed(time.Now().UnixNano())
 	var err error
 	db, err = pkg.ConnectDB()
@@ -100,7 +101,7 @@ func main() {
 		Commands: language.Purchase(),
 		Objects:  language.Alcohol(),
 	}
-	p, err = pkg.NewPackage(pkgName, *port, trigger)
+	p, err = pkg.NewPackage(pkgName, coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}

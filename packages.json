@@ -2,10 +2,9 @@
 	"name": "ava",
 	"version": "0.0.1",
 	"dependencies": {
-		"yelp": "*",
-		"mechanic": "*",
-		"meeting": "*",
-		"onboard": "*",
-		"purchase": "*"
+		"ava_yelp": "*",
+		"ava_mechanic": "*",
+		"ava_onboard": "*",
+		"ava_purchase": "*"
 	}
 }

@@ -41,7 +41,6 @@ type yelpResp struct {
 	}
 }
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
@@ -50,19 +49,22 @@ var p *pkg.Pkg
 var l *log.Entry
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
-	l = log.WithFields(log.Fields{
-		"pkg": "yelp",
-	})
+
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
 	c.token.Secret = os.Getenv("YELP_TOKEN_SECRET")
+
 	var err error
 	db, err = pkg.ConnectDB()
 	if err != nil {
 		l.Fatalln(err)
 	}
+
 	trigger := &nlp.StructuredInput{
 		Commands: []string{
 			"find",
@@ -74,7 +76,7 @@ func main() {
 		},
 		Objects: language.Foods(),
 	}
-	p, err = pkg.NewPackage("yelp", *port, trigger)
+	p, err = pkg.NewPackage("yelp", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}
@@ -96,25 +98,19 @@ func (t *Yelp) Run(m *dt.Msg, resp *string) error {
 	for _, o := range si.Objects {
 		query += o + " "
 	}
-	for _, p := range si.Places {
-		query += p + " "
-	}
 	m.State["query"] = query
-	if len(si.Places) == 0 {
-		l.Infoln("no place entered, getting location")
-		loc, question, err := knowledge.GetLocation(db, m.User)
-		if err != nil {
-			return err
-		}
-		if len(question) > 0 {
-			if loc != nil && len(loc.Name) > 0 {
-				m.State["location"] = loc.Name
-			}
-			*resp = question
-			return nil
-		}
-		m.State["location"] = loc.Name
+	loc, question, err := knowledge.GetLocation(db, m.User)
+	if err != nil {
+		return err
 	}
+	if len(question) > 0 {
+		if loc != nil && len(loc.Name) > 0 {
+			m.State["location"] = loc.Name
+		}
+		m.Sentence = question
+		return p.SaveMsg(respMsg, m)
+	}
+	m.State["location"] = loc.Name
 	// Occurs in the case of "nearby" or other contextual place terms, where
 	// no previous context was available to expand it.
 	if len(m.State["location"].(string)) == 0 {
@@ -141,9 +137,9 @@ func (t *Yelp) Run(m *dt.Msg, resp *string) error {
 func (t *Yelp) FollowUp(m *dt.Msg, resp *string) error {
 	// First we handle dialog. If we asked for a location, use the response
 	if m.State["location"] == "" {
-		loc := m.StructuredInput.All()
-		m.State["location"] = loc
-		if err := t.searchYelp(m, resp); err != nil {
+		// TODO smarter location detection, handling
+		m.State["location"] = m.Sentence
+		if err := t.searchYelp(m); err != nil {
 			l.WithField("fn", "searchYelp").Errorln(err)
 		}
 		return nil

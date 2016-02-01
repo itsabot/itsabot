@@ -411,24 +411,30 @@ var ChatboxItem = {
 
 var CalendarSelector = {
 	controller: function(args) {
+		var t = args.StartTime || new Date();
 		return {
 			// {
 			//     start timestamp
 			//     length (mins)
 			// }
+			StartTime: t,
 			BlockedTimes: args.BlockedTimes
 		};
 	},
 	view: function(ctrl) {
-		var t = new Date();
 		return m("div", [
 			// TODO convert to subcomponent (date selector)
-			m("a[href=#/]", { class: "pull-left" }, "<"),
-			m("a[href=#/]", { class: "pull-right" }, ">"),
+			m("a[href=#/]", {
+				class: "pull-left",
+				onclick: CalendarSelector.backward.bind(ctrl),
+			}, "<"),
+			m("a[href=#/]", {
+				class: "pull-right",
+				onclick: CalendarSelector.forward.bind(ctrl),
+			}, ">"),
 			m("div", { class: "centered" }, [
 				function() {
-					var d = new Date();
-					return t.toLocaleDateString("en-US", {
+					return ctrl.StartTime.toLocaleDateString("en-US", {
 						weekday: "long",
 						year: "numeric",
 						month: "numeric",
@@ -441,7 +447,12 @@ var CalendarSelector = {
 					var trs = [];
 					var hrs = [];
 					var colors = [];
-					for (var i = t.getHours(), j = 0; i <= 24 && j < 12; ++i && ++j) {
+					var i = 0;
+					var d = new Date();
+					if (ctrl.StartTime.getDate() === d.getDate()) {
+						i = ctrl.StartTime.getHours();
+					}
+					for (var j = 0; i <= 24 && j < 24; ++i && ++j) {
 						var c = "";
 						if (i <= 8 || i > 17) {
 							c = "gray";
@@ -457,17 +468,123 @@ var CalendarSelector = {
 						} else {
 							time += "p";
 						}
+						if (time === "0a") {
+							time = "12a";
+						}
+						var d = new Date();
+						d.setHours(i);
 						hrs.push(m("td", { class: c + " calendar-row" }, time));
-						colors.push(m("td", { class: c + " calendar-time" }));
+						colors.push(m("td", {
+							"data-id": time,
+							"data-time": d,
+							class: c + " calendar-time",
+							onclick: CalendarSelector.newEvent
+						}));
 					}
 					trs.push(m("tr", hrs));
 					trs.push(m("tr", colors));
 					return trs;
 				}()
 			]),
-			m("div", { class: "subtle subtle-sm pull-right" }, "Timezone: Pacific") 
+			m("div", {
+				class: "subtle subtle-sm pull-right"
+			}, "Timezone: Pacific"),
+			m("div", {
+				id: "calendar-selector-form",
+				class: "hidden margin-top-sm"
+			}, [
+				m("div", { class: "row" }, [
+					m("div", { class: "col-md-12" }, [
+						m("input", {
+							id: "calendar-selector-form-event-name",
+							class: "form-control form-white",
+							placeholder: "Event name",
+							onkeydown: CalendarSelector.submit,
+						}),
+					])
+				]),
+				m("div", { class: "row margin-top-xs" }, [
+					m("div", { class: "col-md-6" }, [
+						m("input", {
+							id: "calendar-selector-form-starts",
+							class: "form-control form-white",
+							placeholder: "Starts",
+							onkeydown: CalendarSelector.submit,
+						}),
+					]),
+					m("div", { class: "col-md-6" }, [
+						m("input", {
+							id: "calendar-selector-form-ends",
+							class: "form-control form-white",
+							placeholder: "Ends",
+							onkeydown: CalendarSelector.submit,
+						}),
+					])
+				])
+			])
 		]);
 	}
+};
+CalendarSelector.vm = {
+	showForm: function(ev) {
+		document.getElementById("calendar-selector-form").classList.
+			remove("hidden");
+		var tmp = Date.parse(ev.target.getAttribute("data-time"));
+		var time = new Date(tmp);
+		time.setMinutes(0);
+		var s = time.toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "numeric",
+			day: "numeric",
+			hour: "numeric",
+			minute: "numeric",
+			timezone: "short",
+		});
+		time.setMinutes(30);
+		var e = time.toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "numeric",
+			day: "numeric",
+			hour: "numeric",
+			minute: "numeric",
+			timezone: "short",
+		});
+		CalendarSelector.vm.elStartTime().value = s;
+		CalendarSelector.vm.elEndTime().value = e;
+		document.getElementById("calendar-selector-form-event-name").focus();
+	},
+	elStartTime: function() {
+		return document.getElementById("calendar-selector-form-starts");
+	},
+	elEndTime: function() {
+		return document.getElementById("calendar-selector-form-ends");
+	},
+};
+CalendarSelector.newEvent = function(ev) {
+	ev.preventDefault();
+	CalendarSelector.vm.showForm(ev);
+};
+CalendarSelector.submit = function(ev) {
+	if (ev.keyCode !== 13 /* enter */) {
+		return;
+	}
+	var s = Date.parse(CalendarSelector.vm.elStartTime().value);
+	var e = Date.parse(CalendarSelector.vm.elEndTime().value);
+	return m.request({
+		method: "POST",
+		url: "/api/events.json",
+		data: {
+			UserID: parseInt(m.route.param("uid")),
+			StartTime: s,
+			EndTime: e,
+		}
+	});
+};
+CalendarSelector.forward = function() {
+	this.StartTime.setHours(this.StartTime.getHours()+24);
+};
+CalendarSelector.backward = function() {
+	this.StartTime.setHours(this.StartTime.getHours()-24);
 };
 
 // TODO Suggestion

@@ -41,7 +41,6 @@ type yelpResp struct {
 	}
 }
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
 var ErrNoBusinesses = errors.New("no businesses")
 
 var c client
@@ -50,10 +49,12 @@ var db *sqlx.DB
 var l *log.Entry
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
-	l = log.WithFields(log.Fields{
-		"pkg": "mechanic",
-	})
+	l = log.WithFields(log.Fields{"pkg": "mechanic"})
+
 	c.client.Credentials.Token = os.Getenv("YELP_CONSUMER_KEY")
 	c.client.Credentials.Secret = os.Getenv("YELP_CONSUMER_SECRET")
 	c.token.Token = os.Getenv("YELP_TOKEN")
@@ -75,7 +76,7 @@ func main() {
 			language.AutomotiveBrands(),
 		),
 	}
-	p, err = pkg.NewPackage("mechanic", *port, trigger)
+	p, err = pkg.NewPackage("mechanic", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}
@@ -107,22 +108,19 @@ func (pt *Mechanic) Run(m *dt.Msg, resp *string) error {
 		query += o + " "
 	}
 	m.State["query"] = query
-	if len(si.Places) == 0 {
-		// TODO move to task
-		l.Infoln("no place entered, getting location")
-		loc, question, err := knowledge.GetLocation(db, m.User)
-		if err != nil {
-			return err
-		}
-		if len(question) > 0 {
-			if loc != nil && len(loc.Name) > 0 {
-				m.State["location"] = loc.Name
-			}
-			*resp = question
-			return nil
-		}
-		m.State["location"] = loc.Name
+	// TODO move to task
+	loc, question, err := knowledge.GetLocation(db, m.User)
+	if err != nil {
+		return err
 	}
+	if len(question) > 0 {
+		if loc != nil && len(loc.Name) > 0 {
+			m.State["location"] = loc.Name
+		}
+		m.Sentence = question
+		return p.SaveMsg(respMsg, m)
+	}
+	m.State["location"] = loc.Name
 	// Occurs in the case of "nearby" or other contextual place terms, where
 	// no previous context was available to expand it.
 	if len(m.State["location"].(string)) == 0 {
@@ -148,7 +146,7 @@ func (pt *Mechanic) Run(m *dt.Msg, resp *string) error {
 func (pt *Mechanic) FollowUp(m *dt.Msg, resp *string) error {
 	// First we handle dialog, filling out the user's location
 	if m.State["location"] == "" {
-		loc := m.StructuredInput.All()
+		loc := m.Sentence
 		if len(loc) > 0 {
 			m.State["location"] = loc
 			*resp = "Ok. I can help you. " +
@@ -179,7 +177,7 @@ func (pt *Mechanic) FollowUp(m *dt.Msg, resp *string) error {
 
 	// Check warranty information
 	if m.State["warranty"] == "" {
-		warr := m.StructuredInput.All()
+		warr := m.Sentence
 		if language.Yes(warr) {
 			m.State["warranty"] = "yes"
 			m.State["preference"] = "dealer"

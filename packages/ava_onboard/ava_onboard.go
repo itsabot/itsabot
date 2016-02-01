@@ -12,24 +12,25 @@ import (
 	"github.com/avabot/ava/shared/pkg"
 )
 
-var port = flag.Int("port", 0, "Port used to communicate with Ava.")
-
 var p *pkg.Pkg
 var l *log.Entry
 
 type Onboard string
 
 func main() {
+	var coreaddr string
+	flag.StringVar(&coreaddr, "coreaddr", "",
+		"Port used to communicate with Ava.")
 	flag.Parse()
-	l = log.WithFields(log.Fields{
-		"pkg": "onboard",
-	})
+
+	l = log.WithFields(log.Fields{"pkg": "onboard"})
+
 	trigger := &nlp.StructuredInput{
 		Commands: []string{"onboard"},
 		Objects:  []string{"onboard"},
 	}
 	var err error
-	p, err = pkg.NewPackage("onboard", *port, trigger)
+	p, err = pkg.NewPackage("onboard", coreaddr, trigger)
 	if err != nil {
 		l.Fatalln("building", err)
 	}

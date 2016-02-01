@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/rpc"
 	"os"
-	"strconv"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -29,10 +28,10 @@ type Pkg struct {
 }
 
 type PkgConfig struct {
-	Name          string
-	ServerAddress string
-	Route         string
-	Port          int
+	Name        string
+	Route       string
+	CoreRPCAddr string
+	PkgRPCAddr  string
 }
 
 type Ava int
@@ -45,23 +44,19 @@ var (
 	ErrMissingTrigger     = errors.New("missing package trigger")
 )
 
-func NewPackage(name string, port int, trigger *nlp.StructuredInput) (
-	*Pkg, error) {
-	return NewPackageWithServer(name, "", port, trigger)
-}
-
-func NewPackageWithServer(name, serverAddr string, port int,
+func NewPackage(name, coreRPCAddr string,
 	trigger *nlp.StructuredInput) (*Pkg, error) {
+
 	if len(name) == 0 {
 		return &Pkg{}, ErrMissingPackageName
 	}
 	if trigger == nil {
 		return &Pkg{}, ErrMissingTrigger
 	}
+
 	c := PkgConfig{
-		Name:          name,
-		Port:          port,
-		ServerAddress: serverAddr,
+		Name:        name,
+		CoreRPCAddr: coreRPCAddr,
 	}
 	return &Pkg{Config: c, Trigger: trigger}, nil
 }
@@ -69,41 +64,36 @@ func NewPackageWithServer(name, serverAddr string, port int,
 // Register with Ava to begin communicating over RPC.
 func (p *Pkg) Register(pkgT interface{}) error {
 	log.SetLevel(log.DebugLevel)
-	log.WithFields(log.Fields{
-		"port": p.Config.Port + 1,
-		"pkg":  p.Config.Name,
-	}).Debugln("connecting")
-	l, err := net.Listen("tcp", ":"+strconv.Itoa(p.Config.Port+1))
+	log.WithFields(log.Fields{"pkg": p.Config.Name}).Debugln("connecting")
+
+	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
+	p.Config.PkgRPCAddr = ln.Addr().String()
+
 	if err := rpc.Register(pkgT); err != nil {
 		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
-	port, err := strconv.Atoi(os.Getenv("PORT"))
+
+	client, err := rpc.Dial("tcp", p.Config.CoreRPCAddr)
 	if err != nil {
-		log.WithField("pkg", p.Config.Name).Errorln(err)
-		return err
+		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
-	client, err = rpc.Dial("tcp", ":"+strconv.Itoa(port+1))
-	if err != nil {
-		log.WithField("pkg", p.Config.Name).Errorln(err)
-		return err
+
+	if err := client.Call("Ava.RegisterPackage", p, nil); err != nil {
+		log.WithField("pkg", p.Config.Name).Fatalln("calling", err)
 	}
-	var notused string
-	err = client.Call("Ava.RegisterPackage", p, &notused)
-	if err != nil {
-		log.WithField("pkg", p.Config.Name).Errorln("calling", err)
-		return err
-	}
+
 	log.WithField("pkg", p.Config.Name).Debugln("connected")
+
 	db, err = ConnectDB()
 	if err != nil {
 		log.WithField("pkg", p.Config.Name).Errorln("connectDB", err)
 		return err
 	}
 	for {
-		conn, err := l.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
 			log.WithField("pkg", p.Config.Name).Fatalln(err)
 		}

@@ -9,8 +9,6 @@ import (
 	"time"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jbrukh/bayesian"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/shared/nlp"
 )
@@ -22,23 +20,22 @@ var (
 type jsonState json.RawMessage
 
 type Msg struct {
-	ID                uint64
-	FlexID            string
-	FlexIDType        int
-	Sentence          string
-	SentenceAnnotated string
-	User              *User
-	StructuredInput   *nlp.StructuredInput
-	Stems             []string
-	Route             string
-	Package           string
-	State             map[string]interface{}
-	CreatedAt         *time.Time
+	ID              uint64
+	FlexID          string
+	FlexIDType      int
+	Sentence        string
+	User            *User
+	StructuredInput *nlp.StructuredInput
+	Stems           []string
+	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
+	// individual words.
+	Tokens    []string
+	Route     string
+	Package   string
+	State     map[string]interface{}
+	CreatedAt *time.Time
 	// AvaSent determines if msg is from the user or Ava
 	AvaSent bool
-	// SentenceFields breaks the sentence into words. Tokens like ,.' are
-	// treated as individual words.
-	SentenceFields []string
 }
 
 type Feedback struct {
@@ -66,31 +63,16 @@ func (j *jsonState) Value() (driver.Value, error) {
 	return j, nil
 }
 
-func NewMsg(db *sqlx.DB, bayes *bayesian.Classifier, u *User, cmd string) *Msg {
-	words := strings.Fields(cmd)
-	eng := porter2.Stemmer
-	stems := []string{}
-	for _, w := range words {
-		w = strings.TrimRight(w, ",.?;:!-/")
-		stems = append(stems, eng.Stem(w))
-	}
-	// TODO handle training here with the _ var
-	var si *nlp.StructuredInput
-	var annotated string
-	var err error
-	if bayes != nil {
-		si, annotated, _, err = nlp.Classify(bayes, cmd)
-		if err != nil {
-			log.Errorln("classifying sentence", err)
-		}
-	}
+func NewMsg(db *sqlx.DB, classifier nlp.Classifier, u *User, cmd string) *Msg {
+	tokens := nlp.TokenizeSentence(cmd)
+	stems := nlp.StemTokens(tokens)
+	si := classifier.ClassifyTokens(tokens)
 	m := &Msg{
-		User:              u,
-		Sentence:          cmd,
-		SentenceFields:    SentenceFields(cmd),
-		Stems:             stems,
-		StructuredInput:   si,
-		SentenceAnnotated: annotated,
+		User:            u,
+		Sentence:        cmd,
+		Tokens:          tokens,
+		Stems:           stems,
+		StructuredInput: si,
 	}
 	/*
 		m, err = addContext(db, m)
@@ -122,10 +104,10 @@ func (m *Msg) Update(db *sqlx.DB) error {
 
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, package, route, sentenceannotated, avasent)
-	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	      (userid, sentence, package, route, avasent)
+	      VALUES ($1, $2, $3, $4, $5) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
-		m.SentenceAnnotated, m.AvaSent)
+		m.AvaSent)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}
@@ -220,8 +202,9 @@ func (m *Msg) GetLastState(db *sqlx.DB) error {
 }
 
 /*
+// TODO refactor
 // addContext to a StructuredInput, replacing pronouns with the nouns to which
-// they refer. TODO refactor
+// they refer.
 func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
 	for _, w := range m.StructuredInput.Pronouns() {
 		var ctx string

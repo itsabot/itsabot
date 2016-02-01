@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"strconv"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 )
@@ -16,39 +15,36 @@ type packagesConf struct {
 	Dependencies map[string]string
 }
 
-func bootDependencies() {
-	// TODO Inspect for errors
+// bootDependencies executes all binaries listed in "packages.json". each
+// dependencies is passed the rpc address of the ava core. it is expected that
+// each dependency respond with there own rpc address when registering
+// themselves with the ava core
+func bootDependencies(avaRPCAddr string) {
+	log.WithFields(log.Fields{
+		"ava_core_addr": avaRPCAddr,
+	}).Debugln("booting dependencies")
+
 	content, err := ioutil.ReadFile("packages.json")
 	if err != nil {
 		log.Fatalln("reading packages.json", err)
 	}
+
 	var conf packagesConf
-	err = json.Unmarshal(content, &conf)
-	if err != nil {
+	if err := json.Unmarshal(content, &conf); err != nil {
 		log.Fatalln("err: unmarshaling packages", err)
 	}
-	port, err := strconv.Atoi(os.Getenv("PORT"))
-	if err != nil {
-		log.Fatalln("PORT must be an integer")
-	}
-	i := 2
+
 	for name := range conf.Dependencies {
-		p := strconv.Itoa(port + i)
-		log.WithFields(log.Fields{
-			"pkg":  name,
-			"port": p,
-		}).Debugln("booting")
+		log.WithFields(log.Fields{"pkg": name}).Debugln("booting")
 		// NOTE assumes packages are installed with go install ./...,
 		// matching Heroku's Go buildpack
-		cmd := exec.Command(name, "-port", p)
+		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err = cmd.Start(); err != nil {
 			log.WithFields(log.Fields{
-				"pkg":  name,
-				"port": p,
+				"pkg": name,
 			}).Fatalln(err)
 		}
-		i += 2
 	}
 }
