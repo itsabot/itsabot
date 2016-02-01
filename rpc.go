@@ -62,14 +62,13 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	return nil
 }
 
-// getPkg attempts to find a package and route for the given msg input
-// if none can be found, it checks the database for the last route used and
-// gets the package for that. if there is no previously used package, we return
-// ErrMissingPackage
-// the bool value return indicates whether this package is different from the
-// last package used by the user
+// getPkg attempts to find a package and route for the given msg input if none
+// can be found, it checks the database for the last route used and gets the
+// package for that. If there is no previously used package, we return
+// ErrMissingPackage. The bool value return indicates whether this package is
+// different from the last package used by the user
 func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
-	// first check if the user is missing. aka, needs to be onboarded
+	// First check if the user is missing. AKA, needs to be onboarded
 	if m.User == nil {
 		p := regPkgs.Get("onboard_onboard")
 		if p == nil {
@@ -79,8 +78,8 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 		return p, "onboard_onboard", true, nil
 	}
 
-	// first we look for a previously used route. we have to do this in
-	// any case, to check if the users pkg/route has changed. so why not now!
+	// First we look for a previously used route. we have to do this in
+	// any case to check if the users pkg/route has changed, so why not now?
 	log.Debugln("getting last route")
 	prevRoute, err := m.GetLastRoute(db)
 	if err != nil && err != sql.ErrNoRows {
@@ -88,29 +87,30 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	}
 	log.Debugf("user's last route: %q\n", prevRoute)
 
-	// iterate over all command/object pairs and see if any package has
-	// been registered for the resulting route
+	// Iterate over all command/object pairs and see if any package has been
+	// registered for the resulting route
 	for _, c := range m.StructuredInput.Commands {
 		for _, o := range m.StructuredInput.Objects {
 			route := strings.ToLower(c + "_" + o)
 			log.Debugln("searching route", route)
 			if p := regPkgs.Get(route); p != nil {
-				// found route. return it
-				return p, route, route == prevRoute, nil
+				// Found route. Return it
+				return p, route, false, nil
 			}
 		}
 	}
 
-	// the user input didnt match any packages. lets see if the prevRoute does
+	// The user input didnt match any packages. Lets see if the prevRoute
+	// does
 	if prevRoute != "" {
 		log.Debugln("checking prevRoute for pkg")
 		if p := regPkgs.Get(prevRoute); p != nil {
-			// prev route matches a pkg! return it
-			return p, prevRoute, false, nil
+			// Prev route matches a pkg! Return it
+			return p, prevRoute, true, nil
 		}
 	}
 
-	// sadly, if we've reached this point, we are at a lose.
+	// Sadly, if we've reached this point, we are at a loss.
 	log.Warnln("could not match user input to any package")
 	return nil, "", false, ErrMissingPackage
 }

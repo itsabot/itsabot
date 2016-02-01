@@ -7,7 +7,7 @@ import (
 	"net/mail"
 	"time"
 
-	"github.com/sendgrid/smtpapi-go"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/sendgrid/smtpapi-go"
 )
 
 // SGMail is representation of a valid SendGrid Mail

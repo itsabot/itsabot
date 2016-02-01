@@ -118,7 +118,7 @@ func (pt *Mechanic) Run(m *dt.Msg, resp *string) error {
 			m.State["location"] = loc.Name
 		}
 		m.Sentence = question
-		return p.SaveMsg(respMsg, m)
+		return nil
 	}
 	m.State["location"] = loc.Name
 	// Occurs in the case of "nearby" or other contextual place terms, where

@@ -78,6 +78,10 @@ func (s *CustomerShippingDetails) AppendDetails(values *url.Values) {
 		values.Add("shipping[address][state]", s.Address.State)
 	}
 
+	if len(s.Address.Country) > 0 {
+		values.Add("shipping[address][country]", s.Address.Country)
+	}
+
 	if len(s.Address.Zip) > 0 {
 		values.Add("shipping[address][postal_code]", s.Address.Zip)
 	}

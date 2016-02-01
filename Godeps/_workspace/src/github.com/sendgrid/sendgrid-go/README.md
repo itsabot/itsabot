@@ -16,8 +16,12 @@ Version ``1.2.x`` behaves differently in the ``AddTo`` method. In the past this 
 ```bash
 go get github.com/sendgrid/sendgrid-go
 
-// Or pin the version with gopkg
+# Or pin the version with gopkg
 go get gopkg.in/sendgrid/sendgrid-go.v1
+
+echo "export SENDGRID_API_KEY='YOUR_API_KEY'" > sendgrid.env
+echo "sendgrid.env" >> .gitignore
+
 ```
 
 ## Example
@@ -26,36 +30,39 @@ go get gopkg.in/sendgrid/sendgrid-go.v1
 package main
 
 import (
-	"fmt"
-	"github.com/sendgrid/sendgrid-go"
+        "fmt"
+        "github.com/sendgrid/sendgrid-go"
+		"os"
 )
 
 func main() {
-	sg := sendgrid.NewSendGridClient("sendgrid_user", "sendgrid_key")
-	message := sendgrid.NewMail()
-	message.AddTo("yamil@sendgrid.com")
-	message.AddToName("Yamil Asusta")
-	message.SetSubject("SendGrid Testing")
-	message.SetText("WIN")
-	message.SetFrom("yamil@sendgrid.com")
-    if r := sg.Send(message); r == nil {
-		fmt.Println("Email sent!")
-	} else {
-		fmt.Println(r)
+	sendgridKey := os.Getenv("SENDGRID_API_KEY")
+	if sendgridKey == "" {
+	  			fmt.Println("Environment variable SENDGRID_API_KEY is undefined. Did you forget to source sendgrid.env?")
+	  			os.Exit(1);
 	}
+    sg := sendgrid.NewSendGridClientWithApiKey(sendgridKey)
+    message := sendgrid.NewMail()
+    message.AddTo("community@sendgrid.com")
+    message.AddToName("SendGrid Community Dev Team")
+    message.SetSubject("SendGrid Testing")
+    message.SetText("WIN")
+    message.SetFrom("you@yourdomain.com")
+    if r := sg.Send(message); r == nil {
+                fmt.Println("Email sent!")
+        } else {
+                fmt.Println(r)
+        }
 }
-
 ```
 
 ## Usage
 
-To begin using this library, call `NewSendGridClient` with your SendGrid credentials OR `NewSendGridClientWithApiKey` with a SendGrid API Key. API Key is the preferred method. API Keys are in beta. To configure API keys, visit https://sendgrid.com/beta/settings/api_key.
+To begin using this library, call `NewSendGridClientWithApiKey` with a SendGrid API Key.  
 
 ### Creating a Client
 
 ```go
-sg := sendgrid.NewSendGridClient("sendgrid_user", "sendgrid_key")
-// or
 sg := sendgrid.NewSendGridClientWithApiKey("sendgrid_api_key")
 ```
 
@@ -188,36 +195,6 @@ message.SetFilter("footer", filter)
 
 ```go
 message.JSONString() //returns a JSON string representation of the headers
-```
-
-## AppEngine Example
-
-```go
-package main
-
-import (
-	"fmt"
-	"appengine/urlfetch"
-	"github.com/sendgrid/sendgrid-go"
-)
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	sg := sendgrid.NewSendGridClient("sendgrid_user", "sendgrid_key")
-	c := appengine.NewContext(r)
-	// set http.Client to use the appengine client
-	sg.Client = urlfetch.Client(c) //Just perform this swap, and you are good to go.
-	message := sendgrid.NewMail()
-	message.AddTo("yamil@sendgrid.com")
-	message.SetSubject("SendGrid is Baller")
-	message.SetHTML("Simple Text")
-	message.SetFrom("kunal@sendgrid.com")
-	if r := sg.Send(message); r == nil {
-		fmt.Println("Email sent!")
-	} else {
-		c.Errorf("Unable to send mail %v",r)
-	}
-}
-
 ```
 
 Kudos to [Matthew Zimmerman](https://github.com/mzimmerman) for this example.

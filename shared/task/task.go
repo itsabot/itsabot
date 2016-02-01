@@ -32,10 +32,10 @@ const (
 	RequestPurchaseAuthZip
 )
 
-func New(sm *dt.StateMachine, t Type) []dt.State {
+func New(sm *dt.StateMachine, t Type, label string) []dt.State {
 	switch t {
 	case RequestAddress:
-		return getAddress(sm)
+		return getAddress(sm, label)
 	}
 	return []dt.State{}
 }

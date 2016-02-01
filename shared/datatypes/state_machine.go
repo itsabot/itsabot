@@ -9,9 +9,10 @@ import (
 )
 
 type StateMachine struct {
-	State        int
-	StateEntered bool
 	Handlers     []State
+	state        int
+	stateEntered bool
+	states       map[string]int
 	keys         []string
 	pkgName      string
 	logger       *log.Entry
@@ -43,14 +44,21 @@ type State struct {
 	// hit this state's OnInput function again.
 	Complete func(*Msg) (bool, string)
 
-	// Memory will search through preferences about the user. If a past
-	// preference is found, it'll skip to the OnInput response, with that
-	// preference as the input.
-	Memory string
+	// SkipIfComplete will run Complete() on entry. If Complete() == true,
+	// then it'll skip to the next state.
+	SkipIfComplete bool
+
+	// Label enables jumping directly to a State with stateMachine.SetState
+	Label string
 }
 
+// EventRequest is sent to the state machine to request safely jumping between
+// states with guards checking that each new state is valid
+type EventRequest int
+
 func NewStateMachine(pkgName string) (*StateMachine, error) {
-	sm := StateMachine{State: 0, pkgName: pkgName}
+	sm := StateMachine{state: 0, pkgName: pkgName}
+	sm.states = map[string]int{}
 	// TODO load state from DB
 	sm.resetFn = func(*Msg) {}
 	sm.logger = log.WithFields(log.Fields{
@@ -60,9 +68,12 @@ func NewStateMachine(pkgName string) (*StateMachine, error) {
 }
 
 func (sm *StateMachine) SetStates(sss ...[]State) {
-	for _, ss := range sss {
-		for _, s := range ss {
+	for i, ss := range sss {
+		for j, s := range ss {
 			sm.Handlers = append(sm.Handlers, s)
+			if len(s.Label) > 0 {
+				sm.states[s.Label] = i + j
+			}
 		}
 	}
 }
@@ -84,40 +95,43 @@ func (sm *StateMachine) SetPkgName(n string) {
 }
 
 func (sm *StateMachine) Next(in *Msg) string {
-	if sm.State+1 >= len(sm.Handlers) {
+	h := sm.Handlers[sm.state]
+	if sm.state+1 >= len(sm.Handlers) {
 		sm.Reset(in)
-		return sm.Handlers[sm.State].OnEntry(in)
+		sm.stateEntered = true
+		return h.OnEntry(in)
 	}
-	if !sm.StateEntered {
-		sm.StateEntered = true
-		return sm.Handlers[sm.State].OnEntry(in)
-	}
-	// check completion of current state
-	done, str := sm.Handlers[sm.State].Complete(in)
-	if done {
-		sm.State++
-		s := sm.Handlers[sm.State].OnEntry(in)
-		if len(s) == 0 {
-			sm.logger.WithField("state", sm.State).
-				Warnln("OnEntry returned \"\"")
+	if !sm.stateEntered {
+		if h.SkipIfComplete {
+			done, _ := h.Complete(in)
+			if done {
+				sm.logger.Debugln("state was complete. moving on")
+				return sm.Next(in)
+			}
 		}
-		return s
+		sm.stateEntered = true
+		sm.logger.Debugln("setting state entered")
+		return h.OnEntry(in)
+	}
+	sm.logger.Debugln("state was already entered")
+	h.OnInput(in)
+	// check completion of current state
+	done, str := h.Complete(in)
+	if done {
+		sm.logger.Debugln("state is done. going to next")
+		sm.state++
+		sm.stateEntered = true
+		return sm.Handlers[sm.state].OnEntry(in)
 	} else if len(str) > 0 {
+		sm.logger.Debugln("incomplete with message")
 		return str
 	}
-	// check memory to determine if Ava should skip this state
-	mem := sm.Handlers[sm.State].Memory
-	if len(mem) > 0 {
-		if sm.HasMemory(in, mem) {
-			return sm.Next(in)
-		}
-	}
-	sm.Handlers[sm.State].OnInput(in)
+	sm.logger.Debugln("reached here")
 	return ""
 }
 
 func (sm *StateMachine) OnInput(in *Msg) {
-	sm.Handlers[sm.State].OnInput(in)
+	sm.Handlers[sm.state].OnInput(in)
 }
 
 func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
@@ -133,7 +147,7 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	q := `INSERT INTO states (key, value, pkgname, userid)
 	      VALUES ($1, $2, $3, $4)
 	      ON CONFLICT (userid, pkgname, key) DO UPDATE SET value=$2`
-	_, err := sm.db.Exec(q, k, b, sm.pkgName, in.User.ID)
+	_, err = sm.db.Exec(q, k, b, sm.pkgName, in.User.ID)
 	if err != nil {
 		sm.logger.Errorln(err, "setting memory at", k, "to", v)
 		return
@@ -160,7 +174,36 @@ func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
 }
 
 func (sm *StateMachine) Reset(in *Msg) {
-	sm.State = 0
-	sm.StateEntered = false
+	sm.state = 0
+	sm.stateEntered = false
 	sm.resetFn(in)
+}
+
+func (sm *StateMachine) SetState(in *Msg, label string) {
+	desiredState := sm.states[label]
+
+	// If we're in a state beyond the desired state, go back. There are NO
+	// checks for state, so if you're changing state after its been
+	// completed, you'll need to do sanity checks OnEntry.
+	if sm.state > desiredState {
+		sm.state = desiredState
+		sm.stateEntered = false
+		return
+	}
+
+	// If we're in a state before the desired state, go forward only as far
+	// as we're allowed to by the Complete guards
+	for s := sm.state; s < desiredState; s++ {
+		ok, _ := sm.Handlers[s].Complete(in)
+		if !ok {
+			sm.state = s
+			sm.stateEntered = false
+			return
+		}
+	}
+
+	// No guards were triggered (go to state), or the state == desiredState,
+	// so reset the state and run OnEntry again
+	sm.state = desiredState
+	sm.stateEntered = false
 }

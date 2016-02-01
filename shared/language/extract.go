@@ -25,6 +25,7 @@ var regexNum = regexp.MustCompile(`\d+`)
 // found. This API design also maintains consitency when we want to extract and
 // return a struct (which should be returned as a pointer).
 func ExtractCurrency(s string) sql.NullInt64 {
+	log.Println("extracting currency")
 	n := sql.NullInt64{
 		Int64: 0,
 		Valid: false,
@@ -37,6 +38,7 @@ func ExtractCurrency(s string) sql.NullInt64 {
 	if err != nil {
 		return n
 	}
+	log.Println("found value", val)
 	n.Int64 = int64(val * 100)
 	n.Valid = true
 	return n

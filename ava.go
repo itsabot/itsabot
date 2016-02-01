@@ -189,6 +189,7 @@ func processText(c *echo.Context) (string, error) {
 	if err = msg.Save(db); err != nil {
 		return "", err
 	}
+	log.Debugln("followup?", followup)
 	ret, err := callPkg(pkg, msg, followup)
 	if err != nil {
 		return "", err

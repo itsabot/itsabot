@@ -14,10 +14,11 @@ const (
 	addressStateGetName
 )
 
-func getAddress(sm *dt.StateMachine) []dt.State {
+func getAddress(sm *dt.StateMachine, label string) []dt.State {
 	db := sm.GetDBConn()
 	return []dt.State{
 		{
+			Label: label,
 			OnEntry: func(in *dt.Msg) string {
 				return "Ok. Where should I ship this?"
 			},
@@ -38,7 +39,7 @@ func getAddress(sm *dt.StateMachine) []dt.State {
 			},
 		},
 		{
-			Memory: "__remembered",
+			SkipIfComplete: true,
 			OnEntry: func(in *dt.Msg) string {
 				return "Is that your home or office?"
 			},
@@ -66,7 +67,9 @@ func getAddress(sm *dt.StateMachine) []dt.State {
 				sm.SetMemory(in, "shipping_address", addr)
 			},
 			Complete: func(in *dt.Msg) (bool, string) {
-				return sm.HasMemory(in, "shipping_address"), ""
+				c1 := sm.HasMemory(in, "shipping_address")
+				c2 := sm.HasMemory(in, "__remembered")
+				return c1 && c2, ""
 			},
 		},
 	}

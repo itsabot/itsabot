@@ -28,7 +28,7 @@ func (c Client) New(params *stripe.OrderParams) (*stripe.Order, error) {
 
 	if params != nil {
 		body = &url.Values{}
-
+		commonParams = &params.Params
 		// Required fields
 		body.Add("currency", string(params.Currency))
 
@@ -144,12 +144,11 @@ func (c Client) Pay(id string, params *stripe.OrderPayParams) (*stripe.Order, er
 
 	if params != nil {
 		body = &url.Values{}
-
+		commonParams = &params.Params
 		if params.Source == nil && len(params.Customer) == 0 {
 			err := errors.New("Invalid order pay params: either customer or a source must be set")
 			return nil, err
 		}
-
 		// We can't use `AppendDetails` since that nests under `card`.
 		if params.Source != nil {
 			if len(params.Source.Token) > 0 {
@@ -214,14 +213,22 @@ func (c Client) Pay(id string, params *stripe.OrderPayParams) (*stripe.Order, er
 
 // Get returns the details of an order
 // For more details see https://stripe.com/docs/api#retrieve_order.
-func Get(id string) (*stripe.Order, error) {
-	return getC().Get(id)
+func Get(id string, params *stripe.OrderParams) (*stripe.Order, error) {
+	return getC().Get(id, params)
 }
 
-func (c Client) Get(id string) (*stripe.Order, error) {
-	order := &stripe.Order{}
-	err := c.B.Call("GET", "/orders/"+id, c.Key, nil, nil, order)
+func (c Client) Get(id string, params *stripe.OrderParams) (*stripe.Order, error) {
+	var body *url.Values
+	var commonParams *stripe.Params
 
+	if params != nil {
+		body = &url.Values{}
+		commonParams = &params.Params
+		params.AppendTo(body)
+	}
+
+	order := &stripe.Order{}
+	err := c.B.Call("GET", "/orders/"+id, c.Key, body, commonParams, order)
 	return order, err
 }
 

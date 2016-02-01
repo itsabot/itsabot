@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"os"
 
-	"github.com/agonopol/go-stem"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/agonopol/go-stem"
 )
 
 func main() {

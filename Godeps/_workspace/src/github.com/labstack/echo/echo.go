@@ -1,33 +1,63 @@
+/*
+Package echo implements a fast and unfancy micro web framework for Go.
+
+Example:
+
+    package main
+
+    import (
+        "net/http"
+
+        "github.com/labstack/echo"
+        mw "github.com/labstack/echo/middleware"
+    )
+
+    func hello(c *echo.Context) error {
+        return c.String(http.StatusOK, "Hello, World!\n")
+    }
+
+    func main() {
+        e := echo.New()
+
+        e.Use(mw.Logger())
+        e.Use(mw.Recover())
+
+        e.Get("/", hello)
+
+        e.Run(":1323")
+    }
+
+Learn more at https://labstack.com/echo
+*/
 package echo
 
 import (
 	"bytes"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 
-	"encoding/xml"
-
-	"github.com/labstack/gommon/log"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/websocket"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/gommon/log"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/http2"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
 )
 
 type (
+	// Echo is the top-level framework instance.
 	Echo struct {
 		prefix                  string
 		middleware              []MiddlewareFunc
 		http2                   bool
 		maxParam                *int
-		notFoundHandler         HandlerFunc
 		defaultHTTPErrorHandler HTTPErrorHandler
 		httpErrorHandler        HTTPErrorHandler
 		binder                  Binder
@@ -36,25 +66,52 @@ type (
 		debug                   bool
 		hook                    http.HandlerFunc
 		autoIndex               bool
-		logger                  *log.Logger
+		logger                  Logger
 		router                  *Router
 	}
 
+	// Logger is the interface that declares echo's logging system.
+	Logger interface {
+		Debug(...interface{})
+		Debugf(string, ...interface{})
+
+		Info(...interface{})
+		Infof(string, ...interface{})
+
+		Warn(...interface{})
+		Warnf(string, ...interface{})
+
+		Error(...interface{})
+		Errorf(string, ...interface{})
+
+		Fatal(...interface{})
+		Fatalf(string, ...interface{})
+	}
+
+	// Route contains a handler and information for matching against requests.
 	Route struct {
 		Method  string
 		Path    string
 		Handler Handler
 	}
 
+	// HTTPError represents an error that occured while handling a request.
 	HTTPError struct {
 		code    int
 		message string
 	}
 
-	Middleware     interface{}
+	// Middleware ...
+	Middleware interface{}
+
+	// MiddlewareFunc ...
 	MiddlewareFunc func(HandlerFunc) HandlerFunc
-	Handler        interface{}
-	HandlerFunc    func(*Context) error
+
+	// Handler ...
+	Handler interface{}
+
+	// HandlerFunc ...
+	HandlerFunc func(*Context) error
 
 	// HTTPErrorHandler is a centralized HTTP error handler.
 	HTTPErrorHandler func(error, *Context)
@@ -165,9 +222,9 @@ var (
 	// Errors
 	//--------
 
-	UnsupportedMediaType  = errors.New("unsupported media type")
-	RendererNotRegistered = errors.New("renderer not registered")
-	InvalidRedirectCode   = errors.New("invalid redirect status code")
+	ErrUnsupportedMediaType  = NewHTTPError(http.StatusUnsupportedMediaType)
+	ErrRendererNotRegistered = errors.New("renderer not registered")
+	ErrInvalidRedirectCode   = errors.New("invalid redirect status code")
 
 	//----------------
 	// Error handlers
@@ -180,8 +237,6 @@ var (
 	methodNotAllowedHandler = func(c *Context) error {
 		return NewHTTPError(http.StatusMethodNotAllowed)
 	}
-
-	unixEpochTime = time.Unix(0, 0)
 )
 
 // New creates an instance of Echo.
@@ -217,7 +272,6 @@ func New() (e *Echo) {
 
 	// Logger
 	e.logger = log.New("echo")
-	e.logger.SetLevel(log.INFO)
 
 	return
 }
@@ -227,23 +281,13 @@ func (e *Echo) Router() *Router {
 	return e.router
 }
 
-// SetLogPrefix sets the prefix for the logger. Default value is `echo`.
-func (e *Echo) SetLogPrefix(prefix string) {
-	e.logger.SetPrefix(prefix)
-}
-
-// SetLogOutput sets the output destination for the logger. Default value is `os.Std*`
-func (e *Echo) SetLogOutput(w io.Writer) {
-	e.logger.SetOutput(w)
-}
-
-// SetLogLevel sets the log level for the logger. Default value is `log.INFO`.
-func (e *Echo) SetLogLevel(l log.Level) {
-	e.logger.SetLevel(l)
+// SetLogger sets the logger instance.
+func (e *Echo) SetLogger(logger Logger) {
+	e.logger = logger
 }
 
 // Logger returns the logger instance.
-func (e *Echo) Logger() *log.Logger {
+func (e *Echo) Logger() Logger {
 	return e.logger
 }
 
@@ -433,7 +477,7 @@ func (e *Echo) serveFile(dir, file string, c *Context) (err error) {
 		d := f
 
 		// Index file
-		file = filepath.Join(file, indexPage)
+		file = path.Join(file, indexPage)
 		f, err = fs.Open(file)
 		if err != nil {
 			if e.autoIndex {
@@ -591,6 +635,7 @@ func (e *Echo) run(s *http.Server, files ...string) {
 	}
 }
 
+// NewHTTPError creates a new HTTPError instance.
 func NewHTTPError(code int, msg ...string) *HTTPError {
 	he := &HTTPError{code: code, message: http.StatusText(code)}
 	if len(msg) > 0 {
@@ -694,11 +739,16 @@ func wrapHandler(h Handler) HandlerFunc {
 
 func (binder) Bind(r *http.Request, i interface{}) (err error) {
 	ct := r.Header.Get(ContentType)
-	err = UnsupportedMediaType
+	err = ErrUnsupportedMediaType
 	if strings.HasPrefix(ct, ApplicationJSON) {
-		err = json.NewDecoder(r.Body).Decode(i)
+		if err = json.NewDecoder(r.Body).Decode(i); err != nil {
+			err = NewHTTPError(http.StatusBadRequest, err.Error())
+		}
 	} else if strings.HasPrefix(ct, ApplicationXML) {
-		err = xml.NewDecoder(r.Body).Decode(i)
+		if err = xml.NewDecoder(r.Body).Decode(i); err != nil {
+			err = NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+
 	}
 	return
 }
