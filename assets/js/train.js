@@ -57,15 +57,23 @@ TrainIndex.viewFull = function(ctrl) {
 			m("div", {
 				class: "col-md-12 margin-top-sm"
 			}, [
-				m("table", {
-					class: "table table-bordered table-hover"
-				}, [
-					m("tbody", [
-						ctrl.data().map(function(conversation) {
-							return m.component(TrainIndexItem, conversation);
-						})
-					])
-				])
+				function() {
+					if (ctrl.data() === null) {
+						return m("h3", {
+							class: "empty-state"
+						}, "No conversations need training");
+					} else {
+						return m("table", {
+							class: "table table-bordered table-hover"
+						}, [
+						m("tbody", [
+								ctrl.data().map(function(conversation) {
+									return m.component(TrainIndexItem, conversation);
+								})
+							])
+						])
+					}
+				}()
 			])
 		])
 	]);
@@ -192,9 +200,13 @@ TrainShow.viewFull = function(ctrl) {
 						}, [
 							m("div", { class: "margin-left" }, [
 								m("ul", { class: "list-unstyled" }, [
-									ctrl.data().Preferences.map(function(item) {
-										return m("li", item);
-									})
+									function() {
+										if (ctrl.data() != null && ctrl.data().Preferences != null) {
+											ctrl.data().Preferences.map(function(item) {
+												return m("li", item);
+											})
+										}
+									}()
 								]),
 								m("a[href=#/]", {
 									class: "btn btn-xs",
@@ -411,6 +423,9 @@ var ChatboxItem = {
 
 var CalendarSelector = {
 	controller: function(args) {
+		if (args == null) {
+			args = {};
+		}
 		var t = args.StartTime || new Date();
 		return {
 			// {

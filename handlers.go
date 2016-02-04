@@ -581,7 +581,7 @@ func handlerAPIConversations(c *echo.Context) error {
 	          id, sentence, createdat, userid
 	      FROM messages
 	      WHERE needstraining IS TRUE
-	      ORDER BY userid, createdat ASC
+	      ORDER BY userid, createdat DESC
 	      LIMIT 25`
 	err := db.Select(&msgs, q)
 	if err != nil && err != sql.ErrNoRows {
@@ -598,10 +598,6 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	if err != nil {
 		return jsonError(err)
 	}
-	id, err := strconv.Atoi(c.Query("id"))
-	if err != nil {
-		return jsonError(err)
-	}
 	var ret []struct {
 		Sentence  string
 		AvaSent   bool
@@ -609,9 +605,10 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	}
 	q := `SELECT sentence, avasent, createdat
 	      FROM messages
-	      WHERE userid=$1 AND id>=$2
-	      ORDER BY createdat DESC`
-	if err := db.Select(&ret, q, uid, id); err != nil {
+	      WHERE userid=$1
+	      ORDER BY createdat DESC
+	      LIMIT 10`
+	if err := db.Select(&ret, q, uid); err != nil {
 		return jsonError(err)
 	}
 	var username string

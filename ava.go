@@ -200,6 +200,10 @@ func processText(c *echo.Context) (string, error) {
 	m.User = msg.User
 	if len(ret) == 0 {
 		m.Sentence = language.Confused()
+		msg.NeedsTraining = true
+		if err = msg.Update(db); err != nil {
+			return "", err
+		}
 	} else {
 		m.Sentence = ret
 	}

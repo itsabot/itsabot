@@ -35,7 +35,8 @@ type Msg struct {
 	State     map[string]interface{}
 	CreatedAt *time.Time
 	// AvaSent determines if msg is from the user or Ava
-	AvaSent bool
+	AvaSent       bool
+	NeedsTraining bool
 }
 
 type Feedback struct {
@@ -96,18 +97,18 @@ func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 
 func (m *Msg) Update(db *sqlx.DB) error {
 	q := `UPDATE messages
-	      SET sentence=$1, package=$2
-	      WHERE id=$3`
-	_, err := db.Exec(q, m.Sentence, m.Package, m.ID)
+	      SET needstraining=$1
+	      WHERE id=$2`
+	_, err := db.Exec(q, m.NeedsTraining, m.ID)
 	return err
 }
 
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, package, route, avasent)
-	      VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	      (userid, sentence, package, route, avasent, needstraining)
+	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
-		m.AvaSent)
+		m.AvaSent, m.NeedsTraining)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}

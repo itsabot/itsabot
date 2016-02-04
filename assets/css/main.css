@@ -540,6 +540,7 @@ input.form-control.form-white {
 	padding: 10px;
 	border-radius: 2px;
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+	max-width: 95%;
 }
 .messages p {
 	margin: 0 0 0.2rem 0;
@@ -585,6 +586,11 @@ input.form-control {
 	font-size: 10px;
 }
 .centered {
+	text-align: center;
+}
+.empty-state {
+	margin: 3em auto 5em auto;
+	display: block;
 	text-align: center;
 }
 @media (max-width: 320px) {
