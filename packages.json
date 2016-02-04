@@ -5,6 +5,7 @@
 		"ava_yelp": "*",
 		"ava_mechanic": "*",
 		"ava_onboard": "*",
-		"ava_purchase": "*"
+		"ava_purchase": "*",
+		"ava_settings": "*"
 	}
 }

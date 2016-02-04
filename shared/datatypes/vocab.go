@@ -47,15 +47,13 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 func (v *Vocab) HandleKeywords(m *Msg) string {
 	var resp string
 	mod := 1
-	if len(m.Sentence) == 0 {
-		for _, w := range m.Stems {
-			if v.dict[w] == nil {
-				continue
-			}
-			log.Println("found fn in stems", w, v.dict[w])
-			resp = (v.dict[w])(m, mod)
-			break
+	for _, w := range m.Stems {
+		if v.dict[w] == nil {
+			continue
 		}
+		log.Println("found fn in stems", w, v.dict[w])
+		resp = (v.dict[w])(m, mod)
+		break
 	}
 	return resp
 }
