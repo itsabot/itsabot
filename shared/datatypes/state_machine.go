@@ -179,7 +179,7 @@ func (sm *StateMachine) Reset(in *Msg) {
 	sm.resetFn(in)
 }
 
-func (sm *StateMachine) SetState(in *Msg, label string) {
+func (sm *StateMachine) SetState(in *Msg, label string) string {
 	desiredState := sm.states[label]
 
 	// If we're in a state beyond the desired state, go back. There are NO
@@ -188,7 +188,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) {
 	if sm.state > desiredState {
 		sm.state = desiredState
 		sm.stateEntered = false
-		return
+		return sm.Handlers[desiredState].OnEntry(in)
 	}
 
 	// If we're in a state before the desired state, go forward only as far
@@ -198,7 +198,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) {
 		if !ok {
 			sm.state = s
 			sm.stateEntered = false
-			return
+			return sm.Handlers[s].OnEntry(in)
 		}
 	}
 
@@ -206,4 +206,5 @@ func (sm *StateMachine) SetState(in *Msg, label string) {
 	// so reset the state and run OnEntry again
 	sm.state = desiredState
 	sm.stateEntered = false
+	return sm.Handlers[desiredState].OnEntry(in)
 }
