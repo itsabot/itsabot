@@ -69,7 +69,9 @@ func TokenizeSentence(sent string) []string {
 			continue
 		}
 		for i, j := range found {
-			tokens = append(tokens, w[:j-1])
+			if j > 0 {
+				tokens = append(tokens, w[:j-1])
+			}
 			tokens = append(tokens, string(w[j]))
 			if i+1 == len(found) {
 				tokens = append(tokens, w[j+1:])

@@ -2,11 +2,16 @@ package dt
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
+	"strconv"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 )
+
+const stateKey string = "__state"
+const stateEnteredKey string = "__state_entered"
 
 type StateMachine struct {
 	Handlers     []State
@@ -56,15 +61,14 @@ type State struct {
 // states with guards checking that each new state is valid
 type EventRequest int
 
-func NewStateMachine(pkgName string) (*StateMachine, error) {
+func NewStateMachine(pkgName string) *StateMachine {
 	sm := StateMachine{state: 0, pkgName: pkgName}
 	sm.states = map[string]int{}
-	// TODO load state from DB
 	sm.resetFn = func(*Msg) {}
 	sm.logger = log.WithFields(log.Fields{
 		"pkg": pkgName,
 	})
-	return &sm, nil
+	return &sm
 }
 
 func (sm *StateMachine) SetStates(sss ...[]State) {
@@ -86,6 +90,45 @@ func (sm *StateMachine) SetDBConn(s *sqlx.DB) {
 	sm.db = s
 }
 
+func (sm *StateMachine) LoadState(in *Msg) {
+	q := `INSERT INTO states
+	      (key, userid, value, pkgname) VALUES ($1, $2, $3, $4)
+	      ON CONFLICT (userid, key, pkgname) DO UPDATE SET value=$5
+	      RETURNING value`
+	var val []byte
+	err := sm.db.QueryRowx(q, stateKey, in.User.ID, 0, sm.pkgName,
+		sm.state).Scan(&val)
+	if err != nil && err != sql.ErrNoRows {
+		sm.logger.Errorln(err, "fetching value from states")
+		sm.state = 0
+		return
+	}
+
+	// The []byte->string->int conversion is highly inefficient and
+	// should be replaced by something faster. There's talk of such
+	// []byte->int functions being added to the stdlib.
+	//
+	// https://github.com/golang/go/issues/2632
+	tmp, err := strconv.ParseInt(string(val), 10, 64)
+	if err != nil {
+		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+			sm.state = 0
+			return
+		}
+		sm.logger.Errorln(err, "parsing state")
+	}
+	sm.state = int(tmp)
+	// Had we already entered a state?
+	sm.stateEntered = sm.GetMemory(in, stateEnteredKey).Bool()
+	sm.logger.Debugln("set state to", sm.state)
+	sm.logger.Debugln("set state entered to", sm.stateEntered)
+	return
+}
+
+func (sm *StateMachine) State() int {
+	return sm.state
+}
+
 func (sm *StateMachine) GetDBConn() *sqlx.DB {
 	return sm.db
 }
@@ -96,10 +139,9 @@ func (sm *StateMachine) SetPkgName(n string) {
 
 func (sm *StateMachine) Next(in *Msg) string {
 	h := sm.Handlers[sm.state]
-	if sm.state+1 >= len(sm.Handlers) {
-		sm.Reset(in)
-		sm.stateEntered = true
-		return h.OnEntry(in)
+	if sm.state >= len(sm.Handlers) {
+		sm.logger.Debugln("state is >= len(handlers)")
+		return ""
 	}
 	if !sm.stateEntered {
 		if h.SkipIfComplete {
@@ -109,7 +151,7 @@ func (sm *StateMachine) Next(in *Msg) string {
 				return sm.Next(in)
 			}
 		}
-		sm.stateEntered = true
+		sm.setEntered(in)
 		sm.logger.Debugln("setting state entered")
 		return h.OnEntry(in)
 	}
@@ -119,8 +161,18 @@ func (sm *StateMachine) Next(in *Msg) string {
 	done, str := h.Complete(in)
 	if done {
 		sm.logger.Debugln("state is done. going to next")
+		if sm.state+1 >= len(sm.Handlers) {
+			sm.logger.Debugln("finished states, nothing to do")
+			return ""
+		}
+		q := `UPDATE states SET value=$1 WHERE key=$2`
+		b := make([]byte, 8) // space for int64
+		binary.LittleEndian.PutUint64(b, uint64(sm.state))
+		if err, _ := sm.db.Exec(q, b, stateKey); err != nil {
+			sm.logger.Errorln(err, "updating state")
+		}
 		sm.state++
-		sm.stateEntered = true
+		sm.setEntered(in)
 		return sm.Handlers[sm.state].OnEntry(in)
 	} else if len(str) > 0 {
 		sm.logger.Debugln("incomplete with message")
@@ -128,6 +180,12 @@ func (sm *StateMachine) Next(in *Msg) string {
 	}
 	sm.logger.Debugln("reached here")
 	return ""
+}
+
+func (sm *StateMachine) setEntered(in *Msg) {
+	sm.stateEntered = true
+	sm.SetMemory(in, stateEnteredKey, true)
+	sm.logger.Warnln("set state entered!")
 }
 
 func (sm *StateMachine) OnInput(in *Msg) {
@@ -176,6 +234,8 @@ func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
 func (sm *StateMachine) Reset(in *Msg) {
 	sm.state = 0
 	sm.stateEntered = false
+	sm.SetMemory(in, stateKey, 0)
+	sm.SetMemory(in, stateEnteredKey, false)
 	sm.resetFn(in)
 }
 

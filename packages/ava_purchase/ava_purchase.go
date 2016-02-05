@@ -146,11 +146,7 @@ func main() {
 			Words:    []string{"stop"},
 		},
 	)
-	sm, err = dt.NewStateMachine(pkgName)
-	if err != nil {
-		l.Errorln(err)
-		return
-	}
+	sm = dt.NewStateMachine(pkgName)
 	sm.SetStates(
 		[]dt.State{
 			{
@@ -689,8 +685,4 @@ func getShippingAddress(in *dt.Msg) *dt.Address {
 func getBudget(in *dt.Msg) uint64 {
 	mem := sm.GetMemory(in, "budget")
 	return uint64(mem.Int64())
-}
-
-func handleKeywords(in *dt.Msg) string {
-	return ""
 }

@@ -17,10 +17,14 @@ type Settings string
 var vocab dt.Vocab
 var db *sqlx.DB
 var p *pkg.Pkg
-var sm *dt.StateMachine
 var l *log.Entry
 
 const pkgName string = "settings"
+const (
+	stateInvalid int = iota
+	stateAddCard
+	stateChangeCard
+)
 
 func main() {
 	var coreaddr string
@@ -58,14 +62,6 @@ func main() {
 				"alter"},
 		},
 	)
-	sm, err = dt.NewStateMachine(pkgName)
-	if err != nil {
-		l.Errorln(err)
-		return
-	}
-	sm.SetStates([]dt.State{})
-	sm.SetDBConn(db)
-	sm.SetLogger(l)
 	settings := new(Settings)
 	if err := p.Register(settings); err != nil {
 		l.Fatalln("registering", err)
@@ -73,48 +69,82 @@ func main() {
 }
 
 func (t *Settings) Run(in *dt.Msg, resp *string) error {
-	sm.Reset(in)
-	return t.FollowUp(in, resp)
+	sm := bootStateMachine(in)
+	sm.SetOnReset(func(in *dt.Msg) {
+		sm.SetMemory(in, "state", stateInvalid)
+	})
+	sm.SetMemory(in, "__state_entered", false)
+	return handleInput(in, resp)
 }
 
 func (t *Settings) FollowUp(in *dt.Msg, resp *string) error {
+	return handleInput(in, resp)
+}
+
+func handleInput(in *dt.Msg, resp *string) error {
+	sm := bootStateMachine(in)
+	sm.SetOnReset(func(in *dt.Msg) {
+		sm.SetMemory(in, "state", stateInvalid)
+	})
 	*resp = p.Vocab.HandleKeywords(in)
 	if len(*resp) == 0 {
+		state := int(sm.GetMemory(in, "state").Int64())
+		switch state {
+		case stateAddCard:
+			l.Debugln("setting state addCard")
+			sm.SetStates(addCard)
+		case stateChangeCard:
+			l.Debugln("setting state changeCard")
+			sm.SetStates(changeCard)
+		default:
+			l.Warnln("unrecognized state", state)
+		}
 		*resp = sm.Next(in)
 	}
 	return nil
 }
 
 func kwAddCard(in *dt.Msg, _ int) string {
-	sm.SetStates(
-		[]dt.State{
-			{
-				OnEntry: func(in *dt.Msg) string {
-					return "Sure. You can add your card here: https://avabot.co/?/cards/new"
-				}, OnInput: func(in *dt.Msg) {
-				},
-				Complete: func(in *dt.Msg) (bool, string) {
-					return true, ""
-				},
-			},
-		},
-	)
-	return sm.Next(in)
+	sm := bootStateMachine(in)
+	sm.SetMemory(in, "state", stateAddCard)
+	l.Warnln("kwAddCard hit")
+	return ""
 }
 
 func kwChangeCard(in *dt.Msg, _ int) string {
-	sm.SetStates(
-		[]dt.State{
-			{
-				OnEntry: func(in *dt.Msg) string {
-					return "Sure. You can change your cards here: https://avabot.co/?/profile"
-				}, OnInput: func(in *dt.Msg) {
-				},
-				Complete: func(in *dt.Msg) (bool, string) {
-					return true, ""
-				},
-			},
+	sm := bootStateMachine(in)
+	sm.SetMemory(in, "state", stateChangeCard)
+	return ""
+}
+
+func bootStateMachine(in *dt.Msg) *dt.StateMachine {
+	sm := dt.NewStateMachine(pkgName)
+	sm.SetDBConn(db)
+	sm.SetLogger(l)
+	sm.LoadState(in)
+	return sm
+}
+
+var addCard []dt.State = []dt.State{
+	{
+		OnEntry: func(in *dt.Msg) string {
+			return "Sure. You can add your card securely here: https://avabot.co/?/cards/new"
+		}, OnInput: func(in *dt.Msg) {
 		},
-	)
-	return sm.Next(in)
+		Complete: func(in *dt.Msg) (bool, string) {
+			return true, ""
+		},
+	},
+}
+
+var changeCard []dt.State = []dt.State{
+	{
+		OnEntry: func(in *dt.Msg) string {
+			return "Sure. You can change your cards securely here: https://avabot.co/?/profile"
+		}, OnInput: func(in *dt.Msg) {
+		},
+		Complete: func(in *dt.Msg) (bool, string) {
+			return true, ""
+		},
+	},
 }
