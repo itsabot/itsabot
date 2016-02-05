@@ -136,7 +136,6 @@ func handlerMain(c *echo.Context) error {
 	c.Set("flexidtype", c.Form("flexidtype"))
 	c.Set("uid", c.Form("uid"))
 	ret, err := processText(c)
-
 	if err != nil {
 		return err
 	}

@@ -31,6 +31,7 @@ var db *sqlx.DB
 var tc *twilio.Client
 var mc *dt.MailClient
 var ner nlp.Classifier
+var offensive map[string]struct{}
 var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 var (
 	ErrInvalidCommand    = errors.New("invalid command")
@@ -95,6 +96,10 @@ func startServer() {
 	if err != nil {
 		log.Errorln("loading classifier", err)
 	}
+	offensive, err = buildOffensiveMap()
+	if err != nil {
+		log.Errorln("building offensive map", err)
+	}
 	log.Infoln("booting ava http server")
 	e := echo.New()
 	initRoutes(e)
@@ -105,18 +110,15 @@ func startServer() {
 // the server address
 func bootRPCServer() (addr string, err error) {
 	log.Debugln("booting ava core rpc server")
-
 	ava := new(Ava)
 	if err = rpc.Register(ava); err != nil {
 		return
 	}
-
 	var ln net.Listener
 	if ln, err = net.Listen("tcp", ":0"); err != nil {
 		return
 	}
 	addr = ln.Addr().String()
-
 	go func() {
 		for {
 			conn, err := ln.Accept()
@@ -126,7 +128,6 @@ func bootRPCServer() (addr string, err error) {
 			go rpc.ServeConn(conn)
 		}
 	}()
-
 	return // using named return params
 }
 
@@ -189,10 +190,20 @@ func processText(c *echo.Context) (string, error) {
 	if err = msg.Save(db); err != nil {
 		return "", err
 	}
-	log.Debugln("followup?", followup)
-	ret, err := callPkg(pkg, msg, followup)
-	if err != nil {
-		return "", err
+	ret := respondWithOffense(offensive, msg)
+	if len(ret) == 0 {
+		log.Debugln("followup?", followup)
+		ret, err = callPkg(pkg, msg, followup)
+		if err != nil {
+			return "", err
+		}
+		responseNeeded := true
+		if len(ret) == 0 {
+			responseNeeded, ret = respondWithNicety(msg)
+		}
+		if !responseNeeded {
+			return "", nil
+		}
 	}
 	log.Debugln("here...", ret)
 	m := &dt.Msg{}
