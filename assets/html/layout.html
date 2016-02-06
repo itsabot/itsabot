@@ -7,6 +7,7 @@
 	<link rel="stylesheet" href="/public/css/main.css">
 	<link href='https://fonts.googleapis.com/css?family=PT+Serif:400,400italic|700italic|Montserrat:400,700' rel='stylesheet' type='text/css'>
 	<script type="text/javascript" src="https://js.stripe.com/v2/"></script>
+	<script src="https://apis.google.com/js/client:platform.js" defer async></script>
 	<script type="text/javascript">
 		Stripe.setPublishableKey("{{.StripeKey}}");
 	</script>
@@ -14,6 +15,7 @@
 </head>
 
 <body>
+<div id="result"></div>
 </body>
 
 </html>

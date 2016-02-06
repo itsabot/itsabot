@@ -1,6 +1,7 @@
 m.route.mode = "search";
 
 window.onload = function() {
+	start();
 	m.route(document.body, "/", {
 		"/": Index,
 		"/tour": Tour,

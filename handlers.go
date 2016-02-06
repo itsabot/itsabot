@@ -23,6 +23,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/card"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
+	"github.com/avabot/ava/shared/cal"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/sms"
 )
@@ -57,6 +58,10 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
 	e.Get("/api/conversations.json", handlerAPIConversations)
 	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
+
+	// OAuth routes
+	e.Post("/oauth/connect/gcal.json", handlerOAuthConnectGoogleCalendar)
+	e.Post("/oauth/disconnect/gcal.json", handlerOAuthDisconnectGoogleCalendar)
 }
 
 func handlerIndex(c *echo.Context) error {
@@ -726,6 +731,74 @@ func handlerAPIPreviewCmd(c *echo.Context) error {
 	_, err = callPkg(pkg, msg, followup)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func handlerOAuthConnectGoogleCalendar(c *echo.Context) error {
+	var req struct {
+		UserID uint64
+		Code   string
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	accessToken, idToken, err := cal.Exchange(req.Code)
+	if err != nil {
+		return jsonError(err)
+	}
+	gID, err := cal.DecodeIdToken(idToken)
+	if err != nil {
+		return jsonError(err)
+	}
+	q := `INSERT INTO sessions (userid, label, token) VALUES ($1, $2, $3)
+	      ON CONFLICT (userid, label) DO UPDATE SET token=$3`
+	_, err = db.Exec(q, req.UserID, "gcal_token", accessToken)
+	if err != nil {
+		return jsonError(err)
+	}
+	_, err = db.Exec(q, req.UserID, "gcal_id", gID)
+	if err != nil {
+		return jsonError(err)
+	}
+	client, err := cal.Client(db, req.UserID)
+	if err != nil {
+		return jsonError(err)
+	}
+	if err = cal.Events(client); err != nil {
+		return jsonError(err)
+	}
+	if err := c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerOAuthDisconnectGoogleCalendar(c *echo.Context) error {
+	var req struct {
+		UserID uint64
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	var token string
+	q := `SELECT token FROM sessions WHERE userid=$1 AND label='gcal_token'`
+	if err := db.Get(&token, q, req.UserID); err != nil {
+		return jsonError(err)
+	}
+	// Execute HTTP GET request to revoke current token
+	url := "https://accounts.google.com/o/oauth2/revoke?token=" + token
+	resp, err := http.Get(url)
+	if err != nil {
+		return jsonError(err)
+	}
+	defer resp.Body.Close()
+	q = `DELETE FROM sessions WHERE userid=$1 AND label='gcal_token'`
+	if _, err = db.Exec(q, req.UserID); err != nil {
+		return jsonError(err)
+	}
+	if err := c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
 	}
 	return nil
 }

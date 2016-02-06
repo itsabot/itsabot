@@ -86,10 +86,18 @@ TrainIndex.viewFull = function(ctrl) {
 							])
 						])
 					}
-				}()
+				}(),
+				m("button", {
+					id: "signinButton",
+					onclick: oauth
+				}, "Sign in with Google")
 			])
 		])
 	]);
+};
+
+var oauth = function() {
+	auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(signInCallback);
 };
 
 var TrainIndexItem = {

@@ -2273,6 +2273,36 @@ var m = (function app(window, undefined) {
 
 if (typeof module != "undefined" && module !== null && module.exports) module.exports = m;
 else if (typeof define === "function" && define.amd) define(function() {return m});
+var auth2;
+function start() {
+	gapi.load("auth2", function() {
+		auth2 = gapi.auth2.init({
+			client_id: "706975164052-s1tu2v5p2f7vnioee45bh3qbonkfe8qh.apps.googleusercontent.com",
+			scope: "https://www.googleapis.com/auth/calendar"
+		});
+	});
+}
+function signInCallback(authResult) {
+	if (authResult["code"]) {
+		console.log(authResult["code"]);
+		m.request({
+			method: "POST",
+			url: window.location.origin + "/oauth/connect/gcal.json",
+			data: {
+				Code: authResult["code"],
+				UserID: parseInt(cookie.getItem("id")),
+			},
+		}).then(function() {
+			console.log("success");
+		}, function(err) {
+			console.error("err here");
+			console.error(err);
+		});
+	} else {
+		console.error("something went wrong");
+	}
+}
+
 var Phone = function() {
 	var _this = this;
 	_this.number = m.prop("");
@@ -2675,6 +2705,7 @@ ResetPassword.viewFull = function() {
 m.route.mode = "search";
 
 window.onload = function() {
+	start();
 	m.route(document.body, "/", {
 		"/": Index,
 		"/tour": Tour,
@@ -3098,10 +3129,18 @@ TrainIndex.viewFull = function(ctrl) {
 							])
 						])
 					}
-				}()
+				}(),
+				m("button", {
+					id: "signinButton",
+					onclick: oauth
+				}, "Sign in with Google")
 			])
 		])
 	]);
+};
+
+var oauth = function() {
+	auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(signInCallback);
 };
 
 var TrainIndexItem = {
