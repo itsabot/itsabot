@@ -13,7 +13,12 @@ var TrainIndex = {
 	}
 };
 TrainIndex.controller = function() {
+	if (!isLoggedIn()) {
+		m.route("/login?r=" + encodeURIComponent(window.location.search));
+			return;
+	}
 	var userId = cookie.getItem("id");
+	var showSuccess = Boolean(m.route.param("trained"));
 	return {
 		// [
 		//		{
@@ -25,7 +30,8 @@ TrainIndex.controller = function() {
 		//			...
 		//		}
 		// ]
-		data: TrainIndex.loadConversations()
+		data: TrainIndex.loadConversations(),
+		success: showSuccess,
 	};
 };
 TrainIndex.view = function(ctrl) {
@@ -57,6 +63,13 @@ TrainIndex.viewFull = function(ctrl) {
 			m("div", {
 				class: "col-md-12 margin-top-sm"
 			}, [
+				function() {
+					if (ctrl.success) {
+						return m("div", {
+							class: "alert alert-success",
+						}, "Success! Conversation marked as complete")
+					}
+				}(),
 				function() {
 					if (ctrl.data() === null) {
 						return m("h3", {
@@ -106,6 +119,10 @@ var TrainShow = {
 	}
 };
 TrainShow.controller = function() {
+	if (!isLoggedIn()) {
+		m.route("/login?r=" + encodeURIComponent(window.location.search));
+		return;
+	}
 	var ctrl = this;
 	var id = m.route.param("id");
 	var userId = m.route.param("uid");
@@ -309,6 +326,19 @@ TrainShow.vm = {
 };
 TrainShow.newChatWindow = function() {
 	this.chatWindowsOpen(this.chatWindowsOpen()+1);
+};
+TrainShow.confirmComplete = function() {
+	if (confirm("Are you sure you want to mark the conversation as complete? You won't be able to message the user again.")) {
+		var userId = cookie.getItem("id");
+		m.request({
+			method: "PATCH",
+			url: "/api/conversation.json?uid=" + userId,
+		}).then(function() {
+			m.route("/train?trained=true");
+		}, function(err) {
+			console.error(err);
+		});
+	}
 };
 
 var Chatbox = {};
@@ -605,3 +635,8 @@ CalendarSelector.backward = function() {
 // TODO Suggestion
 //
 //
+
+var isLoggedIn = function() {
+	var userId = cookie.getItem("id");
+	return userId != null && parseInt(userId) > 0;
+};

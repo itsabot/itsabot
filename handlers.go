@@ -53,6 +53,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
 	e.Get("/api/conversation.json", handlerAPIConversationsShow)
+	e.Patch("/api/conversation.json", handlerAPIConversationsComplete)
 	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
 	e.Get("/api/conversations.json", handlerAPIConversations)
 	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
@@ -590,6 +591,16 @@ func handlerAPIConversations(c *echo.Context) error {
 		return jsonError(err)
 	}
 	return nil
+}
+
+func handlerAPIConversationsComplete(c *echo.Context) error {
+	uid, err := strconv.Atoi(c.Query("uid"))
+	if err != nil {
+		return jsonError(err)
+	}
+	q := `UPDATE messages SET needstraining=FALSE WHERE userid=$1`
+	_, err = db.Exec(q, uid)
+	return err
 }
 
 func handlerAPIConversationsShow(c *echo.Context) error {

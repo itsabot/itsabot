@@ -20,7 +20,10 @@ var Login = {
 			}
 			cookie.setItem("id", data.Id, exp, null, null, secure);
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
-			m.route("/profile");
+			if (m.route.param("r") == null) {
+				return m.route("/profile");
+			}
+			m.route(decodeURIComponent(m.route.param("r")).substr(1));
 		}, function(err) {
 			Login.vm.showError(err.Msg);
 		});
