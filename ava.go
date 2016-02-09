@@ -168,7 +168,7 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 
 func processText(c *echo.Context) (string, error) {
 	msg, err := preprocess(c)
-	if err != nil || msg == nil /* trained */ {
+	if err != nil {
 		log.WithField("fn", "preprocessForMessage").Error(err)
 		return "", err
 	}
@@ -247,11 +247,14 @@ func validateParams(c *echo.Context) (uint64, string, int) {
 	}
 	if len(tmp) > 0 {
 		uid, err = strconv.ParseUint(tmp, 10, 64)
-		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
 			uid = 0
 		} else if err != nil {
 			log.WithField("fn", "validateParams").Fatalln(err)
 		}
+	}
+	if uid > 0 {
+		return uid, "", 0
 	}
 	tmp, ok = c.Get("flexid").(string)
 	if !ok {

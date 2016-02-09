@@ -8,12 +8,6 @@ import (
 	"github.com/avabot/ava/shared/language"
 )
 
-const (
-	addressStateNone float64 = iota
-	addressStateAskUser
-	addressStateGetName
-)
-
 func getAddress(sm *dt.StateMachine, label string) []dt.State {
 	db := sm.GetDBConn()
 	return []dt.State{

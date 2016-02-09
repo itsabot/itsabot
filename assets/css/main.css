@@ -593,6 +593,9 @@ input.form-control {
 	display: block;
 	text-align: center;
 }
+.btn-oauth-signin:hover {
+	opacity: 0.8;
+}
 @media (max-width: 320px) {
 	#btns .btn {
 		margin-left: 0 !important;

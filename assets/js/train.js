@@ -86,18 +86,10 @@ TrainIndex.viewFull = function(ctrl) {
 							])
 						])
 					}
-				}(),
-				m("button", {
-					id: "signinButton",
-					onclick: oauth
-				}, "Sign in with Google")
+				}()
 			])
 		])
 	]);
-};
-
-var oauth = function() {
-	auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(signInCallback);
 };
 
 var TrainIndexItem = {
@@ -348,6 +340,19 @@ TrainShow.confirmComplete = function() {
 		});
 	}
 };
+TrainShow.confirmAddCalendar = function() {
+	if (confirm("Are you sure you want to have the user add a calendar?")) {
+		m.request({
+			method: "POST",
+			url: "/main.json?cmd=add calendar&uid=" + cookie.getItem("id"),
+		}).then(function(res) {
+			m.route("/train/" + m.route.param("id") +
+					"?uid=" + m.route.param("uid"));
+		}, function(err) {
+			console.error(err);
+		});
+	}
+};
 
 var Chatbox = {};
 Chatbox.controller = function(args) {
@@ -389,11 +394,6 @@ Chatbox.view = function(ctrl) {
 		})
 	]);
 };
-/*
-Chatbox.vm = {
-	showAvaMsg: function(sentence) {}
-};
-*/
 Chatbox.handleSend = function(ev) {
 	if (ev.keyCode === 13 /* enter */ && !ev.shiftKey) {
 		ev.preventDefault();

@@ -44,6 +44,7 @@ func initRoutes(e *echo.Echo) {
 
 	// API routes
 	e.Post("/", handlerMain)
+	e.Post("/main.json", handlerJSON)
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
@@ -58,6 +59,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
 	e.Get("/api/conversations.json", handlerAPIConversations)
 	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
+	e.Post("/api/trigger.json", handlerAPITriggerPkg)
 
 	// OAuth routes
 	e.Post("/oauth/connect/gcal.json", handlerOAuthConnectGoogleCalendar)
@@ -147,6 +149,82 @@ func handlerMain(c *echo.Context) error {
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
 		return err
+	}
+	return nil
+}
+
+func handlerJSON(c *echo.Context) error {
+	c.Set("cmd", c.Form("cmd"))
+	c.Set("flexid", c.Form("flexid"))
+	c.Set("flexidtype", c.Form("flexidtype"))
+	c.Set("uid", c.Form("uid"))
+	msg, err := preprocess(c)
+	if err != nil {
+		return jsonError(err)
+	}
+	pkg, route, _, err := getPkg(msg)
+	if err != nil {
+		log.WithField("fn", "getPkg").Error(err)
+		return jsonError(err)
+	}
+	msg.Route = route
+	if pkg == nil {
+		msg.Package = ""
+	} else {
+		msg.Package = pkg.P.Config.Name
+	}
+	ret, err := callPkg(pkg, msg, false)
+	if err != nil {
+		return jsonError(err)
+	}
+	if len(ret) == 0 {
+		log.Errorln("missing trigger/package for command", c.Get("cmd"))
+		return nil
+	}
+	m := &dt.Msg{}
+	m.AvaSent = true
+	m.User = msg.User
+	m.Sentence = ret
+	if pkg != nil {
+		m.Package = pkg.P.Config.Name
+	}
+	if err = m.Save(db); err != nil {
+		return jsonError(err)
+	}
+	resp := struct {
+		Msg string
+	}{Msg: ret}
+	if err = c.JSON(http.StatusOK, resp); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPITriggerPkg(c *echo.Context) error {
+	log.Debugln("c", c.Get("cmd"))
+	msg, err := preprocess(c)
+	if err != nil {
+		log.WithField("fn", "preprocessForMessage").Error(err)
+		return jsonError(err)
+	}
+	pkg, route, _, err := getPkg(msg)
+	if err != nil {
+		log.WithField("fn", "getPkg").Error(err)
+		return jsonError(err)
+	}
+	msg.Route = route
+	if pkg == nil {
+		msg.Package = ""
+	} else {
+		msg.Package = pkg.P.Config.Name
+	}
+	ret, err := callPkg(pkg, msg, false)
+	if err != nil {
+		return jsonError(err)
+	}
+	resp := struct{ Msg string }{Msg: ret}
+	if err = c.JSON(http.StatusOK, resp); err != nil {
+		return jsonError(err)
 	}
 	return nil
 }

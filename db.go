@@ -48,18 +48,15 @@ func updateTraining(trainID int, hitID string, maxAssignments uint) error {
 func getUser(uid uint64, fid string, fidT flexIDType) (*dt.User, error) {
 	if uid == 0 {
 		fidT = fidtPhone // XXX temporary. we only have phone numbers atm
-
 		if fid == "" {
 			return nil, ErrMissingFlexID
 		} else if fidT == fidtInvalid {
 			return nil, ErrInvalidFlexIDType
 		}
-
 		q := `SELECT userid
 		      FROM userflexids
 		      WHERE flexid=$1 AND flexidtype=$2
 		      ORDER BY createdat DESC`
-
 		if err := db.Get(&uid, q, fid, fidT); err != nil {
 			if err == sql.ErrNoRows {
 				return nil, dt.ErrMissingUser
@@ -67,7 +64,6 @@ func getUser(uid uint64, fid string, fidT flexIDType) (*dt.User, error) {
 			return nil, err
 		}
 	}
-
 	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
 	      FROM users
 	      WHERE id=$1`

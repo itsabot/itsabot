@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"google.golang.org/api/calendar/v3"
+	"github.com/avabot/ava/Godeps/_workspace/src/google.golang.org/api/calendar/v3"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/google"
-	"github.com/jmoiron/sqlx"
-	"golang.org/x/net/context"
 )
 
 // config is the configuration specification supplied to the OAuth package.

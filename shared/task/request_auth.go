@@ -1,17 +1,8 @@
 package task
 
 import (
-	"database/sql"
 	"errors"
-	"fmt"
-	"log"
-	"os"
 	"regexp"
-
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/charge"
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
-	"github.com/avabot/ava/shared/datatypes"
 )
 
 var regexNum = regexp.MustCompile(`\d+`)
@@ -41,6 +32,8 @@ const (
 	MethodWebLogin
 )
 
+// TODO convert to new API
+/*
 // RequestAuth ensures you're speaking to the correct user. Select the LOWEST
 // level of authentication you'll allow based on a tolerance for fraud weighed
 // against the convenience of the user experience. Methods are organized in
@@ -280,3 +273,4 @@ func (t *Task) makePurchase(m dt.Method, p *dt.Purchase) (bool, error) {
 	}
 	return true, nil
 }
+*/

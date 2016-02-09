@@ -2276,33 +2276,24 @@ else if (typeof define === "function" && define.amd) define(function() {return m
 var auth2;
 function start() {
 	gapi.load("auth2", function() {
-		auth2 = gapi.auth2.init({
-			client_id: "706975164052-s1tu2v5p2f7vnioee45bh3qbonkfe8qh.apps.googleusercontent.com",
-			scope: "https://www.googleapis.com/auth/calendar"
-		});
+		auth2 = gapi.auth2.getAuthInstance();
+		if (auth2 === null) {
+			gapi.auth2.init({
+				client_id: "706975164052-s1tu2v5p2f7vnioee45bh3qbonkfe8qh.apps.googleusercontent.com",
+				scope: "https://www.googleapis.com/auth/calendar"
+			}).then(function(a) {
+				auth2 = a;
+				if (auth2.isSignedIn.get()) {
+					var email = auth2.currentUser.get().getBasicProfile().
+						getEmail();
+					Profile.vm.toggleGoogleAccount(email);
+				}
+			}, function(err) {
+				console.log("err here");
+			});
+		}
 	});
 }
-function signInCallback(authResult) {
-	if (authResult["code"]) {
-		console.log(authResult["code"]);
-		m.request({
-			method: "POST",
-			url: window.location.origin + "/oauth/connect/gcal.json",
-			data: {
-				Code: authResult["code"],
-				UserID: parseInt(cookie.getItem("id")),
-			},
-		}).then(function() {
-			console.log("success");
-		}, function(err) {
-			console.error("err here");
-			console.error(err);
-		});
-	} else {
-		console.error("something went wrong");
-	}
-}
-
 var Phone = function() {
 	var _this = this;
 	_this.number = m.prop("");
@@ -2375,14 +2366,12 @@ var Profile = {
 
 Profile.controller = function() {
 	var userId = cookie.getItem("id");
-	console.log(userId);
 	if (userId === null || userId <= 0) {
 		cookie.removeItem("id");
 		cookie.removeItem("session_token");
 		return m.route("/login");
 	}
 	var redirect = m.route.param("r");
-	console.log(redirect);
 	if (redirect != null) {
 		m.route("/" + redirect.substring(1));
 	}
@@ -2531,11 +2520,98 @@ Profile.viewFull = function(controller) {
 								}, "+Add Card")
 							])
 						])
+					]),
+					m("h3", {
+						class: "margin-top-sm"
+					}, "Calendars"),
+					m("div", {
+						class: "form-group card"
+					}, [
+						m("div", [
+							m("div", {
+								id: "oauth-google-success",
+								class: "hidden",
+							}, [
+								m("a[href=#/]", {
+									id: "oauth-google-success-a",
+									onclick: googleRevoke,
+								}, "Google"), 
+							]),
+							m("input", {
+								id: "signinButton",
+								class: "btn-oauth-signin",
+								type: "image",
+								src: "/public/images/btn_google_signin_light_normal_web.png",
+								onclick: googleOAuth
+							}, "Sign in with Google"),
+						])
 					])
+
 				])
 			])
 		])
 	]);
+};
+
+Profile.vm = {
+	toggleGoogleAccount: function(name) {
+		if (Profile.vm.googleLink() == null) {
+			// Not on the Profile page. This function is called globally on
+			// Google's script loading, so it isn't dependent on any route.
+			// Ultimately Google's script should only load on the Profile route,
+			// which eliminates the need for this check
+			return;
+		}
+		if (name == null) {
+			Profile.vm.googleLink.text = "Google";
+		} else {
+			Profile.vm.googleLink.text = "Google - " + name;
+		}
+		document.getElementById("signinButton").classList.toggle("hidden");
+		document.getElementById("oauth-google-success").classList.
+			toggle("hidden");
+	},
+	googleLink: function() {
+		return document.getElementById("oauth-google-success-a");
+	}
+};
+
+var googleOAuth = function(ev) {
+	ev.preventDefault();
+	auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).
+		then(signInCallback, function(err) {
+			console.log("ERR HERE");
+			console.log(err);
+		});
+};
+
+var signInCallback = function(authResult) {
+	if (authResult["code"]) {
+		m.request({
+			method: "POST",
+			url: window.location.origin + "/oauth/connect/gcal.json",
+			data: {
+				Code: authResult["code"],
+				UserID: parseInt(cookie.getItem("id")),
+			},
+		}).then(function() {
+			var email = auth2.currentUser.get().getBasicProfile().getEmail();
+			Profile.vm.toggleGoogleAccount(email);
+		}, function(err) {
+			console.error(err);
+		});
+	} else {
+		console.error("something went wrong");
+	}
+};
+
+var googleRevoke = function(ev) {
+	ev.preventDefault();
+	if (confirm("Disconnect Google?")) {
+		gapi.auth2.getAuthInstance().disconnect();
+		gapi.auth2.getAuthInstance().signOut();
+		Profile.vm.toggleGoogleAccount();
+	}
 };
 var ResetPassword = {
 	submit: function(ev) {
@@ -3129,18 +3205,10 @@ TrainIndex.viewFull = function(ctrl) {
 							])
 						])
 					}
-				}(),
-				m("button", {
-					id: "signinButton",
-					onclick: oauth
-				}, "Sign in with Google")
+				}()
 			])
 		])
 	]);
-};
-
-var oauth = function() {
-	auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(signInCallback);
 };
 
 var TrainIndexItem = {
@@ -3391,6 +3459,19 @@ TrainShow.confirmComplete = function() {
 		});
 	}
 };
+TrainShow.confirmAddCalendar = function() {
+	if (confirm("Are you sure you want to have the user add a calendar?")) {
+		m.request({
+			method: "POST",
+			url: "/main.json?cmd=add calendar&uid=" + cookie.getItem("id"),
+		}).then(function(res) {
+			m.route("/train/" + m.route.param("id") +
+					"?uid=" + m.route.param("uid"));
+		}, function(err) {
+			console.error(err);
+		});
+	}
+};
 
 var Chatbox = {};
 Chatbox.controller = function(args) {
@@ -3432,11 +3513,6 @@ Chatbox.view = function(ctrl) {
 		})
 	]);
 };
-/*
-Chatbox.vm = {
-	showAvaMsg: function(sentence) {}
-};
-*/
 Chatbox.handleSend = function(ev) {
 	if (ev.keyCode === 13 /* enter */ && !ev.shiftKey) {
 		ev.preventDefault();

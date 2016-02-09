@@ -24,6 +24,7 @@ const (
 	stateInvalid int = iota
 	stateAddCard
 	stateChangeCard
+	stateChangeCalendar
 )
 
 func main() {
@@ -61,6 +62,11 @@ func main() {
 			Words: []string{"change", "modify", "delete", "switch",
 				"alter"},
 		},
+		dt.VocabHandler{
+			Fn:       kwChangeCalendar,
+			WordType: "Object",
+			Words:    []string{"calendar", "cal", "schedule", "rota"},
+		},
 	)
 	settings := new(Settings)
 	if err := p.Register(settings); err != nil {
@@ -96,6 +102,9 @@ func handleInput(in *dt.Msg, resp *string) error {
 		case stateChangeCard:
 			l.Debugln("setting state changeCard")
 			sm.SetStates(changeCard)
+		case stateChangeCalendar:
+			l.Debugln("setting state changeCalendar")
+			sm.SetStates(changeCalendar)
 		default:
 			l.Warnln("unrecognized state", state)
 		}
@@ -117,6 +126,12 @@ func kwChangeCard(in *dt.Msg, _ int) string {
 	return ""
 }
 
+func kwChangeCalendar(in *dt.Msg, _ int) string {
+	sm := bootStateMachine(in)
+	sm.SetMemory(in, "state", stateChangeCalendar)
+	return ""
+}
+
 func bootStateMachine(in *dt.Msg) *dt.StateMachine {
 	sm := dt.NewStateMachine(pkgName)
 	sm.SetDBConn(db)
@@ -130,6 +145,19 @@ var addCard []dt.State = []dt.State{
 		OnEntry: func(in *dt.Msg) string {
 			return "Sure. You can add your card securely here: https://avabot.co/?/cards/new"
 		}, OnInput: func(in *dt.Msg) {
+		},
+		Complete: func(in *dt.Msg) (bool, string) {
+			return true, ""
+		},
+	},
+}
+
+var changeCalendar []dt.State = []dt.State{
+	{
+		OnEntry: func(in *dt.Msg) string {
+			return "You can connect your Google calendar on your profile: https://avabot.co/?/profile"
+		},
+		OnInput: func(in *dt.Msg) {
 		},
 		Complete: func(in *dt.Msg) (bool, string) {
 			return true, ""
