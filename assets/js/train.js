@@ -127,10 +127,18 @@ TrainShow.controller = function() {
 	var id = m.route.param("id");
 	var userId = m.route.param("uid");
 	ctrl.chatWindowsOpen = m.prop(1);
-	ctrl.data = TrainShow.loadConversation(id, userId);
-	// {
-	//		ID, []Chats (sorted), []Packages, []UserPreferences
-	// }
+	ctrl.data = {
+		Username: m.prop(""),
+		Addresses: m.prop([]),
+		Calendars: m.prop([]),
+		Cards: m.prop([]),
+		Messages: m.prop([]),
+		Preferences: m.prop([]),
+	};
+	TrainShow.loadConversation(id, userId).then(function(resp) {
+		ctrl.data.Messages(resp.Chats);
+		ctrl.data.Username(resp.Username);
+	});
 	return ctrl;
 };
 TrainShow.view = function(ctrl) {
@@ -175,7 +183,7 @@ TrainShow.viewFull = function(ctrl) {
 				class: "col-md-4",
 			}, [
 				m("div", [
-					m.component(Chatbox, ctrl.data())
+					m.component(Chatbox, ctrl.data),
 				]),
 			]),
 			function() {
@@ -204,7 +212,7 @@ TrainShow.viewFull = function(ctrl) {
 							id: "calendar-selector",
 							class: "margin-sm hidden"
 						}, [
-							m.component(CalendarSelector, ctrl.data())
+							m.component(CalendarSelector, ctrl.data)
 						])
 					]),
 					m("li", [
@@ -218,11 +226,9 @@ TrainShow.viewFull = function(ctrl) {
 							m("div", { class: "margin-left" }, [
 								m("ul", { class: "list-unstyled" }, [
 									function() {
-										if (ctrl.data() != null && ctrl.data().Preferences != null) {
-											ctrl.data().Preferences.map(function(item) {
-												return m("li", item);
-											})
-										}
+										ctrl.data.Preferences().map(function(item) {
+											return m("li", item);
+										})
 									}()
 								]),
 								m("a[href=#/]", {
@@ -260,21 +266,45 @@ TrainShow.viewFull = function(ctrl) {
 							m("ul", { class: "list-unstyled" }, [
 								m("li", [
 									"Credit card: ",
-									m("span", { class: "green-text" }, "Amex (9999)"),
+									function() {
+										if (ctrl.data.Cards().length > 0) {
+											return d.Addresses().map(function(item) {
+												return m("span", { class: "green-text" }, item + " ");
+											})
+										} else {
+											return m("span", { class: "red-text" }, "None");
+										}
+									}(),
 									m("a[href=#/]", {
-										onclick: TrainShow.confirmAddCreditCard,
+										onclick: TrainShow.confirmAddCreditCard.bind(ctrl),
 									}, " (Add)"),
 								]),
 								m("li", [
 									"Shipping addresses: ",
-									m("span", { class: "green-text" }, "Home (1418 7th St)"),
+									function() {
+										if (ctrl.data.Addresses().length > 0) {
+											return d.Addresses().map(function(item) {
+												return m("span", { class: "green-text" }, item + " ");
+											})
+										} else {
+											return m("span", { class: "red-text" }, "None");
+										}
+									}(),
 									m("a[href=#/]", {
 										onclick: TrainShow.confirmAddShippingAddr,
 									}, " (Add)"),
 								]),
 								m("li", [
 									"Calendar: ",
-									m("span", { class: "red-text" }, "None"),
+									function() {
+										if (ctrl.data.Calendars().length > 0) {
+											return d.Calendars().map(function(item) {
+												return m("span", { class: "green-text" }, item + " ");
+											})
+										} else {
+											return m("span", { class: "red-text" }, "None");
+										}
+									}(),
 									m("a[href=#/]", {
 										onclick: TrainShow.confirmAddCalendar,
 									}, " (Add)"),
@@ -341,10 +371,42 @@ TrainShow.confirmComplete = function() {
 	}
 };
 TrainShow.confirmAddCalendar = function() {
+	var ctrl = this;
 	if (confirm("Are you sure you want to have the user add a calendar?")) {
 		m.request({
 			method: "POST",
 			url: "/main.json?cmd=add calendar&uid=" + cookie.getItem("id"),
+		}).then(function(res) {
+		}, function(err) {
+			console.error(err);
+		});
+	}
+};
+TrainShow.confirmAddCreditCard = function() {
+	var ctrl = this;
+	if (confirm("Are you sure you want to have the user add a credit card?")) {
+		m.request({
+			method: "POST",
+			url: "/main.json?cmd=add credit card&uid=" + cookie.getItem("id"),
+		}).then(function(res) {
+			console.log("updating data");
+			TrainShow.loadConversation(m.route.param("id"), m.route.param("uid")).then(function(resp) {
+				ctrl.data.Messages([]);
+				setTimeout(function() {
+					ctrl.data.Messages(resp.Chats);
+					m.redraw(true);
+				}, 0);
+			});
+		}, function(err) {
+			console.error(err);
+		});
+	}
+};
+TrainShow.confirmAddShippingAddr = function() {
+	if (confirm("Are you sure you want to have the user add a shipping address?")) {
+		m.request({
+			method: "POST",
+			url: "/main.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
 		}).then(function(res) {
 			m.route("/train/" + m.route.param("id") +
 					"?uid=" + m.route.param("uid"));
@@ -356,32 +418,30 @@ TrainShow.confirmAddCalendar = function() {
 
 var Chatbox = {};
 Chatbox.controller = function(args) {
-	//		ID, []Chats (sorted), []Packages, []UserPreferences
-	args = args || { Conversations: [] };
-	return {
-		Username: args.Username,
-		Conversations: args.Conversations
-	};
+	var d = {};
+	d.Username = args.Username;
+	d.Messages = args.Messages;
+	return d;
 };
-Chatbox.view = function(ctrl) {
+Chatbox.view = function(ctrl, args) {
 	return m("div", { class: "chat-container" }, [
 		m("input", {
 			type: "text",
 			class: "disabled",
 			placeholder: "To:",
-			value: ctrl.Username || ""
+			value: ctrl.Username,
 		}),
 		m("ol", {
 			id: "chat-box",
 			class: "chat-box",
-			config: Chatbox.scrollToBottom
+			config: Chatbox.scrollToBottom,
 		}, [
-			ctrl.Conversations.map(function(c) {
+			ctrl.Messages().map(function(c) {
 				var d = {
 					Username: ctrl.Username,
 					Sentence: c.Sentence,
 					AvaSent: c.AvaSent,
-					CreatedAt: c.CreatedAt
+					CreatedAt: c.CreatedAt,
 				};
 				return m.component(ChatboxItem, d);
 			})
@@ -390,7 +450,7 @@ Chatbox.view = function(ctrl) {
 			class: "chat-textarea",
 			rows: 4,
 			placeholder: "Your message",
-			onkeydown: Chatbox.handleSend
+			onkeydown: Chatbox.handleSend,
 		})
 	]);
 };
@@ -432,6 +492,7 @@ Chatbox.send = function(uid, sentence) {
 
 var ChatboxItem = {
 	controller: function(args) {
+		console.log("controller: " + args.Sentence);
 		return {
 			Sentence: args.Sentence,
 			CreatedAt: args.CreatedAt,
@@ -440,6 +501,7 @@ var ChatboxItem = {
 		};
 	},
 	view: function(ctrl) {
+		console.log("view: " + ctrl.Sentence);
 		var c, u;
 		if (ctrl.AvaSent) {
 			c = "chat-ava";

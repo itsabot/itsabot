@@ -731,18 +731,67 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 		prefs = append(prefs, p.Key+": "+
 			strings.ToUpper(p.Value[:1])+p.Value[1:])
 	}
+	var tmp []string
+	q = `SELECT label FROM sessions
+	     WHERE label='gcal_token' AND userid=$1 AND token IS NOT NULL`
+	err = db.Select(&tmp, q, uid)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+	cals := []string{}
+	if len(tmp) > 0 {
+		cals = append(cals, "Google")
+	}
+	var addrsTmp []struct {
+		Name  string
+		Line1 string
+	}
+	q = `SELECT name, line1 FROM addresses WHERE userid=$1`
+	err = db.Select(&addrsTmp, q, uid)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+	var addrs []string
+	for _, addr := range addrsTmp {
+		if len(addr.Name) > 0 {
+			s := fmt.Sprintf("%s (%s)", addr.Name, addr.Line1)
+			addrs = append(addrs, s)
+		} else {
+			addrs = append(addrs, addr.Line1)
+		}
+	}
+	var cardsTmp []struct {
+		Last4 string
+		Brand string
+	}
+	q = `SELECT brand, last4 FROM cards WHERE userid=$1`
+	err = db.Select(&cardsTmp, q, uid)
+	if err != nil && err != sql.ErrNoRows {
+		return jsonError(err)
+	}
+	var cards []string
+	for _, card := range cardsTmp {
+		s := fmt.Sprintf("%s (%s)", card.Brand, card.Last4)
+		cards = append(cards, s)
+	}
 	resp := struct {
-		Username      string
-		Conversations []struct {
+		Username string
+		Chats    []struct {
 			Sentence  string
 			AvaSent   bool
 			CreatedAt time.Time
 		}
 		Preferences []string
+		Calendars   []string
+		Addresses   []string
+		Cards       []string
 	}{
-		Username:      username,
-		Conversations: ret,
-		Preferences:   prefs,
+		Username:    username,
+		Chats:       ret,
+		Preferences: prefs,
+		Calendars:   cals,
+		Addresses:   addrs,
+		Cards:       cards,
 	}
 	if err := c.JSON(http.StatusOK, resp); err != nil {
 		return jsonError(err)

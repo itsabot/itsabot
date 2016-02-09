@@ -10,6 +10,7 @@ import (
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/nlp"
 	"github.com/avabot/ava/shared/pkg"
+	"github.com/avabot/ava/shared/task"
 )
 
 type Settings string
@@ -25,6 +26,7 @@ const (
 	stateAddCard
 	stateChangeCard
 	stateChangeCalendar
+	stateAddAddress
 )
 
 func main() {
@@ -67,6 +69,11 @@ func main() {
 			WordType: "Object",
 			Words:    []string{"calendar", "cal", "schedule", "rota"},
 		},
+		dt.VocabHandler{
+			Fn:       kwAddAddress,
+			WordType: "Object",
+			Words:    []string{"address", "addr"},
+		},
 	)
 	settings := new(Settings)
 	if err := p.Register(settings); err != nil {
@@ -105,6 +112,9 @@ func handleInput(in *dt.Msg, resp *string) error {
 		case stateChangeCalendar:
 			l.Debugln("setting state changeCalendar")
 			sm.SetStates(changeCalendar)
+		case stateAddAddress:
+			l.Debugln("setting state changeCalendar")
+			sm.SetStates(addShippingAddress(in))
 		default:
 			l.Warnln("unrecognized state", state)
 		}
@@ -132,6 +142,12 @@ func kwChangeCalendar(in *dt.Msg, _ int) string {
 	return ""
 }
 
+func kwAddAddress(in *dt.Msg, _ int) string {
+	sm := bootStateMachine(in)
+	sm.SetMemory(in, "state", stateAddAddress)
+	return ""
+}
+
 func bootStateMachine(in *dt.Msg) *dt.StateMachine {
 	sm := dt.NewStateMachine(pkgName)
 	sm.SetDBConn(db)
@@ -143,7 +159,7 @@ func bootStateMachine(in *dt.Msg) *dt.StateMachine {
 var addCard []dt.State = []dt.State{
 	{
 		OnEntry: func(in *dt.Msg) string {
-			return "Sure. You can add your card securely here: https://avabot.co/?/cards/new"
+			return "You can add your card securely here: https://avabot.co/?/cards/new"
 		}, OnInput: func(in *dt.Msg) {
 		},
 		Complete: func(in *dt.Msg) (bool, string) {
@@ -168,11 +184,17 @@ var changeCalendar []dt.State = []dt.State{
 var changeCard []dt.State = []dt.State{
 	{
 		OnEntry: func(in *dt.Msg) string {
-			return "Sure. You can change your cards securely here: https://avabot.co/?/profile"
+			return "You can change your cards securely here: https://avabot.co/?/profile"
 		}, OnInput: func(in *dt.Msg) {
 		},
 		Complete: func(in *dt.Msg) (bool, string) {
 			return true, ""
 		},
 	},
+}
+
+func addShippingAddress(in *dt.Msg) []dt.State {
+	sm := bootStateMachine(in)
+	sm.SetMemory(in, "state", stateAddAddress)
+	return task.New(sm, task.RequestAddress, "shipping_address")
 }

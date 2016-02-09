@@ -14,7 +14,7 @@ func getAddress(sm *dt.StateMachine, label string) []dt.State {
 		{
 			Label: label,
 			OnEntry: func(in *dt.Msg) string {
-				return "Ok. Where should I ship this?"
+				return "Where should I ship to?"
 			},
 			OnInput: func(in *dt.Msg) {
 				addr, mem, err := language.ExtractAddress(db,
