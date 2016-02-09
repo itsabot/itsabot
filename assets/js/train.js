@@ -391,11 +391,7 @@ TrainShow.confirmAddCreditCard = function() {
 		}).then(function(res) {
 			console.log("updating data");
 			TrainShow.loadConversation(m.route.param("id"), m.route.param("uid")).then(function(resp) {
-				ctrl.data.Messages([]);
-				setTimeout(function() {
-					ctrl.data.Messages(resp.Chats);
-					m.redraw(true);
-				}, 0);
+				ctrl.data.Messages(resp.Chats);
 			});
 		}, function(err) {
 			console.error(err);
@@ -417,28 +413,22 @@ TrainShow.confirmAddShippingAddr = function() {
 };
 
 var Chatbox = {};
-Chatbox.controller = function(args) {
-	var d = {};
-	d.Username = args.Username;
-	d.Messages = args.Messages;
-	return d;
-};
-Chatbox.view = function(ctrl, args) {
+Chatbox.view = function(_, args) {
 	return m("div", { class: "chat-container" }, [
 		m("input", {
 			type: "text",
 			class: "disabled",
 			placeholder: "To:",
-			value: ctrl.Username,
+			value: args.Username,
 		}),
 		m("ol", {
 			id: "chat-box",
 			class: "chat-box",
 			config: Chatbox.scrollToBottom,
 		}, [
-			ctrl.Messages().map(function(c) {
+			args.Messages().map(function(c) {
 				var d = {
-					Username: ctrl.Username,
+					Username: args.Username,
 					Sentence: c.Sentence,
 					AvaSent: c.AvaSent,
 					CreatedAt: c.CreatedAt,
@@ -491,31 +481,22 @@ Chatbox.send = function(uid, sentence) {
 };
 
 var ChatboxItem = {
-	controller: function(args) {
-		console.log("controller: " + args.Sentence);
-		return {
-			Sentence: args.Sentence,
-			CreatedAt: args.CreatedAt,
-			Username: args.Username,
-			AvaSent: args.AvaSent
-		};
-	},
-	view: function(ctrl) {
-		console.log("view: " + ctrl.Sentence);
+	view: function(_, args) {
+		console.log("view: " + args.Sentence);
 		var c, u;
-		if (ctrl.AvaSent) {
+		if (args.AvaSent) {
 			c = "chat-ava";
 			u = "Ava";
 		} else {
 			c = "chat-user";
-			u = ctrl.Username;
+			u = args.Username;
 		}
 		return m("li", { class: c }, [
 			m("div", { class: "messages" }, [
-				m("p", ctrl.Sentence),
+				m("p", args.Sentence),
 				m("time", {
-					datetime: ctrl.CreatedAt
-				}, u + " • " + prettyDate(ctrl.CreatedAt))
+					datetime: args.CreatedAt
+				}, u + " • " + prettyDate(args.CreatedAt))
 			])
 		]);
 	}
