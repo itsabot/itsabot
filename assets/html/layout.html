@@ -12,6 +12,32 @@
 	</script>
 	<script src="https://apis.google.com/js/platform.js?onload=start" defer></script>
 	<script src="/public/js/main.js"></script>
+{{if not .IsProd}}
+<script>
+(function(url, maxAttempts) {
+	var ws = null, at = 0
+	function wsclose() { if (!!ws) { ws.onclose = function() {}; ws.close() } }
+	(function wsinit() {
+		if (maxAttempts > 0 && at > maxAttempts) { console.log('giving up'); return }
+		wsclose()
+		var delay = at < 3? at*300: 1000
+		window.setTimeout(function() {
+			ws = new WebSocket(url)
+			ws.onopen = function() { at = 0 }
+			ws.onclose = ws.onerror = wsinit
+			ws.onmessage = function(event) {
+				try { var data = JSON.parse(event.data) } catch(err) { return }
+				if (data.cmd === "reload") {
+					wsclose()
+					window.location.reload(true)
+				}
+			}
+		}, delay)
+		at++
+	})();
+})('ws://'+window.location.host+'/_/cmd/ws', 1000);
+</script>
+{{end}}
 </head>
 
 <body></body>

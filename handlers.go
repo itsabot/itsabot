@@ -23,6 +23,7 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/card"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go/customer"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/crypto/bcrypt"
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
 	"github.com/avabot/ava/shared/cal"
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/sms"
@@ -35,12 +36,17 @@ func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
 	e.SetDebug(true)
 
-	e.Static("/public/css", "assets/css")
+	e.Static("/public/css", "public/css")
 	e.Static("/public/js", "public/js")
 	e.Static("/public/images", "assets/images")
 
+	if os.Getenv("AVA_ENV") != "production" {
+		cmd := e.Group("/_/cmd")
+		initCMDGroup(cmd)
+	}
+
 	// Web routes
-	e.Get("/", handlerIndex)
+	e.Get("/*", handlerIndex)
 
 	// API routes
 	e.Post("/", handlerMain)
@@ -66,6 +72,53 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/oauth/disconnect/gcal.json", handlerOAuthDisconnectGoogleCalendar)
 }
 
+type CMDConn struct {
+	ws     *websocket.Conn
+	respch chan bool
+}
+
+func cmder(cmdch <-chan string, addconnch, delconnch <-chan *CMDConn) {
+	cmdconns := map[*websocket.Conn](chan bool){}
+	for {
+		select {
+		case c := <-addconnch:
+			cmdconns[c.ws] = c.respch
+		case c := <-delconnch:
+			delete(cmdconns, c.ws)
+		case c := <-cmdch:
+			cmd := fmt.Sprintf(`{"cmd": "%s"}`, c)
+			fmt.Println("sending cmd:", cmd)
+			for ws, respch := range cmdconns {
+				// error ignored because we close no matter what
+				_ = websocket.Message.Send(ws, cmd)
+				respch <- true
+			}
+		}
+	}
+}
+
+func initCMDGroup(g *echo.Group) {
+	cmdch := make(chan string, 10)
+	addconnch := make(chan *CMDConn, 10)
+	delconnch := make(chan *CMDConn, 10)
+
+	go cmder(cmdch, addconnch, delconnch)
+
+	g.Get("/:cmd", func(c *echo.Context) error {
+		cmdch <- c.Param("cmd")
+		return c.String(http.StatusOK, "")
+	})
+	g.WebSocket("/ws", func(c *echo.Context) error {
+		ws := c.Socket()
+		respch := make(chan bool)
+		conn := &CMDConn{ws: ws, respch: respch}
+		addconnch <- conn
+		<-respch
+		delconnch <- conn
+		return nil
+	})
+}
+
 func handlerIndex(c *echo.Context) error {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
@@ -75,7 +128,11 @@ func handlerIndex(c *echo.Context) error {
 	b := bytes.NewBuffer(s)
 	data := struct {
 		StripeKey string
-	}{StripeKey: os.Getenv("STRIPE_PUBLIC_KEY")}
+		IsProd    bool
+	}{
+		StripeKey: os.Getenv("STRIPE_PUBLIC_KEY"),
+		IsProd:    os.Getenv("AVA_ENV") == "production",
+	}
 	if err := tmplLayout.Execute(b, data); err != nil {
 		log.Fatalln(err)
 	}

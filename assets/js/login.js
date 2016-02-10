@@ -1,9 +1,12 @@
-var Login = {
-	login: function(ev) {
-		ev.preventDefault();
-		Login.vm.hideError();
-		var email = document.getElementById("email").value;
-		var pass = document.getElementById("password").value;
+(function(ava) {
+ava.Login = {}
+ava.Login.controller = function() {
+	var ctrl = this
+	ctrl.login = function(ev) {
+		ev.preventDefault()
+		ctrl.hideError()
+		var email = document.getElementById("email").value
+		var pass = document.getElementById("password").value
 		return m.request({
 			method: "POST",
 			data: {
@@ -12,159 +15,110 @@ var Login = {
 			},
 			url: "/api/login.json"
 		}).then(function(data) {
-			var date = new Date();
-			var exp = date.setDate(date + 30);
-			var secure = true;
+			var date = new Date()
+			var exp = date.setDate(date + 30)
+			var secure = true
 			if (window.location.hostname === "localhost") {
-				secure = false;
+				secure = false
 			}
-			cookie.setItem("id", data.Id, exp, null, null, secure);
-			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure);
+			cookie.setItem("id", data.Id, exp, null, null, secure)
+			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure)
 			if (m.route.param("r") == null) {
-				return m.route("/profile");
+				return m.route("/profile")
 			}
-			m.route(decodeURIComponent(m.route.param("r")).substr(1));
+			m.route(decodeURIComponent(m.route.param("r")).substr(1))
 		}, function(err) {
-			Login.vm.showError(err.Msg);
-		});
+			ctrl.showError(err.Msg)
+		})
 	},
-	checkAuth: function(callback) {
+	ctrl.checkAuth = function(callback) {
 		if (cookie.getItem("id") !== null) {
-			callback(true);
+			callback(true)
 		}
 	}
-};
-
-Login.controller = function() {
-	Login.checkAuth(function(loggedIn) {
+	ctrl.checkAuth(function(loggedIn) {
 		if (loggedIn) {
-			return m.route("/profile");
+			return m.route("/profile")
 		}
-	});
-	Login.controller.error = m.prop("");
-};
-
-Login.vm = {
-	hideError: function() {
-		Login.controller.error("");
-		document.getElementById("err").classList.add("hidden");
+	})
+	ctrl.hideError = function() {
+		ctrl.error("")
+		document.getElementById("err").classList.add("hidden")
 	},
-	showError: function(err) {
-		Login.controller.error(err);
-		document.getElementById("err").classList.remove("hidden");
+	ctrl.showError = function(err) {
+		ctrl.error(err)
+		document.getElementById("err").classList.remove("hidden")
 	}
-};
-
-Login.view = function() {
-	return m("div", {
-		class: "body"
-	}, [
-		header.view(),
-		Login.viewFull(),
-		Footer.view()
-	]);
+	ctrl.error = m.prop("")
 }
-
-Login.viewFull = function() {
-	return m("div", {
-		id: "full",
-		class: "container"
-	}, [
-		m("div", {
-			class: "row margin-top-sm"
-		}, [
-			m("div", {
-				class: "col-md-push-3 col-md-6 card"
-			}, [
-				m("div", {
-					class: "row"
-				}, [
-					m("div", {
-						class: "col-md-12 text-center"
-					}, [
-						m("h2", "Log In")
-					])
-				]),
-				m("form", [
-					m("div", {
-						class: "row margin-top-sm"
-					}, [
+ava.Login.view = function(ctrl) {
+	return m(".body", [
+		m.component(ava.Header),
+		m("#full.container", m(".row.margin-top-sm", m(".col-md-push-3.col-md-6.card", [
+			m(".row", [
+				m(".col-md-12.text-center", [
+					m("h2", "Log In")
+				])
+			]),
+			m("form", [
+				m(".row.margin-top-sm", [
+					m(".col-md-12", [
 						m("div", {
-							class: "col-md-12"
-						}, [
-							m("div", {
-								id: "err",
-								class: "alert alert-danger hidden"
-							}, Login.controller.error()),
-							m("div", {
-								class: "form-group"
-							}, [
-								m("input", {
-									type: "email",
-									class: "form-control",
-									id: "email",
-									placeholder: "Email"
-								})
-							]),
-							m("div", {
-								class: "form-group"
-							}, [
-								m("input", {
-									type: "password",
-									class: "form-control",
-									id: "password",
-									placeholder: "Password"
-								})
-							]),
-							m("div", {
-								class: "form-group text-right"
-							}, [
-								m("a", {
-									href: "/forgot_password",
-									config: m.route
-								}, "Forgot password?")
-							])
-						])
-					]),
-					m("div", {
-						class: "row"
-					}, [
-						m("div", {
-							class: "col-md-12 text-center"
-						}, [
-							m("div", {
-								class: "form-group"
-							}, [
-								m("input", {
-									class: "btn btn-sm",
-									id: "btn",
-									type: "submit",
-									onclick: Login.login,
-									onsubmit: Login.login,
-									value: "Log In"
-								})
-							])
-						])
-					])
-				]),
-				m("div", {
-					class: "row"
-				}, [
-					m("div", {
-						class: "col-md-12 text-center"
-					}, [
-						m("div", {
-							class: "form-group"
-						}, [
-							m("span", "No account? "),
+							id: "err",
+							class: "alert alert-danger hidden"
+						}, ctrl.error()),
+						m(".form-group", [
+							m("input", {
+								type: "email",
+								class: "form-control",
+								id: "email",
+								placeholder: "Email"
+							})
+						]),
+						m(".form-group", [
+							m("input", {
+								type: "password",
+								class: "form-control",
+								id: "password",
+								placeholder: "Password"
+							})
+						]),
+						m(".form-group.text-right", [
 							m("a", {
-								href: "/signup",
+								href: "/forgot_password",
 								config: m.route
-							}, "Sign Up")
+							}, "Forgot password?")
+						])
+					])
+				]),
+				m(".row", [
+					m(".col-md-12.text-center", [
+						m(".form-group", [
+							m("input", {
+								class: "btn btn-sm",
+								id: "btn",
+								type: "submit",
+								onclick: ctrl.login,
+								onsubmit: ctrl.login,
+								value: "Log In"
+							})
 						])
 					])
 				])
+			]),
+			m(".row", [
+				m(".col-md-12.text-center", [
+					m(".form-group", [
+						m("span", "No account? "),
+						m("a", {
+							href: "/signup",
+							config: m.route
+						}, "Sign Up")
+					])
+				])
 			])
-		])
-	]);
-};
+		]))),
+		m.component(ava.Footer)
+	])
+}
+})(!window.ava ? window.ava={} : window.ava);

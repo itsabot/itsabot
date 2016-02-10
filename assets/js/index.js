@@ -1,75 +1,21 @@
-var Index = {};
-Index.controller = function() {
-	return {};
-};
-Index.vm = {
+(function(ava) {
+ava.Index = {}
+ava.Index.vm = {
 	showEarlyAccess: function() {
-		document.getElementById("btns").classList.add("hidden");
-		document.getElementById("earlyAccess").classList.remove("hidden");
+		document.getElementById("btns").classList.add("hidden")
+		document.getElementById("earlyAccess").classList.remove("hidden")
 		setTimeout(function() {
-			document.getElementById("earlyAccess").classList.add("fade-in");
-		}, 300);
+			document.getElementById("earlyAccess").classList.add("fade-in")
+		}, 300)
 	}
-};
-Index.view = function() {
+}
+ava.Index.view = function() {
 	return m("div", [
-		m("div", {
-			class: "gradient gradient-big gradient-bright"
-		}, [
-			m("div", {
-				class: "jumbo-container"
-			}, [
-				m("header", [
-					m("div", {
-						class: "container"
-					}, [
-						m("a", {
-							class: "navbar-brand",
-							href: "/",
-							config: m.route
-						}, [
-							m("div", [
-								m("img", {
-									src: "/public/images/logo.svg"
-								})
-							])
-						]),
-						m("div", {
-							class: "text-right navbar-right"
-						}, [
-							m("a", {
-								href: "/",
-								config: m.route
-							}, "Home"),
-							m("a", {
-								href: "/tour",
-								config: m.route
-							}, "Tour"),
-							m("a", {
-								class: "hide-md",
-								href: "https://medium.com/ava-updates/latest"
-							}, "Updates"),
-							function() {
-								if (cookie.getItem("id") !== null) {
-									return m("a", {
-										href: "/profile",
-										config: m.route
-									}, "Profile")
-								}
-								return m("a", {
-									href: "/login",
-									config: m.route
-								}, "Log in")
-							}()
-						])
-					])
-				]),
-				m("div", {
-					class: "jumbo container"
-				}, [
-					m("div", {
-						class: "col-md-8"
-					}, [
+		m("div", { class: "gradient gradient-big gradient-bright" }, [
+			m("div", { class: "jumbo-container" }, [
+				m.component(ava.Header),
+				m("div", { class: "jumbo container" }, [
+					m("div", { class: "col-md-8" }, [
 						m("h1", "Meet Ava."),
 						m("br"),
 						m("h1", "Your new assistant."),
@@ -99,7 +45,7 @@ Index.view = function() {
 								}, "Take a tour"),
 								m("a", {
 									class: "btn btn-green",
-									onclick: Index.vm.showEarlyAccess
+									onclick: ava.Index.vm.showEarlyAccess
 								}, "Get early access")
 							])
 						])
@@ -115,27 +61,17 @@ Index.view = function() {
 				])
 			])
 		]),
-		m("div", {
-			class: "container body-container"
-		}, [
-			m("div", {
-				class: "row"
-			}, [
-				m("div", {
-					class: "col-md-1 margin-bottom"
-				}, [
+		m("div", { class: "container body-container" }, [
+			m("div", { class: "row" }, [
+				m("div", { class: "col-md-1 margin-bottom" }, [
 					m("div", {
 						class: "label label-primary"
 					}, "New")
 				]),
-				m("div", {
-					class: "col-md-4"
-				}, [
+				m("div", { class: "col-md-4" }, [
 					m("p", "Car trouble? Ava now finds recommended mechanic and tow services nearby.")
 				]),
-				m("div", {
-					class: "col-md-2"
-				}, [
+				m("div", { class: "col-md-2" }, [
 					m("a", {
 						class: "bold",
 						href: "https://medium.com/@egtann/car-mechanic-1af70923eb19#.o7htx32u7"
@@ -143,6 +79,7 @@ Index.view = function() {
 				])
 			])
 		]),
-		Footer.view()
-	]);
-};
+		m.component(ava.Footer)
+	])
+}
+})(!window.ava ? window.ava={} : window.ava);

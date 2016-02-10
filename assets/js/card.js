@@ -1,94 +1,61 @@
-var Card = function(data) {
-	var _this = this;
-	data = data || {};
-	_this.id = m.prop(data.id || 0);
-	_this.cardholderName = m.prop(data.cardholderName || "");
-	_this.number = m.prop(data.number || "");
-	_this.expMonth = m.prop("");
-	_this.expYear = m.prop("");
-	_this.zip5 = m.prop(data.zip5 || "");
-	_this.brand = m.prop("");
-	if (data.expMonth != null && data.expYear != null) {
-		_this.expiry = m.prop(data.expMonth + " / " + data.expYear);
-	} else {
-		_this.expiry = m.prop(data.expiry || "");
+(function(ava) {
+ava.Card = {}
+ava.Card.controller = function(props) {
+	var ctrl = this
+	ctrl.brandIcon = function(brand) {
+		var icon
+		switch(brand) {
+		case "American Express", "Diners", "Discover", "JCB", "Maestro",
+			"MasterCard", "PayPal", "Visa":
+			var imgPath = brand.toLowerCase().replace(" ", "_")
+			imgPath = "card_" + imgPath + ".svg"
+			imgPath = "/public/images/" + imgPath
+			icon = m("img", { src: imgPath, class: "icon-fit" })
+			break
+		default:
+			console.log("no brand match: " + brand)
+			icon = m("span", brand)
+			break
+		}
+		return icon
 	}
-	_this.cvc = m.prop(data.cvc || "");
-	_this.last4 = m.prop(data.last4 || "");
-	_this.save = function() {
-		var deferred = m.deferred();
-		saveStripe().then(function(resp) {
-			_this.brand(resp.card.brand);
-			var data = {
-				UserID: parseInt(cookie.getItem("id")),
-				StripeToken: resp.id,
-				CardholderName: resp.card.name,
-				ExpMonth: resp.card.exp_month,
-				ExpYear: resp.card.exp_year,
-				Brand: _this.brand(),
-				Last4: resp.card.last4,
-				AddressZip: _this.zip5()
-			};
-			m.request({
-				method: "POST",
-				url: "/api/cards.json",
-				data: data
-			}).then(function(data) {
-				deferred.resolve(data);
-			}, function(err) {
-				deferred.reject(new Error(err.Msg));
-			});
+	ctrl.del = function() {
+		var data = {
+			ID: props.Id,
+			UserID: parseInt(cookie.getItem("id"))
+		}
+		m.request({
+			method: "DELETE",
+			url: "/api/cards.json",
+			data: data
+		}).then(function() {
 		}, function(err) {
-			deferred.reject(err);
-		});
-		return deferred.promise;
-	};
-	var saveStripe = function() {
-		var deferred = m.deferred();
-		Stripe.card.createToken({
-			number: _this.number(),
-			cvc: _this.cvc(),
-			exp: _this.expiry(),
-			name: _this.cardholderName(),
-			address_zip: _this.zip5()
-		}, function(status, response) {
-			if (response.error) {
-				return deferred.reject(new Error(response.error.message));
-			}
-			deferred.resolve(response);
-		});
-		return deferred.promise;
-	};
-	_this.del = function() {
-			var data = {
-				ID: _this.id(),
-				UserID: parseInt(cookie.getItem("id"))
-			};
-			m.request({
-				method: "DELETE",
-				url: "/api/cards.json",
-				data: data
-			}).then(function() {
-			}, function(err) {
-				console.error(err);
-			});
-	};
-};
-
-Card.brandIcon = function(brand) {
-	var icon;
-	switch(brand) {
-	case "American Express", "Diners", "Discover", "JCB", "Maestro",
-		"MasterCard", "PayPal", "Visa":
-		var imgPath = brand.toLowerCase().replace(" ", "_");
-		imgPath = "card_" + imgPath + ".svg";
-		imgPath = "/public/images/" + imgPath;
-		icon = m("img", { src: imgPath, class: "icon-fit" });
-		break;
-	default:
-		console.log("no brand match: " + brand)
-		icon = m("span", brand);
-		break;
+			console.error(err)
+		})
 	}
-	return icon;
-};
+}
+ava.Card.view = function(ctrl, props) {
+	return m("tr", { key: props.Id }, [
+		m("td", { style: "width: 10%" }, ctrl.brandIcon(props.Brand)),
+		m("td", props.CardholderName),
+		m("td", {class: "subtle"}, "XXXX-" + props.Last4),
+		m("td", props.ExpMonth + " / " + props.ExpYear),
+		m("td", {
+			class: "text-right"
+		}, [
+			m("img", {
+				class: "icon icon-xs icon-delete",
+				src: "/public/images/icon_delete.svg",
+				onclick: function(ev) {
+					var c = confirm("Delete this number?");
+					if (c) {
+						//props.del(); TODO
+						ev.target.parentElement.parentElement.
+							remove();
+					}
+				}
+			})
+		])
+	])
+}
+})(!window.ava ? window.ava={} : window.ava);

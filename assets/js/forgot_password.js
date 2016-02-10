@@ -1,8 +1,11 @@
-var ForgotPassword = {
-	submit: function(ev) {
-		ev.preventDefault();
-		ForgotPassword.vm.hideError();
-		var email = document.getElementById("email").value;
+(function(ava) {
+ava.ForgotPassword = {}
+ava.ForgotPassword.controller = function() {
+	var ctrl = this
+	ctrl.submit = function(ev) {
+		ev.preventDefault()
+		ctrl.hideError()
+		var email = document.getElementById("email").value
 		return m.request({
 			method: "POST",
 			data: {
@@ -10,97 +13,70 @@ var ForgotPassword = {
 			},
 			url: "/api/forgot_password.json"
 		}).then(function(data) {
-			ForgotPassword.vm.showSuccess();
+			ctrl.showSuccess()
 		}, function(err) {
-			ForgotPassword.vm.showError(err.Msg);
-		});
+			ctrl.showError(err.Msg)
+		})
 	},
-	checkAuth: function(callback) {
+	ctrl.checkAuth = function(callback) {
 		if (cookie.getItem("id") !== null) {
-			callback(true);
+			callback(true)
 		}
 	}
-};
-
-ForgotPassword.controller = function() {
-	ForgotPassword.checkAuth(function(loggedIn) {
+	ctrl.checkAuth(function(loggedIn) {
 		if (loggedIn) {
-			return m.route("/profile");
+			return m.route("/profile")
 		}
-	});
-	ForgotPassword.controller.error = m.prop("");
-	ForgotPassword.controller.success = m.prop("");
-};
-
-ForgotPassword.vm = {
-	hideError: function() {
-		ForgotPassword.controller.error("");
-		document.getElementById("err").classList.add("hidden");
+	})
+	ctrl.error = m.prop("")
+	ctrl.success = m.prop("")
+	ctrl.hideError = function() {
+		ctrl.error("")
+		document.getElementById("err").classList.add("hidden")
 	},
-	showError: function(err) {
-		ForgotPassword.controller.error(err);
-		document.getElementById("err").classList.remove("hidden");
+	ctrl.showError = function(err) {
+		ctrl.error(err)
+		document.getElementById("err").classList.remove("hidden")
 	},
-	showSuccess: function() {
-		ForgotPassword.controller.success("We've emailed you a link to reset your password. Please open that link to continue. For security reasons the link will expire in 30 minutes.");
-		document.getElementById("success").classList.remove("hidden");
-		document.getElementById("form").classList.add("hidden");
-		document.getElementById("btn").classList.add("hidden");
+	ctrl.showSuccess = function() {
+		ctrl.success("We've emailed you a link to reset your password. Please open that link to continue. For security reasons the link will expire in 30 minutes.")
+		document.getElementById("success").classList.remove("hidden")
+		document.getElementById("form").classList.add("hidden")
+		document.getElementById("btn").classList.add("hidden")
 	}
-};
-
-ForgotPassword.view = function() {
-	return m("div", {
-		class: "body"
-	}, [
-		header.view(),
-		ForgotPassword.viewFull(),
-		Footer.view()
-	]);
 }
 
-ForgotPassword.viewFull = function() {
-	return m("div", {
-		id: "full",
-		class: "container"
-	}, [
-		m("div", {
-			class: "row margin-top-sm"
-		}, [
-			m("div", {
-				class: "col-md-push-3 col-md-6 card"
-			}, [
-				m("div", {
-					class: "row"
-				}, [
-					m("div", {
-						class: "col-md-12 text-center"
-					}, [
+ava.ForgotPassword.view = function(ctrl) {
+	return m(".body", [
+		m.component(ava.Header),
+		ava.ForgotPassword.viewFull(ctrl),
+		m.component(ava.Footer)
+	])
+}
+
+ava.ForgotPassword.viewFull = function(ctrl) {
+	return m("#full.container", [
+		m(".row.margin-top-sm", [
+			m(".col-md-push-3.col-md-6.card", [
+				m(".row", [
+					m(".col-md-12.text-center", [
 						m("h2", "Reset Password")
 					])
 				]),
 				m("form", [
-					m("div", {
-						class: "row margin-top-sm"
-					}, [
-						m("div", {
-							class: "col-md-12"
-						}, [
+					m(".row.margin-top-sm", [
+						m(".col-md-12", [
 							m("div", {
 								id: "err",
 								class: "alert alert-danger hidden"
-							}, ForgotPassword.controller.error()),
+							}, ctrl.error()),
 							m("div", {
 								id: "success",
 								class: "alert alert-success hidden"
-							}, ForgotPassword.controller.success()),
-							m("div", {
-								id: "form"
-							}, [
+							}, ctrl.success()),
+							m("#form", [
 								m("p", "We'll email you a confirmation link to reset your password. Please enter your email below."),
-								m("div", {
-									class: "form-group"
-								}, [
+								m(".form-group", [
 									m("input", {
 										type: "email",
 										class: "form-control",
@@ -111,36 +87,24 @@ ForgotPassword.viewFull = function() {
 							])
 						])
 					]),
-					m("div", {
-						class: "row"
-					}, [
-						m("div", {
-							class: "col-md-12 text-center"
-						}, [
-							m("div", {
-								class: "form-group"
-							}, [
+					m(".row", [
+						m(".col-md-12.text-center", [
+							m(".form-group", [
 								m("input", {
 									class: "btn btn-sm",
 									id: "btn",
 									type: "submit",
-									onclick: ForgotPassword.submit,
-									onsubmit: ForgotPassword.submit,
+									onclick: ctrl.submit,
+									onsubmit: ctrl.submit,
 									value: "Submit"
 								})
 							])
 						])
 					])
 				]),
-				m("div", {
-					class: "row"
-				}, [
-					m("div", {
-						class: "col-md-12 text-center"
-					}, [
-						m("div", {
-							class: "form-group"
-						}, [
+				m(".row", [
+					m(".col-md-12.text-center", [
+						m(".form-group", [
 							m("span", "No account? "),
 							m("a", {
 								href: "/signup",
@@ -151,5 +115,6 @@ ForgotPassword.viewFull = function() {
 				])
 			])
 		])
-	]);
-};
+	])
+}
+})(!window.ava ? window.ava={} : window.ava);

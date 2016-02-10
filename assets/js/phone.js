@@ -1,11 +1,20 @@
-var Phone = function() {
-	var _this = this;
-	_this.number = m.prop("");
-	_this.format = function() {
-		var a1 = _this.number().slice(0, 2);
-		var a2 = " (" + _this.number().slice(2, 5) + ") ";
-		var a3 = _this.number().slice(5, 8) + "-"
-		return a1 + a2 + a3 + _this.number().slice(8)
-	};
-	return _this;
-};
+(function(ava) {
+ava.Phone = {}
+ava.Phone.view = function(_, props) {
+	return m("tr", { "attr-id": props.Id }, [
+		m("td", props.Number),
+		m("td.text-right", [
+			m("img.icon.icon-xs.icon-delete", {
+				src: "/public/images/icon_delete.svg",
+				onclick: function() {
+					var c = confirm("Delete this number?")
+					if (c) {
+						// TODO delete from database
+						console.log("not implemented")
+					}
+				}
+			})
+		])
+	])
+}
+})(!window.ava ? window.ava={} : window.ava);

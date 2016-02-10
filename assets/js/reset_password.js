@@ -54,9 +54,9 @@ ResetPassword.view = function() {
 	return m("div", {
 		class: "body"
 	}, [
-		header.view(),
+		m.component(ava.Header),
 		ResetPassword.viewFull(),
-		Footer.view()
+		m.component(ava.Footer)
 	]);
 }
 
