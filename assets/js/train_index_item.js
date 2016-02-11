@@ -5,7 +5,7 @@ ava.TrainIndexItem.controller = function(props, pctrl) {
 	ava.fnCopy(pctrl, ctrl, "route")
 }
 ava.TrainIndexItem.view = function(ctrl, props) {
-	var t = prettyDate(props.CreatedAt)
+	var t = ava.prettyDate(props.CreatedAt)
 	return m("tr", {
 		"data-id": props.ID,
 		"data-user-id": props.UserID,
@@ -13,7 +13,7 @@ ava.TrainIndexItem.view = function(ctrl, props) {
 		onclick: ctrl.route
 	}, [
 		m("td", props.Sentence),
-		m("td", prettyDate(props.CreatedAt))
+		m("td", ava.prettyDate(props.CreatedAt))
 	])
 }
 })(!window.ava ? window.ava={} : window.ava);

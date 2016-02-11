@@ -47,7 +47,7 @@ ava.Chatbox.view = function(ctrl, props) {
 			config: ctrl.scrollToBottom,
 		}, props.Messages().map(function(c) {
 			var d = {
-				Username: props.Username,
+				Username: props.Username(),
 				Sentence: c.Sentence,
 				AvaSent: c.AvaSent,
 				CreatedAt: c.CreatedAt,
