@@ -32,7 +32,6 @@ ava.Profile.controller = function() {
 			data: { UserID: parseInt(uid, 10) }
 		})
 	}
-
 	ctrl.props = {
 		username: m.prop(""),
 		email: m.prop(""),
@@ -58,10 +57,10 @@ ava.Profile.controller = function() {
 	})
 	ctrl.sendView(userId)
 }
-ava.Profile.view = function(controller) {
+ava.Profile.view = function(ctrl) {
 	return m(".body", [
 		m.component(ava.Header),
-		ava.Profile.viewFull(controller),
+		ava.Profile.viewFull(ctrl),
 		m.component(ava.Footer)
 	])
 }

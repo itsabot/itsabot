@@ -63,7 +63,6 @@ ava.TrainShow.controller = function() {
 				method: "POST",
 				url: "/main.json?cmd=add credit card&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
-				console.log("updating data")
 				ctrl.loadConversation()
 			}, function(err) {
 				console.error(err)
@@ -102,7 +101,6 @@ ava.TrainShow.view = function(ctrl) {
 	])
 }
 ava.TrainShow.viewFull = function(ctrl) {
-	console.log(ctrl.props.Messages())
 	return m("#full.container", [
 		m(".row", [
 			m(".col-md-12", [
@@ -131,7 +129,12 @@ ava.TrainShow.viewFull = function(ctrl) {
 						m("#calendar-selector.margin-sm", {
 							class: "hidden"
 						}, [
-							m.component(ava.CalendarSelector, ctrl.props)
+							function() {
+								if (ctrl.props.Calendars().length > 0) {
+									return m.component(ava.CalendarSelector, ctrl.props)
+								}
+								return m("div", "Please connect a calendar")
+							}()
 						])
 					]),
 					m("li", [

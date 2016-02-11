@@ -6,8 +6,7 @@ ava.Gcal.controller = function() {
 		ev.preventDefault()
 		ava.auth2.grantOfflineAccess({'redirect_uri': 'postmessage'})
 		.then(ctrl.signInCallback, function(err) {
-			console.log("ERR HERE")
-			console.log(err)
+			console.error(err)
 		})
 	}
 	ctrl.signInCallback = function(authResult) {
@@ -45,21 +44,19 @@ ava.Gcal.view = function(ctrl) {
 	return m('div', [
 		m("h3.margin-top-sm", "Calendars"),
 		m(".form-group.card", [
-			m("div", [
-				m("#oauth-google-success", [
-					m("a#oauth-google-success[href=#/]", {
-						class: "hidden",
-						onclick: ctrl.googleRevoke
-					}, "Google")
-				]),
-				m("input", {
-					id: "signinButton",
-					class: "btn-oauth-signin",
-					type: "image",
-					src: "/public/images/btn_google_signin_light_normal_web.png",
-					onclick: ctrl.googleOAuth
-				}, "Sign in with Google"),
-			])
+			m("#oauth-google-success", [
+				m("a#oauth-google-success[href=#/]", {
+					class: "hidden",
+					onclick: ctrl.googleRevoke
+				}, "Google")
+			]),
+			m("input", {
+				id: "signinButton",
+				class: "btn-oauth-signin",
+				type: "image",
+				src: "/public/images/btn_google_signin_light_normal_web.png",
+				onclick: ctrl.googleOAuth
+			}, "Sign in with Google"),
 		])
 	])
 }

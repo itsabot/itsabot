@@ -1,4 +1,5 @@
-// Package cal enables control over Gmail calendars
+// Package cal enables control over Google calendars. Eventually it will act as
+// a standarized API across Google, Outlook, and more calendars
 package cal
 
 import (
@@ -17,6 +18,34 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/google"
 )
+
+type Event struct {
+	Title          string
+	Location       string
+	StartTime      *time.Time
+	DurationInMins int
+	Recurring      bool
+	RecurringFreq  RecurringFreq
+	AllDay         bool
+	Attendees      []*Attendee
+	UserID         uint64
+}
+
+type RecurringFreq int
+
+const (
+	RecurringFreqOnce RecurringFreq = iota
+	RecurringFreqDaily
+	RecurringFreqWeekly
+	RecurringFreqMonthly
+	RecurringFreqYearly
+)
+
+type Attendee struct {
+	Name  string
+	Email string
+	Phone string
+}
 
 // config is the configuration specification supplied to the OAuth package.
 var config = &oauth2.Config{
@@ -106,6 +135,57 @@ func Client(db *sqlx.DB, uid uint64) (*http.Client, error) {
 	return config.Client(context, &t), nil
 }
 
+func (e *Event) Save(client *http.Client) error {
+	srv, err := calendar.New(client)
+	if err != nil {
+		return err
+	}
+	event := &calendar.Event{
+		Summary:  e.Title,
+		Location: e.Location,
+	}
+	if e.AllDay {
+		dt := e.StartTime.Format("2006-01-02")
+		tz := e.StartTime.Format("-0700")
+		event.Start = &calendar.EventDateTime{
+			Date:     dt,
+			TimeZone: tz,
+		}
+		event.End = event.Start
+	} else {
+		dt := e.StartTime.Format(time.RFC3339)
+		endTime := e.StartTime.Add(time.Duration(e.DurationInMins) *
+			time.Minute)
+		dt2 := endTime.Format(time.RFC3339)
+		tz := endTime.Format("-0700")
+		event.Start = &calendar.EventDateTime{
+			DateTime: dt,
+			TimeZone: tz,
+		}
+		event.End = &calendar.EventDateTime{
+			DateTime: dt2,
+			TimeZone: tz,
+		}
+	}
+	if e.Recurring {
+		var freq string
+		switch e.RecurringFreq {
+		case RecurringFreqDaily:
+			freq = "DAILY"
+		case RecurringFreqWeekly:
+			freq = "WEEKLY"
+		case RecurringFreqMonthly:
+			freq = "MONTHLY"
+		case RecurringFreqYearly:
+			freq = "YEARLY"
+		}
+		event.Recurrence = []string{"RRULE:FREQ=" + freq}
+	}
+	call := srv.Events.Insert("primary", event)
+	_, err = call.Do()
+	return err
+}
+
 func Events(client *http.Client) error {
 	srv, err := calendar.New(client)
 	if err != nil {
@@ -120,8 +200,8 @@ func Events(client *http.Client) error {
 	if len(events.Items) > 0 {
 		for _, i := range events.Items {
 			var when string
-			// If the DateTime is an empty string the Event is an all-day Event.
-			// So only Date is available.
+			// If the DateTime is an empty string the Event is an
+			// all-day Event. So only Date is available.
 			if i.Start.DateTime != "" {
 				when = i.Start.DateTime
 			} else {
