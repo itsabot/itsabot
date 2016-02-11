@@ -299,7 +299,7 @@ span.heading {
 	background-color: rgba(255, 63, 63, 0.32);
 }
 .blue {
-	background-color: rgba(16, 60, 211, 0.28);
+	background-color: rgba(16, 60, 211, 0.28) !important;
 }
 .green {
 	background-color: rgba(16, 211, 67, 0.27);

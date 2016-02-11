@@ -60,6 +60,7 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
+	e.Post("/api/calendar/events.json", handlerAPICalendarEventCreate)
 	e.Get("/api/conversation.json", handlerAPIConversationsShow)
 	e.Patch("/api/conversation.json", handlerAPIConversationsComplete)
 	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
@@ -705,6 +706,51 @@ func handlerAPICardDelete(c *echo.Context) error {
 	}
 	err = c.JSON(http.StatusOK, nil)
 	if err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPICalendarEventCreate(c *echo.Context) error {
+	var req struct {
+		Title          string
+		StartTime      uint64
+		DurationInMins int
+		AllDay         bool
+		Recurring      bool
+		RecurringFreq  cal.RecurringFreq
+		UserID         uint64
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	if len(req.Title) == 0 {
+		return jsonError(errors.New("Title cannot be blank"))
+	}
+	if req.DurationInMins <= 0 {
+		return jsonError(errors.New("DurationInMins must be > 0"))
+	}
+	if req.RecurringFreq > cal.RecurringFreqYearly {
+		return jsonError(errors.New("RecurringFreq is too high"))
+	}
+	if req.UserID <= 0 {
+		return jsonError(errors.New("UserID must be > 0"))
+	}
+	ev := &cal.Event{}
+	ev.Title = req.Title
+	var tmp time.Time
+	tmp = time.Unix(int64(req.StartTime), 0)
+	ev.StartTime = &tmp
+	ev.DurationInMins = req.DurationInMins
+	ev.AllDay = req.AllDay
+	ev.Recurring = req.Recurring
+	ev.RecurringFreq = req.RecurringFreq
+	ev.UserID = req.UserID
+	client, err := cal.Client(db, ev.UserID)
+	if err != nil {
+		return jsonError(err)
+	}
+	if err = ev.Save(client); err != nil {
 		return jsonError(err)
 	}
 	return nil
