@@ -4,8 +4,7 @@ ava.Searchbox.controller = function(props, pctrl) {
 	var ctrl = this
 	ctrl.update = function(ev) {
 		var query = ev.target.value
-		ctrl.props.Username(query)	
-		console.log(ctrl.props.Username())
+		ctrl.props.Username(query)
 		if (query.length < 3) {
 			// The server uses trigram indexes in Postgres, so input must be at
 			// least 3 characters
