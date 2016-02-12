@@ -298,7 +298,7 @@ span.heading {
 .red {
 	background-color: rgba(255, 63, 63, 0.32);
 }
-.blue {
+.blue, .autocomplete li:hover {
 	background-color: rgba(16, 60, 211, 0.28) !important;
 }
 .green {
@@ -595,6 +595,13 @@ input.form-control {
 }
 .btn-oauth-signin:hover {
 	opacity: 0.8;
+}
+.autocomplete {
+	margin-bottom: 0;
+}
+.autocomplete li {
+	padding: 0.5em 1em;
+	border-bottom: 1px solid #ccc;
 }
 @media (max-width: 320px) {
 	#btns .btn {
