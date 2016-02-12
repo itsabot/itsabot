@@ -119,6 +119,13 @@ ava.TrainShow.viewFull = function(ctrl) {
 		]),
 		m(".row.margin-top-sm", [
 			m(".col-md-4", m.component(ava.Chatbox, ctrl.props, ctrl)),
+			function() {
+				var windows = []
+				for (var i = 1; i < ctrl.props.chatWindowsOpen(); ++i) {
+					windows.push(m(".col-md-4", m.component(ava.Chatbox, ctrl.props, ctrl)))
+				}
+				return windows
+			}(),
 			m(".col-md-4.options", [
 				m("h4", "Quick Functions"),
 				m("ul.list-unstyled", [
