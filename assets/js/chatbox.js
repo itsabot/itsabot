@@ -27,22 +27,46 @@ ava.Chatbox.controller = function(_, pctrl) {
 		ev.scrollTop = ev.scrollHeight
 	}
 	ctrl.send = function(uid, sentence) {
+		if (ctrl.props.Contact().length === 0) {
+			// Send to the user
+			return m.request({
+				method: "POST",
+				url: "/api/conversations.json",
+				data: {
+					UserID: parseInt(uid),
+					Sentence: sentence,
+					Contact: ctrl.props.Contact(),
+					ContactMethod: ctrl.props.ContactMethod(),
+				}
+			})
+		}
+		// Else send to a contact
 		return m.request({
 			method: "POST",
-			url: "/api/conversations.json",
+			url: "/api/contacts/conversations.json",
 			data: {
 				UserID: parseInt(uid),
-				Sentence: sentence
+				Sentence: sentence,
+				Contact: ctrl.props.Contact(),
+				ContactMethod: ctrl.props.ContactMethod(),
 			}
 		})
 	}
+	ctrl.props = {
+		Contact: m.prop(""),
+		ContactMethod: m.prop(""), // Email or Phone
+	}
 }
 ava.Chatbox.view = function(ctrl, props) {
+	if (props == null) {
+		props = {
+			Username: m.prop(""),
+			Messages: m.prop([]),
+			UsernameDisabled: "",
+		}
+	}
 	return m("div.chat-container", [
-		m("input[type=text][placeholder=To:]", {
-			class: "disabled",
-			value: props.Username(),
-		}),
+		m.component(ava.Searchbox, props, ctrl),
 		m("ol#chat-box.chat-box", {
 			config: ctrl.scrollToBottom,
 		}, props.Messages().map(function(c) {

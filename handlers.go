@@ -64,7 +64,11 @@ func initRoutes(e *echo.Echo) {
 	e.Get("/api/conversation.json", handlerAPIConversationsShow)
 	e.Patch("/api/conversation.json", handlerAPIConversationsComplete)
 	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
+	e.Post("/api/contacts/conversations.json",
+		handlerAPIContactsConversationsCreate)
 	e.Get("/api/conversations.json", handlerAPIConversations)
+	e.Get("/api/contacts/search.json", handlerAPIContactsSearch)
+	e.Get("/api/contacts/search.json", handlerAPIContactsCreate)
 	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
 	e.Post("/api/trigger.json", handlerAPITriggerPkg)
 
@@ -935,6 +939,54 @@ func handlerAPIConversationsCreate(c *echo.Context) error {
 			return jsonError(err)
 		}
 	*/
+	if err := c.JSON(http.StatusOK, nil); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIContactsConversationsCreate(c *echo.Context) error {
+	var req struct {
+		Sentence      string
+		Contact       string
+		ContactMethod string
+	}
+	if err := c.Bind(&req); err != nil {
+		return jsonError(err)
+	}
+	// TODO insert into contact's messages, send message
+	return jsonError(errors.New("ContactsConversationsCreate not implemented"))
+}
+
+func handlerAPIContactsSearch(c *echo.Context) error {
+	uid, err := strconv.Atoi(c.Query("UserID"))
+	if err != nil {
+		return jsonError(err)
+	}
+	var results []dt.Contact
+	q := `SELECT name, email, phone FROM contacts
+	      WHERE userid=$1 AND name ILIKE $2`
+	term := "%" + c.Query("Query") + "%"
+	if err := db.Select(&results, q, uid, term); err != nil {
+		return jsonError(err)
+	}
+	if err := c.JSON(http.StatusOK, results); err != nil {
+		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerAPIContactsCreate(c *echo.Context) error {
+	var contact dt.Contact
+	if err := c.Bind(&contact); err != nil {
+		return jsonError(err)
+	}
+	q := `INSERT INTO contacts
+	      (name, email, phone, userid) VALUES
+	      (:name, :email, :phone, :userid)`
+	if _, err := db.NamedExec(q, contact); err != nil {
+		return jsonError(err)
+	}
 	if err := c.JSON(http.StatusOK, nil); err != nil {
 		return jsonError(err)
 	}

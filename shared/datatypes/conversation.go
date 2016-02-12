@@ -27,16 +27,16 @@ type Msg struct {
 	User            *User
 	StructuredInput *nlp.StructuredInput
 	Stems           []string
-	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
-	// individual words.
-	Tokens    []string
-	Route     string
-	Package   string
-	State     map[string]interface{}
-	CreatedAt *time.Time
+	Package         string
+	State           map[string]interface{}
+	CreatedAt       *time.Time
 	// AvaSent determines if msg is from the user or Ava
 	AvaSent       bool
 	NeedsTraining bool
+	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
+	// individual words.
+	Tokens []string
+	Route  string
 }
 
 type Feedback struct {

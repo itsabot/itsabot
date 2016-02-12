@@ -90,6 +90,7 @@ ava.TrainShow.controller = function() {
 		Cards: m.prop([]),
 		Messages: m.prop([]),
 		Preferences: m.prop([]),
+		UsernameDisabled: "disabled",
 	}
 	ctrl.loadConversation()
 }
@@ -122,7 +123,8 @@ ava.TrainShow.viewFull = function(ctrl) {
 			function() {
 				var windows = []
 				for (var i = 1; i < ctrl.props.chatWindowsOpen(); ++i) {
-					windows.push(m(".col-md-4", m.component(ava.Chatbox, ctrl.props, ctrl)))
+					windows.push(
+						m(".col-md-4", m.component(ava.Chatbox, null, ctrl)))
 				}
 				return windows
 			}(),
