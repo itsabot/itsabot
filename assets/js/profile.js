@@ -98,7 +98,7 @@ ava.Profile.viewFull = function(ctrl) {
 								m("a", {
 									class: "btn btn-sm",
 									href: "#/",
-									onclick: ava.Profile.signout
+									onclick: ctrl.signout,
 								}, "Sign out")
 							])
 						])

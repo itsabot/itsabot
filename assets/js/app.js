@@ -25,26 +25,21 @@ ava.prettyDate = function(time) {
 	diff < 60 && "just now" || diff < 120 && "1 minute ago" || diff < 3600 && Math.floor(diff / 60) + " minutes ago" || diff < 7200 && "1 hour ago" || diff < 86400 && Math.floor(diff / 3600) + " hours ago") || day_diff == 1 && "Yesterday" || day_diff < 7 && day_diff + " days ago" || day_diff < 31 && Math.ceil(day_diff / 7) + " weeks ago";
 }
 ava.auth2Callback = function() {
-	console.log("in auth2 callback")
 	ava.auth2 = gapi.auth2.getAuthInstance()
 	if (!!ava.auth2) {
-		console.log("auth2 is okay")
 		return
 	}
-	console.log("auth2 is null")
 	gapi.auth2.init({
 		client_id: "706975164052-s1tu2v5p2f7vnioee45bh3qbonkfe8qh.apps.googleusercontent.com",
 		scope: "https://www.googleapis.com/auth/calendar"
 	}).then(function(a) {
-		console.log("auth2 init returned")
-		console.log(a)
 		ava.auth2 = a
 		if (ava.auth2.isSignedIn.get()) {
 			var email = ava.auth2.currentUser.get().getBasicProfile().getEmail()
 			ava.toggleGoogleAccount(email)
 		}
 	}, function(err) {
-		console.log("err here")
+		console.error(err)
 	})
 }
 ava.toggleGoogleAccount = function(name) {
@@ -82,8 +77,6 @@ window.addEventListener('load', function() {
 		"/reset_password": ResetPassword,
 		"/profile": ava.Profile,
 		"/cards/new": ava.NewCard,
-		//"/train": Train,
-		//"/train/:sentenceID": Train,
 	})
 })
 })(!window.ava ? window.ava={} : window.ava);
