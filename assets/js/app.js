@@ -29,8 +29,9 @@ ava.auth2Callback = function() {
 	if (!!ava.auth2) {
 		return
 	}
+	var gid = document.querySelector("meta[name=google-client-id]").getAttribute("content")
 	gapi.auth2.init({
-		client_id: "706975164052-s1tu2v5p2f7vnioee45bh3qbonkfe8qh.apps.googleusercontent.com",
+		client_id: gid,
 		scope: "https://www.googleapis.com/auth/calendar"
 	}).then(function(a) {
 		ava.auth2 = a

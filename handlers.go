@@ -50,7 +50,6 @@ func initRoutes(e *echo.Echo) {
 
 	// API routes
 	e.Post("/", handlerMain)
-	e.Post("/main.json", handlerJSON)
 	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
@@ -61,30 +60,36 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
 	e.Post("/api/calendar/events.json", handlerAPICalendarEventCreate)
-	e.Get("/api/conversation.json", handlerAPIConversationsShow)
+	e.Get("/api/message.json", handlerAPIConversationsShow)
+	e.Post("/api/messages.json", handlerAPIMessagesCreate)
+	e.Get("/api/messages.json", handlerAPIMessages)
 	e.Patch("/api/conversation.json", handlerAPIConversationsComplete)
-	e.Post("/api/conversations.json", handlerAPIConversationsCreate)
 	e.Post("/api/contacts/conversations.json",
 		handlerAPIContactsConversationsCreate)
-	e.Get("/api/conversations.json", handlerAPIConversations)
 	e.Get("/api/contacts/search.json", handlerAPIContactsSearch)
-	e.Get("/api/contacts/search.json", handlerAPIContactsCreate)
-	e.Post("/api/conversations_preview.json", handlerAPIPreviewCmd)
 	e.Post("/api/trigger.json", handlerAPITriggerPkg)
 
 	// OAuth routes
 	e.Post("/oauth/connect/gcal.json", handlerOAuthConnectGoogleCalendar)
-	e.Post("/oauth/disconnect/gcal.json", handlerOAuthDisconnectGoogleCalendar)
+	e.Post("/oauth/disconnect/gcal.json",
+		handlerOAuthDisconnectGoogleCalendar)
 
 	// WebSockets
 	e.WebSocket("/ws", handlerWSConversations)
 }
 
+// CMDConn establishes a websocket and channel to listen for changes in assets/
+// to automatically reload the page.
+//
+// To get started with autoreload, please see cmd/fswatcher.sh (cross-platform)
+// or cmd/inotifywaitwatcher.sh (Linux).
 type CMDConn struct {
 	ws     *websocket.Conn
 	respch chan bool
 }
 
+// cmder manages opening and closing websockets to enable autoreload on any
+// assets/ change.
 func cmder(cmdch <-chan string, addconnch, delconnch <-chan *CMDConn) {
 	cmdconns := map[*websocket.Conn](chan bool){}
 	for {
@@ -97,7 +102,7 @@ func cmder(cmdch <-chan string, addconnch, delconnch <-chan *CMDConn) {
 			cmd := fmt.Sprintf(`{"cmd": "%s"}`, c)
 			fmt.Println("sending cmd:", cmd)
 			for ws, respch := range cmdconns {
-				// error ignored because we close no matter what
+				// Error ignored because we close no matter what
 				_ = websocket.Message.Send(ws, cmd)
 				respch <- true
 			}
@@ -105,6 +110,8 @@ func cmder(cmdch <-chan string, addconnch, delconnch <-chan *CMDConn) {
 	}
 }
 
+// initCMDGroup establishes routes for automatically reloading the page on any
+// assets/ change when a watcher is running (see cmd/*watcher.sh).
 func initCMDGroup(g *echo.Group) {
 	cmdch := make(chan string, 10)
 	addconnch := make(chan *CMDConn, 10)
@@ -127,6 +134,8 @@ func initCMDGroup(g *echo.Group) {
 	})
 }
 
+// handlerIndex presents the homepage to the user and populates the HTML with
+// server-side variables.
 func handlerIndex(c *echo.Context) error {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
@@ -135,11 +144,13 @@ func handlerIndex(c *echo.Context) error {
 	var s []byte
 	b := bytes.NewBuffer(s)
 	data := struct {
-		StripeKey string
-		IsProd    bool
+		StripeKey      string
+		GoogleClientID string
+		IsProd         bool
 	}{
-		StripeKey: os.Getenv("STRIPE_PUBLIC_KEY"),
-		IsProd:    os.Getenv("AVA_ENV") == "production",
+		StripeKey:      os.Getenv("STRIPE_PUBLIC_KEY"),
+		GoogleClientID: os.Getenv("GOOGLE_CLIENT_ID"),
+		IsProd:         os.Getenv("AVA_ENV") == "production",
 	}
 	if err := tmplLayout.Execute(b, data); err != nil {
 		log.Fatalln(err)
@@ -150,16 +161,28 @@ func handlerIndex(c *echo.Context) error {
 	return nil
 }
 
+// handlerTwilio responds to SMS messages sent through Twilio. Unlike other
+// handlers, we process internal errors without returning here, since any errors
+// should not be presented directly to the user -- they should be "humanized"
 func handlerTwilio(c *echo.Context) error {
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
+	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
+	errSent := false
 	ret, uid, err := processText(c)
 	if err != nil {
-		return err
+		log.Errorln("processText", err)
+		ret = errMsg
+		mc.SendBug(err)
+		errSent = true
 	}
 	if err = notifySockets(c, uid, c.Form("Body"), ret); err != nil {
-		return err
+		if !errSent {
+			log.Errorln("processText", err)
+			ret = errMsg
+			mc.SendBug(err)
+		}
 	}
 	var resp twilioResp
 	if len(ret) == 0 {
@@ -173,39 +196,8 @@ func handlerTwilio(c *echo.Context) error {
 	return nil
 }
 
-func handlerAPISentence(c *echo.Context) error {
-	var q string
-	var sent struct {
-		ID             int
-		ForeignID      string
-		Sentence       string
-		MaxAssignments int
-	}
-	if len(c.Query("id")) > 0 {
-		q = `
-		SELECT id, foreignid, sentence, maxassignments FROM trainings
-		WHERE trainedcount<3 AND id=$1
-		OFFSET FLOOR(RANDOM() * (SELECT COUNT(*) FROM trainings WHERE trainedcount<3 AND id=$1))`
-		err := db.Get(&sent, q, c.Query("id"))
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-	} else {
-		q = `
-		SELECT id, foreignid, sentence, maxassignments FROM trainings
-		WHERE trainedcount<3
-		OFFSET FLOOR(RANDOM() * (SELECT COUNT(*) FROM trainings WHERE trainedcount<3))`
-		err := db.Get(&sent, q)
-		if err != nil && err != sql.ErrNoRows {
-			return err
-		}
-	}
-	if err := c.JSON(http.StatusOK, sent); err != nil {
-		return err
-	}
-	return nil
-}
-
+// handlerMain is the endpoint to hit when you want to speak to Ava outside of
+// Twilio/SMS. This endpoint enables avarepl.
 func handlerMain(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("flexid", c.Form("flexid"))
@@ -224,41 +216,10 @@ func handlerMain(c *echo.Context) error {
 	return nil
 }
 
-func notifySockets(c *echo.Context, uid uint64, cmd, ret string) error {
-	s := ws.Get(uid)
-	if s == nil {
-		return errors.New("socket doesn't exist")
-	}
-	t := time.Now()
-	data := []struct {
-		Sentence  string
-		AvaSent   bool
-		CreatedAt *time.Time
-	}{
-		{
-			Sentence:  cmd,
-			AvaSent:   false,
-			CreatedAt: &t,
-		},
-	}
-	if len(ret) > 0 {
-		data = append(data, struct {
-			Sentence  string
-			AvaSent   bool
-			CreatedAt *time.Time
-		}{
-			Sentence:  ret,
-			AvaSent:   true,
-			CreatedAt: &t,
-		})
-	}
-	return websocket.JSON.Send(s, &data)
-}
-
-func handlerJSON(c *echo.Context) error {
+// handlerAPITriggerPkg enables easier communication via JSON with the training
+// interface when trainers want to "trigger" an action on behalf of a user.
+func handlerAPITriggerPkg(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
-	c.Set("flexid", c.Form("flexid"))
-	c.Set("flexidtype", c.Form("flexidtype"))
 	c.Set("uid", c.Form("uid"))
 	msg, err := preprocess(c)
 	if err != nil {
@@ -302,35 +263,8 @@ func handlerJSON(c *echo.Context) error {
 	return nil
 }
 
-func handlerAPITriggerPkg(c *echo.Context) error {
-	log.Debugln("c", c.Get("cmd"))
-	msg, err := preprocess(c)
-	if err != nil {
-		log.WithField("fn", "preprocessForMessage").Error(err)
-		return jsonError(err)
-	}
-	pkg, route, _, err := getPkg(msg)
-	if err != nil {
-		log.WithField("fn", "getPkg").Error(err)
-		return jsonError(err)
-	}
-	msg.Route = route
-	if pkg == nil {
-		msg.Package = ""
-	} else {
-		msg.Package = pkg.P.Config.Name
-	}
-	ret, err := callPkg(pkg, msg, false)
-	if err != nil {
-		return jsonError(err)
-	}
-	resp := struct{ Msg string }{Msg: ret}
-	if err = c.JSON(http.StatusOK, resp); err != nil {
-		return jsonError(err)
-	}
-	return nil
-}
-
+// handlerAPILoginSubmit processes a login request providing back a session
+// token to be saved client-side for security.
 func handlerAPILoginSubmit(c *echo.Context) error {
 	var u struct {
 		Id       int
@@ -374,6 +308,8 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPISignupSubmit signs up a user after server-side validation of all
+// passed in values.
 func handlerAPISignupSubmit(c *echo.Context) error {
 	req := struct {
 		Name     string
@@ -426,7 +362,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		stripeCustomerID = cust.ID
 	}
 
-	// db stuff...
+	// Begin DB access
 	tx, err := db.Beginx()
 	if err != nil {
 		return jsonError(errors.New("Something went wrong. Try again."))
@@ -460,7 +396,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return jsonError(errors.New(
 			"Something went wrong. Please try again."))
 	}
-	// end db stuff
+	// End DB access
 
 	var resp struct {
 		Id           int
@@ -484,6 +420,8 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPIProfile shows a user profile with the user's current addresses,
+// credit cards, and contact information.
 func handlerAPIProfile(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
@@ -517,28 +455,25 @@ func handlerAPIProfile(c *echo.Context) error {
 	if err != nil {
 		return jsonError(err)
 	}
-	q = `
-		SELECT flexid FROM userflexids
-		WHERE flexidtype=2 AND userid=$1
-		LIMIT 10`
+	q = `SELECT flexid FROM userflexids
+	     WHERE flexidtype=2 AND userid=$1
+	     LIMIT 10`
 	err = db.Select(&user.Phones, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return jsonError(err)
 	}
-	q = `
-		SELECT id, cardholdername, last4, expmonth, expyear, brand
-		FROM cards
-		WHERE userid=$1
-		LIMIT 10`
+	q = `SELECT id, cardholdername, last4, expmonth, expyear, brand
+	     FROM cards
+	     WHERE userid=$1
+	     LIMIT 10`
 	err = db.Select(&user.Cards, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return jsonError(err)
 	}
-	q = `
-		SELECT id, name, line1, line2, city, state, country, zip
-		FROM addresses
-		WHERE userid=$1
-		LIMIT 10`
+	q = `SELECT id, name, line1, line2, city, state, country, zip
+	     FROM addresses
+	     WHERE userid=$1
+	     LIMIT 10`
 	err = db.Select(&user.Addresses, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return jsonError(err)
@@ -549,6 +484,15 @@ func handlerAPIProfile(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPIProfileView is used to validate a purchase or disclosure of
+// sensitive information by a package. This method of validation has the user
+// view their profile page, meaning that they have to be logged in on their
+// device, ensuring that they either have a valid email/password or a valid
+// session token in their cookies before the package will continue. This is a
+// useful security measure because SMS is not a secure means of communication;
+// SMS messages can easily be hijacked or spoofed. Taking the user to an HTTPS
+// site offers the developer a better guarantee that information entered is
+// coming from the correct person.
 func handlerAPIProfileView(c *echo.Context) error {
 	var err error
 	req := struct {
@@ -578,6 +522,8 @@ Response:
 	return nil
 }
 
+// handlerAPIForgotPasswordSubmit asks the server to send the user a "Forgot
+// Password" email with instructions for resetting their password.
 func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	var req struct {
 		Email string
@@ -616,6 +562,10 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPIResetPasswordSubmit is arrived at through the email generated by
+// handlerAPIForgotPasswordSubmit. This endpoint resets the user password with
+// another bcrypt hash after validating on the server that their new password is
+// sufficient.
 func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	var req struct {
 		Secret   string
@@ -663,6 +613,9 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPICardSubmit creates a new credit card via Stripe. As little
+// information as possible is kept on the server to protect the users. Card
+// details like the card number never touch the server.
 func handlerAPICardSubmit(c *echo.Context) error {
 	var req struct {
 		StripeToken    string
@@ -755,6 +708,9 @@ func handlerAPICardDelete(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPICalendarEventCreate creates an event on a user's calendaer. Right
+// now support is built in for Google Calendar, but additional support will be
+// added for Office/Exchange and others.
 func handlerAPICalendarEventCreate(c *echo.Context) error {
 	var req struct {
 		Title          string
@@ -800,7 +756,11 @@ func handlerAPICalendarEventCreate(c *echo.Context) error {
 	return nil
 }
 
-func handlerAPIConversations(c *echo.Context) error {
+// handlerAPIMessages loads up conversations that need training for the
+// Training Index endpoint. A max of 1 message per user will be loaded, since
+// any user that needs help will receive help for their most recent request
+// via their most recent message.
+func handlerAPIMessages(c *echo.Context) error {
 	var msgs []struct {
 		ID        uint64
 		Sentence  string
@@ -823,6 +783,8 @@ func handlerAPIConversations(c *echo.Context) error {
 	return nil
 }
 
+// handlerAPIConversationsComplete marks a conversation as complete, so it's no
+// longer presented in the Training Index.
 func handlerAPIConversationsComplete(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
@@ -833,6 +795,9 @@ func handlerAPIConversationsComplete(c *echo.Context) error {
 	return err
 }
 
+// handlerAPIMessagesShow returns all relevant messages and information in a
+// single conversation to enable trainers to get a sense of what happened in the
+// messages leading up to this problem and provide a better and faster solution.
 func handlerAPIConversationsShow(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
@@ -946,7 +911,9 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	return nil
 }
 
-func handlerAPIConversationsCreate(c *echo.Context) error {
+// handlerAPIMessagesCreate sends a message to a user on behalf of Ava and is
+// called via the training interface.
+func handlerAPIMessagesCreate(c *echo.Context) error {
 	var req struct {
 		Sentence string
 		UserID   uint64
@@ -985,6 +952,9 @@ func handlerAPIConversationsCreate(c *echo.Context) error {
 	return nil
 }
 
+// TODO
+// handlerAPIContactsConversationsCreate is not yet implemented. At this point
+// we're finalizing the Contact API before continuing.
 func handlerAPIContactsConversationsCreate(c *echo.Context) error {
 	var req struct {
 		Sentence      string
@@ -998,6 +968,8 @@ func handlerAPIContactsConversationsCreate(c *echo.Context) error {
 	return jsonError(errors.New("ContactsConversationsCreate not implemented"))
 }
 
+// handlerAPIContactsSearch provides a way to query for contacts using full-text
+// search on their name, email and phone number.
 func handlerAPIContactsSearch(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("UserID"))
 	if err != nil {
@@ -1012,47 +984,6 @@ func handlerAPIContactsSearch(c *echo.Context) error {
 	}
 	if err := c.JSON(http.StatusOK, results); err != nil {
 		return jsonError(err)
-	}
-	return nil
-}
-
-func handlerAPIContactsCreate(c *echo.Context) error {
-	var contact dt.Contact
-	if err := c.Bind(&contact); err != nil {
-		return jsonError(err)
-	}
-	q := `INSERT INTO contacts
-	      (name, email, phone, userid) VALUES
-	      (:name, :email, :phone, :userid)`
-	if _, err := db.NamedExec(q, contact); err != nil {
-		return jsonError(err)
-	}
-	if err := c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
-	}
-	return nil
-}
-
-func handlerAPIPreviewCmd(c *echo.Context) error {
-	msg, err := preprocess(c)
-	if err != nil || msg == nil /* trained */ {
-		log.WithField("fn", "preprocessForMessage").Error(err)
-		return err
-	}
-	pkg, route, followup, err := getPkg(msg)
-	if err != nil && err != ErrMissingPackage {
-		log.WithField("fn", "getPkg").Error(err)
-		return err
-	}
-	msg.Route = route
-	msg.Package = pkg.P.Config.Name
-	if err = msg.Save(db); err != nil {
-		return err
-	}
-	// TODO use ret.Sentence
-	_, err = callPkg(pkg, msg, followup)
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -1125,6 +1056,8 @@ func handlerOAuthDisconnectGoogleCalendar(c *echo.Context) error {
 	return nil
 }
 
+// handlerWSConversations establishes a socket connection for the training
+// interface to reload as new user messages arrive.
 func handlerWSConversations(c *echo.Context) error {
 	uid, err := strconv.ParseUint(c.Query("UserID"), 10, 64)
 	if err != nil {
@@ -1145,6 +1078,8 @@ func handlerWSConversations(c *echo.Context) error {
 	return nil
 }
 
+// jsonError builds a simple JSON message from an error type in the format of
+// { "Msg": err.Error() }
 func jsonError(err error) error {
 	tmp := strings.Replace(err.Error(), `"`, "'", -1)
 	return errors.New(`{"Msg":"` + tmp + `"}`)
@@ -1167,6 +1102,8 @@ func validatePhone(s string) error {
 	return nil
 }
 
+// randSeq generates a random string of letters to provide a secure password
+// reset token.
 func randSeq(n int) string {
 	b := make([]rune, n)
 	for i := range b {

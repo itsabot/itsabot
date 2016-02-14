@@ -41,7 +41,7 @@ ava.TrainShow.controller = function() {
 	ctrl.loadConversation = function() {
 		m.request({
 			method: "GET",
-			url: "/api/conversation.json?id=" + id + "&uid=" + uid
+			url: "/api/message.json?id=" + id + "&uid=" + uid
 		}).then(function(resp) {
 			ctrl.props.Messages(resp.Chats)
 			ctrl.props.Username(resp.Username)
@@ -79,7 +79,7 @@ ava.TrainShow.controller = function() {
 		if (confirm("Are you sure you want to have the user add a calendar?")) {
 			m.request({
 				method: "POST",
-				url: "/main.json?cmd=add calendar&uid=" + cookie.getItem("id"),
+				url: "/api/trigger.json?cmd=add calendar&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				ctrl.loadConversation()
 			}, function(err) {
@@ -91,7 +91,7 @@ ava.TrainShow.controller = function() {
 		if (confirm("Are you sure you want to have the user add a credit card?")) {
 			m.request({
 				method: "POST",
-				url: "/main.json?cmd=add credit card&uid=" + cookie.getItem("id"),
+				url: "/api/trigger.json?cmd=add credit card&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				ctrl.loadConversation()
 			}, function(err) {
@@ -103,7 +103,7 @@ ava.TrainShow.controller = function() {
 		if (confirm("Are you sure you want to have the user add a shipping address?")) {
 			m.request({
 				method: "POST",
-				url: "/main.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
+				url: "/api/trigger.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				m.route("/train/" + m.route.param("id") +
 						"?uid=" + m.route.param("uid"))

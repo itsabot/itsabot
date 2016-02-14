@@ -15,7 +15,7 @@ ava.TrainIndex.controller = function() {
 	ctrl.props = {
 		convos: m.request({
 			method: "GET",
-			url: "/api/conversations.json"
+			url: "/api/messages.json"
 		}),
 		isTrained: m.prop(!!m.route.param("trained"))
 	}

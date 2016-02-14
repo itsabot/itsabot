@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
@@ -20,12 +22,9 @@ import (
 	"github.com/avabot/ava/shared/datatypes"
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/nlp"
+	"github.com/avabot/ava/shared/pkg"
 	"github.com/avabot/ava/shared/sms"
 )
-
-// TODO variable routes. e.g. "Help me get drunk" could route to purchase
-// (alcohol) or bars nearby. Ava should ask the user which route to send them
-// to on packages with overlapping routes.
 
 var db *sqlx.DB
 var tc *twilio.Client
@@ -69,7 +68,11 @@ func main() {
 			showHelp = false
 		}
 		if c.Bool("server") {
-			db = connectDB()
+			var err error
+			db, err = pkg.ConnectDB()
+			if err != nil {
+				log.Fatalln("connecting to db", err)
+			}
 			startServer()
 			showHelp = false
 		}
@@ -80,6 +83,7 @@ func main() {
 	app.Run(os.Args)
 }
 
+// startServer initializes any clients that are needed and boots packages
 func startServer() {
 	if err := checkRequiredEnvVars(); err != nil {
 		log.Errorln("checking env vars", err)
@@ -107,7 +111,7 @@ func startServer() {
 	e.Run(":" + os.Getenv("PORT"))
 }
 
-// bootRPCServer starts the rpc for ava core in a go routine and returns
+// bootRPCServer starts the rpc for Ava core in a go routine and returns
 // the server address
 func bootRPCServer() (addr string, err error) {
 	log.Debugln("booting ava core rpc server")
@@ -129,26 +133,11 @@ func bootRPCServer() (addr string, err error) {
 			go rpc.ServeConn(conn)
 		}
 	}()
-	return // using named return params
+	return addr, err
 }
 
-func connectDB() *sqlx.DB {
-	log.Debugln("connecting to db")
-	var d *sqlx.DB
-	var err error
-	if os.Getenv("AVA_ENV") == "production" {
-		d, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
-	} else {
-		d, err = sqlx.Connect("postgres",
-			"user=postgres dbname=ava sslmode=disable")
-	}
-	if err != nil {
-		log.Errorln("connecting to db", err)
-	}
-	log.Infoln("connected to db")
-	return d
-}
-
+// preprocess converts a user input into a Msg that's been persisted to the
+// database
 func preprocess(c *echo.Context) (*dt.Msg, error) {
 	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
@@ -167,6 +156,12 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 	return msg, nil
 }
 
+// processText is Ava's core logic. This function processes a user's message,
+// routes it to the correct package, and handles edge cases like offensive
+// language before returning a response to the user. Any user-presentable error
+// is returned in the string. Errors returned from this function are not for the
+// user, so they are handled by Ava explicitly on this function's return
+// (logging, notifying admins, etc.).
 func processText(c *echo.Context) (ret string, uid uint64, err error) {
 	msg, err := preprocess(c)
 	if err != nil {
@@ -237,10 +232,7 @@ func processText(c *echo.Context) (ret string, uid uint64, err error) {
 	return m.Sentence, m.User.ID, nil
 }
 
-func validateParams(c *echo.Context) (uint64, string, int) {
-	var uid uint64
-	var fidT int
-	var fid string
+func validateParams(c *echo.Context) (uid uint64, fid string, fidT int) {
 	var err error
 	tmp, ok := c.Get("uid").(string)
 	if !ok {
@@ -301,4 +293,37 @@ func checkRequiredEnvVars() error {
 	}
 	// TODO Check for DATABASE_URL if AVA_ENV==production
 	return nil
+}
+
+// notifySockets sends listening clients new messages over WebSockets,
+// eliminating the need for trainers to constantly reload the page.
+func notifySockets(c *echo.Context, uid uint64, cmd, ret string) error {
+	s := ws.Get(uid)
+	if s == nil {
+		return errors.New("socket doesn't exist")
+	}
+	t := time.Now()
+	data := []struct {
+		Sentence  string
+		AvaSent   bool
+		CreatedAt *time.Time
+	}{
+		{
+			Sentence:  cmd,
+			AvaSent:   false,
+			CreatedAt: &t,
+		},
+	}
+	if len(ret) > 0 {
+		data = append(data, struct {
+			Sentence  string
+			AvaSent   bool
+			CreatedAt *time.Time
+		}{
+			Sentence:  ret,
+			AvaSent:   true,
+			CreatedAt: &t,
+		})
+	}
+	return websocket.JSON.Send(s, &data)
 }

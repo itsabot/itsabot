@@ -31,7 +31,7 @@ ava.Chatbox.controller = function(_, pctrl) {
 			// Send to the user
 			return m.request({
 				method: "POST",
-				url: "/api/conversations.json",
+				url: "/api/messages.json",
 				data: {
 					UserID: parseInt(uid),
 					Sentence: sentence,
@@ -43,9 +43,9 @@ ava.Chatbox.controller = function(_, pctrl) {
 		// Else send to a contact
 		return m.request({
 			method: "POST",
-			url: "/api/contacts/conversations.json",
+			url: "/api/contacts/messages.json",
 			data: {
-				UserID: parseInt(uid),
+					UserID: parseInt(uid),
 				Sentence: sentence,
 				Contact: ctrl.props.Contact(),
 				ContactMethod: ctrl.props.ContactMethod(),

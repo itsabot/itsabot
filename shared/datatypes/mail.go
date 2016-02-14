@@ -6,9 +6,17 @@ import (
 	"os"
 	"time"
 
+	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/sendgrid/sendgrid-go"
 )
 
+// MailClient provides a higher level API over a raw SendGrid client. This has
+// the following benefits:
+//
+// 1. It enables a standardized API when developers want to swap SendGrid for
+// something else.
+// 2. It reduces the workload to perform common tasks, such as sending users
+// purchase confirmations or sending vendors requests for products purchased.
 type MailClient struct {
 	sgc *sendgrid.SGClient
 }
@@ -65,8 +73,8 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 	} else {
 		subj = fmt.Sprintf("[TEST - PLEASE IGNORE] Order Request: #%s",
 			p.DisplayID())
-		(*p.Vendor).ContactName = "Evan"
-		(*p.Vendor).ContactEmail = "egtann@gmail.com"
+		(*p.Vendor).ContactName = os.Getenv("ADMIN_NAME")
+		(*p.Vendor).ContactEmail = os.Getenv("ADMIN_EMAIL")
 	}
 	text := "<html><body>"
 	text += fmt.Sprintf("<p>Hi %s:</p>", p.Vendor.ContactName)
@@ -107,6 +115,23 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 	return sg.Send(subj, text, p.Vendor)
 }
 
+// SendBug is called every time an unhandled error occurs, particularly when
+// that error happens as a result of the message a user sends to Ava
+func (sg *MailClient) SendBug(err error) {
+	subj := "[Bug] " + err.Error()[0:24]
+	if len(err.Error()) > 24 {
+		subj += "..."
+	}
+	text := "<html><body>"
+	text += fmt.Sprintf("<p>%s</p>", err.Error())
+	text += "</body></html>"
+	if err := sg.Send(subj, text, GetAdmin()); err != nil {
+		log.Errorln("sending bug report", err)
+	}
+}
+
+// Send a custom HTML email to any Contactable (user, vendor, admin, etc.) from
+// Ava
 func (sg *MailClient) Send(subj, html string, c Contactable) error {
 	msg := sendgrid.NewMail()
 	msg.SetFrom("ava@avabot.co")
