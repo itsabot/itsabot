@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/golang/protobuf/proto"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
+	"github.com/golang/protobuf/proto"
 )
 
 type ProtoClient struct {

@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/avabot/ava",
-	"GoVersion": "go1.5",
+	"GoVersion": "go1.5.3",
 	"Packages": [
 		"./..."
 	],
@@ -52,10 +52,6 @@
 		{
 			"ImportPath": "github.com/garyburd/go-oauth/oauth",
 			"Rev": "255d509a6f270332ffcaef6723047891319a2ffb"
-		},
-		{
-			"ImportPath": "github.com/golang/protobuf/proto",
-			"Rev": "45bba206dd5270d96bac4942dcfe515726613249"
 		},
 		{
 			"ImportPath": "github.com/jmoiron/sqlx",
@@ -157,10 +153,6 @@
 			"Rev": "8a57ed94ffd43444c0879fe75701732a38afc985"
 		},
 		{
-			"ImportPath": "golang.org/x/sys/unix",
-			"Rev": "eb2c74142fd19a79b3f237334c7384d5167b1b46"
-		},
-		{
 			"ImportPath": "google.golang.org/api/calendar/v3",
 			"Rev": "f6ba98773d96b877b246f3a9266493dfc11e276b"
 		},
@@ -171,10 +163,6 @@
 		{
 			"ImportPath": "google.golang.org/api/googleapi",
 			"Rev": "f6ba98773d96b877b246f3a9266493dfc11e276b"
-		},
-		{
-			"ImportPath": "google.golang.org/appengine",
-			"Rev": "6bde959377a90acb53366051d7d587bfd7171354"
 		},
 		{
 			"ImportPath": "google.golang.org/cloud/compute/metadata",

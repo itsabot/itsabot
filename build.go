@@ -23,17 +23,14 @@ func bootDependencies(avaRPCAddr string) {
 	log.WithFields(log.Fields{
 		"ava_core_addr": avaRPCAddr,
 	}).Debugln("booting dependencies")
-
 	content, err := ioutil.ReadFile("packages.json")
 	if err != nil {
 		log.Fatalln("reading packages.json", err)
 	}
-
 	var conf packagesConf
 	if err := json.Unmarshal(content, &conf); err != nil {
 		log.Fatalln("err: unmarshaling packages", err)
 	}
-
 	for name := range conf.Dependencies {
 		log.WithFields(log.Fields{"pkg": name}).Debugln("booting")
 		// NOTE assumes packages are installed with go install ./...,
