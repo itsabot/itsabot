@@ -30,6 +30,7 @@ import (
 var db *sqlx.DB
 var tc *twilio.Client
 var mc *dt.MailClient
+var ws dt.AtomicWebSocketMap = dt.NewAtomicWebSocketMap()
 var ner nlp.Classifier
 var offensive map[string]struct{}
 var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
@@ -166,11 +167,11 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 	return msg, nil
 }
 
-func processText(c *echo.Context) (string, error) {
+func processText(c *echo.Context) (ret string, uid uint64, err error) {
 	msg, err := preprocess(c)
 	if err != nil {
 		log.WithField("fn", "preprocessForMessage").Error(err)
-		return "", err
+		return "", 0, err
 	}
 	log.Debugln("processed input into message...")
 	log.Debugln("commands:", msg.StructuredInput.Commands)
@@ -179,7 +180,7 @@ func processText(c *echo.Context) (string, error) {
 	pkg, route, followup, err := getPkg(msg)
 	if err != nil {
 		log.WithField("fn", "getPkg").Error(err)
-		return "", err
+		return "", msg.User.ID, err
 	}
 	msg.Route = route
 	if pkg == nil {
@@ -188,21 +189,21 @@ func processText(c *echo.Context) (string, error) {
 		msg.Package = pkg.P.Config.Name
 	}
 	if err = msg.Save(db); err != nil {
-		return "", err
+		return "", msg.User.ID, err
 	}
-	ret := respondWithOffense(offensive, msg)
+	ret = respondWithOffense(offensive, msg)
 	if len(ret) == 0 {
 		log.Debugln("followup?", followup)
 		ret, err = callPkg(pkg, msg, followup)
 		if err != nil {
-			return "", err
+			return "", msg.User.ID, err
 		}
 		responseNeeded := true
 		if len(ret) == 0 {
 			responseNeeded, ret = respondWithNicety(msg)
 		}
 		if !responseNeeded {
-			return "", nil
+			return "", msg.User.ID, nil
 		}
 	}
 	log.Debugln("here...", ret)
@@ -213,7 +214,7 @@ func processText(c *echo.Context) (string, error) {
 		m.Sentence = language.Confused()
 		msg.NeedsTraining = true
 		if err = msg.Update(db); err != nil {
-			return "", err
+			return "", m.User.ID, err
 		}
 	} else {
 		m.Sentence = ret
@@ -222,7 +223,7 @@ func processText(c *echo.Context) (string, error) {
 		m.Package = pkg.P.Config.Name
 	}
 	if err = m.Save(db); err != nil {
-		return "", err
+		return "", m.User.ID, err
 	}
 	/*
 		// TODO handle earlier when classifying
@@ -233,7 +234,7 @@ func processText(c *echo.Context) (string, error) {
 			}
 		}
 	*/
-	return m.Sentence, nil
+	return m.Sentence, m.User.ID, nil
 }
 
 func validateParams(c *echo.Context) (uint64, string, int) {

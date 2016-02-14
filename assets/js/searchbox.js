@@ -44,7 +44,6 @@ ava.Searchbox.controller = function(props, pctrl) {
 	}
 }
 ava.Searchbox.view = function(ctrl, props, pctrl) {
-	console.log(ctrl.props.Username())
 	return m("div", [
 		m("input[type=text][placeholder=To:].form-control.form-white", {
 			disabled: props.UsernameDisabled,

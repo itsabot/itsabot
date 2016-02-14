@@ -75,6 +75,9 @@ func initRoutes(e *echo.Echo) {
 	// OAuth routes
 	e.Post("/oauth/connect/gcal.json", handlerOAuthConnectGoogleCalendar)
 	e.Post("/oauth/disconnect/gcal.json", handlerOAuthDisconnectGoogleCalendar)
+
+	// WebSockets
+	e.WebSocket("/ws", handlerWSConversations)
 }
 
 type CMDConn struct {
@@ -151,8 +154,11 @@ func handlerTwilio(c *echo.Context) error {
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
-	ret, err := processText(c)
+	ret, uid, err := processText(c)
 	if err != nil {
+		return err
+	}
+	if err = notifySockets(c, uid, c.Form("Body"), ret); err != nil {
 		return err
 	}
 	var resp twilioResp
@@ -205,14 +211,48 @@ func handlerMain(c *echo.Context) error {
 	c.Set("flexid", c.Form("flexid"))
 	c.Set("flexidtype", c.Form("flexidtype"))
 	c.Set("uid", c.Form("uid"))
-	ret, err := processText(c)
+	ret, uid, err := processText(c)
 	if err != nil {
+		return err
+	}
+	if err = notifySockets(c, uid, c.Form("cmd"), ret); err != nil {
 		return err
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
 		return err
 	}
 	return nil
+}
+
+func notifySockets(c *echo.Context, uid uint64, cmd, ret string) error {
+	s := ws.Get(uid)
+	if s == nil {
+		return errors.New("socket doesn't exist")
+	}
+	t := time.Now()
+	data := []struct {
+		Sentence  string
+		AvaSent   bool
+		CreatedAt *time.Time
+	}{
+		{
+			Sentence:  cmd,
+			AvaSent:   false,
+			CreatedAt: &t,
+		},
+	}
+	if len(ret) > 0 {
+		data = append(data, struct {
+			Sentence  string
+			AvaSent   bool
+			CreatedAt *time.Time
+		}{
+			Sentence:  ret,
+			AvaSent:   true,
+			CreatedAt: &t,
+		})
+	}
+	return websocket.JSON.Send(s, &data)
 }
 
 func handlerJSON(c *echo.Context) error {
@@ -1081,6 +1121,26 @@ func handlerOAuthDisconnectGoogleCalendar(c *echo.Context) error {
 	}
 	if err := c.JSON(http.StatusOK, nil); err != nil {
 		return jsonError(err)
+	}
+	return nil
+}
+
+func handlerWSConversations(c *echo.Context) error {
+	uid, err := strconv.ParseUint(c.Query("UserID"), 10, 64)
+	if err != nil {
+		return err
+	}
+	ws.Set(uid, c.Socket())
+	err = websocket.Message.Send(ws.Get(uid), "connected to socket")
+	if err != nil {
+		return err
+	}
+	var msg string
+	for {
+		// Keep the socket open
+		if err = websocket.Message.Receive(ws.Get(uid), &msg); err != nil {
+			return err
+		}
 	}
 	return nil
 }

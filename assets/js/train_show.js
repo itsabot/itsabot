@@ -5,7 +5,37 @@ ava.TrainShow.controller = function() {
 		m.route("/login?r=" + encodeURIComponent(window.location.search))
 		return
 	}
+	var uri = 'ws:'
+	if (window.location.protocol === 'https:') {
+		uri = 'wss:'
+	}
+	var uid = parseInt(cookie.getItem("id"))
+	uri += '//' + window.location.host + '/ws?UserID=' + uid
+	var sockInterval
 	var ctrl = this
+	ctrl.connectSocket = function() {
+		ava.socket = new WebSocket(uri)
+		ava.socket.onopen = function() {
+			console.log("opened socket")
+			clearInterval(sockInterval)
+		}
+		ava.socket.onmessage = function(ev) {
+			console.log("message received")
+			try { var msgs = JSON.parse(ev.data) } catch(err) { return }
+			for (var i = 0; i < msgs.length; ++i) {
+				ctrl.props.Messages().push(msgs[i])
+			}
+			m.redraw(true)
+		}
+		ava.socket.onclose = function() {
+			console.log("socket closed, setting retry interval")
+			sockInterval = setInterval(function() {
+				console.log("retrying socket...")
+				ctrl.connectSocket()
+			}, 5000)
+		}
+	}
+	ctrl.connectSocket()
 	id = m.route.param("id")
 	uid = m.route.param("uid")
 	ctrl.loadConversation = function() {

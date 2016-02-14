@@ -13,7 +13,7 @@ import (
 
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/context"
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/internal"
-	"github.com/avabot/ava/Godeps/_workspace/src/google.golang.org/appengine/urlfetch"
+	"google.golang.org/appengine/urlfetch"
 )
 
 func init() {
