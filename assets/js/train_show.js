@@ -119,7 +119,6 @@ ava.TrainShow.controller = function() {
 		Calendars: m.prop([]),
 		Cards: m.prop([]),
 		Messages: m.prop([]),
-		Preferences: m.prop([]),
 		UsernameDisabled: "disabled",
 	}
 	ctrl.loadConversation()
@@ -178,38 +177,6 @@ ava.TrainShow.viewFull = function(ctrl) {
 					]),
 					m("li", [
 						m("a[href=#/]", {
-							onclick: ctrl.toggleUserPrefs
-						}, "User preferences"),
-						m("#user-prefs.margin-sm", {
-							class: "hidden"
-						}, [
-							m(".margin-left", [
-								m("ul.list-unstyled", [
-									ctrl.props.Preferences().map(function(item) {
-										return m("li", item)
-									})
-								]),
-								m("a.btn.btn-xs[href=#/]", {
-									onclick: ctrl.addPreference
-								}, "+ New preference")
-							])
-						])
-					]),
-					m("li", m("a[href=#/]", "Past purchases")),
-					m("li", [
-						m("a[href=#/]", {
-							onclick: ctrl.toggleContactSearch
-						}, "Find contact"),
-						m("#contact-search.margin-sm", {
-							class: "hidden"
-						}, [
-							m("input.form-control.form-white", {
-								placeholder: "Search contacts"
-							})
-						])
-					]),
-					m("li", [
-						m("a[href=#/]", {
 							onclick: ctrl.toggleAccountInfo
 						}, "Edit account info (address, credit card, etc)"),
 						m("#edit-account-info.margin-sm", {
@@ -264,23 +231,7 @@ ava.TrainShow.viewFull = function(ctrl) {
 							])
 						])
 					])
-				]),
-				m(".form-group", { class: "hidden" }, [
-					m("input.form-control[type=text]", {
-						placeholder: "Your message"
-					})
-				]),
-				m("div", { class: "hidden" }, [
-					m("input.form-control[type=text]", {
-						placeholder: "New preference key",
-					}),
-					m("input.form-control[type=text]", {
-						placeholder: "New preference value",
-					}),
-					m("input.btn.btn-sm[type=submit]", {
-						class: "disabled"
-					})
-				]),
+				])
 			])
 		])
 	])
