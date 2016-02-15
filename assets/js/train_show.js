@@ -5,6 +5,10 @@ ava.TrainShow.controller = function() {
 		m.route("/login?r=" + encodeURIComponent(window.location.search))
 		return
 	}
+	if (!ava.isTrainer()) {
+		m.route("/profile")
+		return
+	}
 	var uri = 'ws:'
 	if (window.location.protocol === 'https:') {
 		uri = 'wss:'
@@ -37,7 +41,7 @@ ava.TrainShow.controller = function() {
 	}
 	ctrl.connectSocket()
 	id = m.route.param("id")
-	uid = m.route.param("uid")
+	uid = cookie.getItem("id")
 	ctrl.loadConversation = function() {
 		m.request({
 			method: "GET",
@@ -106,7 +110,7 @@ ava.TrainShow.controller = function() {
 				url: "/api/trigger.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				m.route("/train/" + m.route.param("id") +
-						"?uid=" + m.route.param("uid"))
+						"?uid=" + cookie.getItem("id"))
 			}, function(err) {
 				console.error(err)
 			})

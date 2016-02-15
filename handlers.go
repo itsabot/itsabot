@@ -280,10 +280,6 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 // handlerAPILoginSubmit processes a login request providing back a session
 // token to be saved client-side for security.
 func handlerAPILoginSubmit(c *echo.Context) error {
-	var u struct {
-		Id       int
-		Password []byte
-	}
 	var req struct {
 		Email    string
 		Password string
@@ -291,7 +287,12 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return jsonError(err)
 	}
-	q := `SELECT id, password FROM users WHERE email=$1`
+	var u struct {
+		Id       int
+		Password []byte
+		Trainer  bool
+	}
+	q := `SELECT id, password, trainer FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		return jsonError(ErrInvalidUserPass)
@@ -311,8 +312,10 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	var resp struct {
 		Id           int
 		SessionToken string
+		Trainer      bool
 	}
 	resp.Id = u.Id
+	resp.Trainer = u.Trainer
 	tmp := uuid.NewV4().Bytes()
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	// TODO save session token

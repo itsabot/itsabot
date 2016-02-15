@@ -14,6 +14,10 @@ ava.isLoggedIn = function() {
 	var userId = cookie.getItem("id")
 	return userId != null && parseInt(userId) > 0
 }
+ava.isTrainer = function() {
+	var trainer = cookie.getItem("trainer")
+	return trainer != null && Boolean(trainer)
+}
 ava.prettyDate = function(time) {
     var date = new Date((time || "").replace(/-/g, "/").replace(/[TZ]/g, " ")),
         diff = (((new Date()).getTime() - date.getTime()) / 1000),

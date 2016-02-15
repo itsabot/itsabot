@@ -5,12 +5,16 @@ ava.TrainIndex.controller = function() {
 		m.route("/login?r=" + encodeURIComponent(window.location.search))
 		return
 	}
+	if (!ava.isTrainer()) {
+		m.route("/profile")
+		return
+	}
 	var ctrl = this
 	ctrl.route = function(ev) {
 		ev.preventDefault()
 		var id = ev.target.parentNode.getAttribute("data-id")
 		var uid = ev.target.parentNode.getAttribute("data-user-id")
-		m.route("/train/" + id + "?uid=" + uid)
+		m.route("/train/" + id)
 	}
 	ctrl.props = {
 		convos: m.request({

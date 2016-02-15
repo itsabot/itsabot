@@ -95,12 +95,15 @@ func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 	return m, nil
 }
 
-func (m *Msg) Update(db *sqlx.DB) error {
+// Update marks a message as needing training and notifies trainers.
+func (m *Msg) Update(db *sqlx.DB, mc *MailClient) error {
 	q := `UPDATE messages
 	      SET needstraining=$1
 	      WHERE id=$2`
-	_, err := db.Exec(q, m.NeedsTraining, m.ID)
-	return err
+	if _, err := db.Exec(q, m.NeedsTraining, m.ID); err != nil {
+		return err
+	}
+	return mc.SendTrainingNotification(db, m)
 }
 
 func (m *Msg) Save(db *sqlx.DB) error {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/sendgrid/sendgrid-go"
 )
 
@@ -127,9 +128,9 @@ func (sg *MailClient) SendBug(err error) {
 	if os.Getenv("AVA_ENV") != "production" {
 		return
 	}
-	subj := "[Bug] " + err.Error()[0:24]
-	if len(err.Error()) > 24 {
-		subj += "..."
+	subj := "[Bug] " + err.Error()
+	if len(subj) > 30 {
+		subj = subj[0:27] + "..."
 	}
 	text := "<html><body>"
 	text += fmt.Sprintf("<p>%s</p>", err.Error())
@@ -137,6 +138,46 @@ func (sg *MailClient) SendBug(err error) {
 	if err := sg.Send(subj, text, Admin()); err != nil {
 		log.Errorln("sending bug report", err)
 	}
+}
+
+// SendTrainingNotification is called every time an unhandled error occurs,
+// particularly when that error happens as a result of the message a user sends
+// to Ava
+func (sg *MailClient) SendTrainingNotification(db *sqlx.DB, m *Msg) error {
+	subj := "[Train] " + m.Sentence
+	if len(m.Sentence) > 30 {
+		subj = subj[0:27] + "..."
+	}
+	text := "<html><body>"
+	text += fmt.Sprintf(
+		"<p>We received a request that needs your help: %s</p>",
+		m.Sentence)
+	var url string
+	if len(os.Getenv("PORT")) > 0 {
+		url = fmt.Sprintf("%s:%s/train/%d", os.Getenv("BASE_URL"),
+			os.Getenv("PORT"), m.ID)
+	} else {
+		url = fmt.Sprintf("%s/train/%d", os.Getenv("BASE_URL"), m.ID)
+	}
+	text += fmt.Sprintf(
+		"<p><a href=\"%s\">Click here to help.</a></p>", url)
+	text += "</body></html>"
+	q := `SELECT name, email FROM users WHERE trainer IS TRUE`
+	rows, err := db.Queryx(q)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	user := &User{}
+	for rows.Next() {
+		if err = rows.Scan(&user.Name, &user.Email); err != nil {
+			return err
+		}
+		if err := sg.Send(subj, text, user); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Send a custom HTML email to any Contactable (user, vendor, admin, etc.) from

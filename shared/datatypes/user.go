@@ -21,6 +21,11 @@ type User struct {
 	AuthorizationID          sql.NullInt64
 	LastAuthenticated        *time.Time
 	LastAuthenticationMethod AuthMethod
+
+	// Trainer determines whether the user has access to the training
+	// interface and will be notified via email when new training is
+	// required
+	Trainer bool
 }
 
 // AuthMethod allows you as the package developer to control the level of
