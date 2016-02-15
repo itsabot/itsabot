@@ -124,6 +124,9 @@ func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 // SendBug is called every time an unhandled error occurs, particularly when
 // that error happens as a result of the message a user sends to Ava
 func (sg *MailClient) SendBug(err error) {
+	if os.Getenv("AVA_ENV") != "production" {
+		return
+	}
 	subj := "[Bug] " + err.Error()[0:24]
 	if len(err.Error()) > 24 {
 		subj += "..."

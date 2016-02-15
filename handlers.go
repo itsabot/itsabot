@@ -136,7 +136,7 @@ func initCMDGroup(g *echo.Group) {
 
 // handlerIndex presents the homepage to the user and populates the HTML with
 // server-side variables.
-func handlerIndex(c *echo.Context) error {
+func handlerIndex(c *echo.Context) {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
 		log.Fatalln(err)
@@ -153,18 +153,20 @@ func handlerIndex(c *echo.Context) error {
 		IsProd:         os.Getenv("AVA_ENV") == "production",
 	}
 	if err := tmplLayout.Execute(b, data); err != nil {
-		log.Fatalln(err)
+		log.Errorln(err)
+		mc.SendBug(err)
+		return
 	}
 	if err = c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
-		return err
+		log.Errorln(err)
+		mc.SendBug(err)
 	}
-	return nil
 }
 
 // handlerTwilio responds to SMS messages sent through Twilio. Unlike other
 // handlers, we process internal errors without returning here, since any errors
 // should not be presented directly to the user -- they should be "humanized"
-func handlerTwilio(c *echo.Context) error {
+func handlerTwilio(c *echo.Context) {
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
@@ -191,29 +193,38 @@ func handlerTwilio(c *echo.Context) error {
 		resp = twilioResp{Message: ret}
 	}
 	if err = c.XML(http.StatusOK, resp); err != nil {
-		return err
+		log.Errorln(err)
+		mc.SendBug(err)
 	}
-	return nil
 }
 
 // handlerMain is the endpoint to hit when you want to speak to Ava outside of
 // Twilio/SMS. This endpoint enables avarepl.
-func handlerMain(c *echo.Context) error {
+func handlerMain(c *echo.Context) {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("flexid", c.Form("flexid"))
 	c.Set("flexidtype", c.Form("flexidtype"))
 	c.Set("uid", c.Form("uid"))
+	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
+	errSent := false
 	ret, uid, err := processText(c)
 	if err != nil {
-		return err
+		log.Errorln(err)
+		mc.SendBug(err)
+		errSent = true
+		ret = errMsg
 	}
 	if err = notifySockets(c, uid, c.Form("cmd"), ret); err != nil {
-		return err
+		log.Errorln(err)
+		if !errSent {
+			mc.SendBug(err)
+		}
+		return
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
-		return err
+		log.Errorln(err)
+		mc.SendBug(err)
 	}
-	return nil
 }
 
 // handlerAPITriggerPkg enables easier communication via JSON with the training
