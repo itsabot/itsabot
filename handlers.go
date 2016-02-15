@@ -136,7 +136,7 @@ func initCMDGroup(g *echo.Group) {
 
 // handlerIndex presents the homepage to the user and populates the HTML with
 // server-side variables.
-func handlerIndex(c *echo.Context) {
+func handlerIndex(c *echo.Context) error {
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
 		log.Fatalln(err)
@@ -155,18 +155,20 @@ func handlerIndex(c *echo.Context) {
 	if err := tmplLayout.Execute(b, data); err != nil {
 		log.Errorln(err)
 		mc.SendBug(err)
-		return
+		return err
 	}
 	if err = c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
 		log.Errorln(err)
 		mc.SendBug(err)
+		return err
 	}
+	return nil
 }
 
 // handlerTwilio responds to SMS messages sent through Twilio. Unlike other
 // handlers, we process internal errors without returning here, since any errors
 // should not be presented directly to the user -- they should be "humanized"
-func handlerTwilio(c *echo.Context) {
+func handlerTwilio(c *echo.Context) error {
 	c.Set("cmd", c.Form("Body"))
 	c.Set("flexid", c.Form("From"))
 	c.Set("flexidtype", 2)
@@ -196,11 +198,12 @@ func handlerTwilio(c *echo.Context) {
 		log.Errorln(err)
 		mc.SendBug(err)
 	}
+	return nil
 }
 
 // handlerMain is the endpoint to hit when you want to speak to Ava outside of
 // Twilio/SMS. This endpoint enables avarepl.
-func handlerMain(c *echo.Context) {
+func handlerMain(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("flexid", c.Form("flexid"))
 	c.Set("flexidtype", c.Form("flexidtype"))
@@ -215,16 +218,16 @@ func handlerMain(c *echo.Context) {
 		ret = errMsg
 	}
 	if err = notifySockets(c, uid, c.Form("cmd"), ret); err != nil {
-		log.Errorln(err)
 		if !errSent {
+			log.Errorln(err)
 			mc.SendBug(err)
 		}
-		return
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
 		log.Errorln(err)
 		mc.SendBug(err)
 	}
+	return nil
 }
 
 // handlerAPITriggerPkg enables easier communication via JSON with the training
