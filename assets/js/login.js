@@ -1,6 +1,12 @@
 (function(ava) {
 ava.Login = {}
 ava.Login.controller = function() {
+	ava.Login.checkAuth = function(callback) {
+		if (cookie.getItem("id") !== null) {
+			callback(true)
+		}
+	}
+
 	var ctrl = this
 	ctrl.login = function(ev) {
 		ev.preventDefault()
@@ -30,13 +36,8 @@ ava.Login.controller = function() {
 		}, function(err) {
 			ctrl.showError(err.Msg)
 		})
-	},
-	ctrl.checkAuth = function(callback) {
-		if (cookie.getItem("id") !== null) {
-			callback(true)
-		}
 	}
-	ctrl.checkAuth(function(loggedIn) {
+	ava.Login.checkAuth(function(loggedIn) {
 		if (loggedIn) {
 			return m.route("/profile")
 		}
@@ -44,7 +45,7 @@ ava.Login.controller = function() {
 	ctrl.hideError = function() {
 		ctrl.error("")
 		document.getElementById("err").classList.add("hidden")
-	},
+	}
 	ctrl.showError = function(err) {
 		ctrl.error(err)
 		document.getElementById("err").classList.remove("hidden")

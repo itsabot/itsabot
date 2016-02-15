@@ -2,7 +2,7 @@
 ava.Signup = {}
 ava.Signup.controller = function() {
 	var ctrl = this
-	Login.checkAuth(function(cb) {
+	ava.Login.checkAuth(function(cb) {
 		if (cb) {
 			return m.route("/profile")
 		}
