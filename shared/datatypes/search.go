@@ -8,15 +8,22 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
 )
 
+// SearchClient wraps an ElasticSearch client connection to provide a higher
+// level API in searching for products, etc.
 type SearchClient struct {
 	*elastigo.Conn
 }
 
+// Bucket is an ElasticSearch data structure that's used to get a count of
+// ElasticSearch documents that match a given query.
 type Bucket struct {
 	Key      string
 	DocCount uint `json:"doc_count"`
 }
 
+// NewSearchClient returns the higher-level API ElasticSearch connection with
+// filled in auth data from ELASTICSEARCH_USERNAME, ELASTICSEARCH_PASSWORD,
+// and ELASTICSEARCH_DOMAIN environment variables.
 func NewSearchClient() *SearchClient {
 	client := elastigo.NewConn()
 	client.Username = os.Getenv("ELASTICSEARCH_USERNAME")
@@ -25,8 +32,11 @@ func NewSearchClient() *SearchClient {
 	return &SearchClient{client}
 }
 
+// FindProducts retrieves a slice of products for a given query, product
+// category, product type and budget.
 func (ec *SearchClient) FindProducts(query, category, typ string,
 	budget uint64) ([]Product, error) {
+
 	// JSON is the worst querying language ever
 	q := map[string]interface{}{
 		"query": map[string]interface{}{
@@ -78,6 +88,9 @@ func (ec *SearchClient) FindProducts(query, category, typ string,
 	return products, nil
 }
 
+// FindProductKeywords returns the counts of the most-common descriptive words
+// in reviews for a product category. These most common words can then be
+// labeled for the Summarization algorithm.
 func (ec *SearchClient) FindProductKeywords(typ string) ([]Bucket, error) {
 	q := map[string]interface{}{
 		"aggs": map[string]interface{}{

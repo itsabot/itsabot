@@ -2,6 +2,9 @@ package task
 
 import "github.com/avabot/ava/shared/datatypes"
 
+// getCalendar asks the user to connect their Google calendar via a secure web
+// interface (user profile). Eventually this will support adding additional
+// calendar services beyond just Google's.
 func getCalendar(sm *dt.StateMachine, label string) []dt.State {
 	return []dt.State{
 		{

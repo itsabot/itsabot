@@ -1,32 +1,40 @@
 package dt
 
 import (
-	"errors"
-
 	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
 )
 
+// Vocab maintains sets of Commands and Objects recognized by packages as well
+// as the functions to be performed when such Commands or Objects are found.
 type Vocab struct {
-	Commands map[string]bool
-	Objects  map[string]bool
+	Commands map[string]struct{}
+	Objects  map[string]struct{}
 	dict     map[string]VocabFn
 }
 
+// VocabHandler maintains sets of Commands and Objects recognized by packages as well
+// as the functions to be performed when such Commands or Objects are found.
+//
+// TODO use pkg triggers rather than WordTypes, which provides more control over
+// when to run specific functions.
 type VocabHandler struct {
 	Fn       VocabFn
 	WordType string
 	Words    []string
 }
 
-type VocabFn func(m *Msg, mod int) string
+// VocabFn is a function run when the user sends a matched vocab word as defined
+// by a package. For an example, see packages/ava_purchase/ava_purchase.go. The
+// response returned is a user-presentable string from the VocabFn.
+type VocabFn func(m *Msg, mod int) (response string)
 
-var ErrNoFn = errors.New("no function")
-
+// NewVocab returns Vocab with all Commands and Objects stemmed using the
+// Porter2 Snowball algorithm.
 func NewVocab(vhs ...VocabHandler) *Vocab {
 	v := Vocab{
-		Commands: map[string]bool{},
-		Objects:  map[string]bool{},
+		Commands: map[string]struct{}{},
+		Objects:  map[string]struct{}{},
 		dict:     map[string]VocabFn{},
 	}
 	eng := porter2.Stemmer
@@ -35,15 +43,17 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 			vh.Words[i] = eng.Stem(vh.Words[i])
 			v.dict[vh.Words[i]] = vh.Fn
 			if vh.WordType == "Command" {
-				v.Commands[vh.Words[i]] = true
+				v.Commands[vh.Words[i]] = struct{}{}
 			} else if vh.WordType == "Object" {
-				v.Objects[vh.Words[i]] = true
+				v.Objects[vh.Words[i]] = struct{}{}
 			}
 		}
 	}
 	return &v
 }
 
+// HandleKeywords is a runs the first matching VocabFn in the sentence. For an
+// example, see packages/ava_purchase/ava_purchase.go.
 func (v *Vocab) HandleKeywords(m *Msg) string {
 	var resp string
 	mod := 1

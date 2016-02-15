@@ -970,22 +970,26 @@ func handlerAPIContactsConversationsCreate(c *echo.Context) error {
 
 // handlerAPIContactsSearch provides a way to query for contacts using full-text
 // search on their name, email and phone number.
+//
+// TODO this will be implemented when the Contact API has been decided.
 func handlerAPIContactsSearch(c *echo.Context) error {
-	uid, err := strconv.Atoi(c.Query("UserID"))
-	if err != nil {
-		return jsonError(err)
-	}
-	var results []dt.Contact
-	q := `SELECT name, email, phone FROM contacts
-	      WHERE userid=$1 AND name ILIKE $2`
-	term := "%" + c.Query("Query") + "%"
-	if err := db.Select(&results, q, uid, term); err != nil {
-		return jsonError(err)
-	}
-	if err := c.JSON(http.StatusOK, results); err != nil {
-		return jsonError(err)
-	}
-	return nil
+	/*
+		uid, err := strconv.Atoi(c.Query("UserID"))
+		if err != nil {
+			return jsonError(err)
+		}
+		var results []dt.Contact
+		q := `SELECT name, email, phone FROM contacts
+		      WHERE userid=$1 AND name ILIKE $2`
+		term := "%" + c.Query("Query") + "%"
+		if err := db.Select(&results, q, uid, term); err != nil {
+			return jsonError(err)
+		}
+		if err := c.JSON(http.StatusOK, results); err != nil {
+			return jsonError(err)
+		}
+	*/
+	return jsonError(errors.New("not implemented"))
 }
 
 func handlerOAuthConnectGoogleCalendar(c *echo.Context) error {
@@ -1014,11 +1018,9 @@ func handlerOAuthConnectGoogleCalendar(c *echo.Context) error {
 	if err != nil {
 		return jsonError(err)
 	}
-	client, err := cal.Client(db, req.UserID)
+	// Ensure we can connect to the client
+	_, err = cal.Client(db, req.UserID)
 	if err != nil {
-		return jsonError(err)
-	}
-	if err = cal.Events(client); err != nil {
 		return jsonError(err)
 	}
 	if err := c.JSON(http.StatusOK, nil); err != nil {

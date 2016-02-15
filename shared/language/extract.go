@@ -22,7 +22,7 @@ var regexNum = regexp.MustCompile(`\d+`)
 
 // ExtractCurrency returns a pointer to a string to allow a user a simple check
 // to see if currency text was found. If the response is nil, no currency was
-// found. This API design also maintains consitency when we want to extract and
+// found. This API design also maintains consistency when we want to extract and
 // return a struct (which should be returned as a pointer).
 func ExtractCurrency(s string) sql.NullInt64 {
 	log.Println("extracting currency")
@@ -44,6 +44,8 @@ func ExtractCurrency(s string) sql.NullInt64 {
 	return n
 }
 
+// TODO should be converted to return a *bool for consistency with the rest of
+// the Extract API.
 func ExtractYesNo(s string) sql.NullBool {
 	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
@@ -67,6 +69,9 @@ func ExtractYesNo(s string) sql.NullBool {
 	}
 }
 
+// ExtractAddress will return an address from a user's message, whether it's a
+// labeled address (e.g. "home", "office"), or a full U.S. address (e.g. 100
+// Penn St., CA 90000)
 func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	error) {
 	addr, err := address.Parse(s)
@@ -158,6 +163,13 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	return &a, false, nil
 }
 
+// ExtractCount returns a number from a user's message, useful in situations
+// like:
+//	Ava>  How many would you like to buy?
+//	User> Order 5.
+//
+// TODO this should return an *int64 to maintain consistency with the Extract
+// API.
 func ExtractCount(s string) sql.NullInt64 {
 	n := sql.NullInt64{
 		Int64: 0,
