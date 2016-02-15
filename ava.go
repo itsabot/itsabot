@@ -148,9 +148,6 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 		return nil, err
 	}
 	msg := dt.NewMsg(db, ner, u, cmd)
-	if err = msg.Update(db); err != nil {
-		return nil, err
-	}
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
 }
@@ -207,7 +204,7 @@ func processText(c *echo.Context) (ret string, uid uint64, err error) {
 	if len(ret) == 0 {
 		m.Sentence = language.Confused()
 		msg.NeedsTraining = true
-		if err = msg.Update(db); err != nil {
+		if err = msg.Update(db, mc); err != nil {
 			return "", m.User.ID, err
 		}
 	} else {

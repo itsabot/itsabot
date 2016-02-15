@@ -28,6 +28,7 @@ ava.Login.controller = function() {
 				secure = false
 			}
 			cookie.setItem("id", data.Id, exp, null, null, secure)
+			cookie.setItem("trainer", data.Trainer, exp, null, null, secure)
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure)
 			if (m.route.param("r") == null) {
 				return m.route("/profile")
