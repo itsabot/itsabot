@@ -95,7 +95,6 @@ func startServer() {
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
-	appVocab = dt.NewAtomicMap()
 	go bootDependencies(addr)
 	ner, err = buildClassifier()
 	if err != nil {

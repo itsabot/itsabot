@@ -14,20 +14,27 @@ import (
 
 type Ava int
 
+// pkgMap is a thread-safe atomic map that's used to route user messages to the
+// appropriate packages. The map's key is the route in the form of
+// command_object, e.g. "find_restaurant", and the PkgWrapper contains both the
+// package and the RPC client used to communicate with it.
 type pkgMap struct {
 	pkgs  map[string]*pkg.PkgWrapper
 	mutex *sync.Mutex
 }
 
+// regPkgs initializes a pkgMap and holds it in global memory, which works OK
+// given pkgMap is an atomic, thread-safe map.
 var regPkgs = pkgMap{
 	pkgs:  make(map[string]*pkg.PkgWrapper),
 	mutex: &sync.Mutex{},
 }
 
-var appVocab dt.AtomicMap
-
 // RegisterPackage enables Ava to notify packages when specific StructuredInput
-// is encountered. Note that packages will only listen when ALL criteria are met
+// is encountered matching triggers set in the packages themselves. Note that
+// packages will only listen when ALL criteria are met and that there's no
+// support currently for duplicate routes (e.g. "find_restaurant" leading to
+// either one of two packages).
 func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 	log.WithFields(log.Fields{
 		"pkg":  p.Config.Name,
@@ -38,9 +45,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 		return err
 	}
 	for _, c := range p.Trigger.Commands {
-		appVocab.Set(c, true)
 		for _, o := range p.Trigger.Objects {
-			appVocab.Set(o, true)
 			s := strings.ToLower(c + "_" + o)
 			if regPkgs.Get(s) != nil {
 				log.WithFields(log.Fields{
@@ -51,14 +56,6 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: client})
 		}
 	}
-	if p.Vocab != nil {
-		for k := range p.Vocab.Commands {
-			appVocab.Set(k, true)
-		}
-		for k := range p.Vocab.Objects {
-			appVocab.Set(k, true)
-		}
-	}
 	return nil
 }
 
@@ -66,7 +63,7 @@ func (t *Ava) RegisterPackage(p *pkg.Pkg, reply *string) error {
 // can be found, it checks the database for the last route used and gets the
 // package for that. If there is no previously used package, we return
 // ErrMissingPackage. The bool value return indicates whether this package is
-// different from the last package used by the user
+// different from the last package used by the user.
 func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	// First check if the user is missing. AKA, needs to be onboarded
 	if m.User == nil {
@@ -115,7 +112,14 @@ func getPkg(m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	return nil, "", false, ErrMissingPackage
 }
 
-func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (string, error) {
+// callPkg sends a package the user's preprocessed message. The followup bool
+// dictates whether this is the first consecutive time the user has sent that
+// package a message, or if the user is engaged in a conversation with the pkg.
+// This difference enables packages to respond differently--like reset state--
+// when messaged for the first time in each new conversation.
+func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (packageReply string,
+	err error) {
+
 	tmp := ""
 	reply := &tmp
 	if pw == nil {
@@ -136,6 +140,7 @@ func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (string, error) {
 	return *reply, nil
 }
 
+// Get is a thread-safe, locking way to access the values of a pkgMap.
 func (pm pkgMap) Get(k string) *pkg.PkgWrapper {
 	var pw *pkg.PkgWrapper
 	pm.mutex.Lock()
@@ -145,6 +150,7 @@ func (pm pkgMap) Get(k string) *pkg.PkgWrapper {
 	return pw
 }
 
+// Set is a thread-safe, locking way to set the values of a pkgMap.
 func (pm pkgMap) Set(k string, v *pkg.PkgWrapper) {
 	pm.mutex.Lock()
 	pm.pkgs[k] = v

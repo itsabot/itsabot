@@ -20,30 +20,7 @@ var (
 	ErrInvalidFlexIDType = errors.New("invalid flexid type")
 )
 
-func saveTrainingSentence(msg *dt.Msg) (int, error) {
-	q := `INSERT INTO trainings (sentence) VALUES ($1) RETURNING id`
-	var id int
-	if err := db.QueryRowx(q, msg.Sentence).Scan(&id); err != nil {
-		return 0, err
-	}
-	q = `UPDATE messages SET trainingid=$1 WHERE id=$2`
-	_, err := db.Exec(q, id, msg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
-}
-
-func updateTraining(trainID int, hitID string, maxAssignments uint) error {
-	q := `UPDATE trainings SET foreignid=$1, maxassignments=$2 WHERE id=$3`
-	_, err := db.Exec(q, hitID, maxAssignments, trainID)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// getUser returns a dt.User object based on the uid. if uid = 0, it uses the
+// getUser returns a dt.User object based on the uid. If uid == 0, it uses the
 // flexid and flexidtype to find it first.
 func getUser(uid uint64, fid string, fidT flexIDType) (*dt.User, error) {
 	if uid == 0 {
@@ -73,13 +50,4 @@ func getUser(uid uint64, fid string, fidT flexIDType) (*dt.User, error) {
 		return nil, err
 	}
 	return &u, nil
-}
-
-func getInputAnnotation(id int) (string, error) {
-	var annotation string
-	q := `SELECT sentenceannotated FROM inputs WHERE trainingid=$1`
-	if err := db.Get(&annotation, q, id); err != nil {
-		return "", err
-	}
-	return annotation, nil
 }
