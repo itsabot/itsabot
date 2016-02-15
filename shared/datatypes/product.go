@@ -21,13 +21,21 @@ type Product struct {
 	}
 }
 
+// ProductSel is a user's product selection, keeping track of both the product
+// selected and the quantity desired.
 type ProductSel struct {
 	*Product
 	Count uint
 }
 
+// ProductSels represents a slice of product selections, adding a helper method
+// that makes it easy to calculate the prices (subtotal, tax, shipping, and
+// total).
 type ProductSels []ProductSel
 
+// ProductSels represents a slice of product selections, adding a helper method
+// that makes it easy to calculate the prices (subtotal, tax, shipping, and
+// total) for a given group of product selections.
 func (prods ProductSels) Prices(addr *Address) map[string]uint64 {
 	m := map[string]uint64{
 		"products": 0,
@@ -38,7 +46,9 @@ func (prods ProductSels) Prices(addr *Address) map[string]uint64 {
 	for _, prod := range prods {
 		m["products"] += prod.Price * uint64(prod.Count)
 	}
-	// calculate shipping. note that this is vendor specific
+	// TODO
+	// Calculate shipping. Note that this is vendor specific, so this should
+	// be moved to the Vendors table in the database.
 	m["shipping"] = 1290 + uint64((len(prods)-1)*120)
 	var tax float64
 	if addr != nil {

@@ -90,6 +90,7 @@ var states = map[string]string{
 	"wyoming":        "WY",
 }
 
+// Parse a string to return a fully-validated U.S. address.
 func Parse(s string) (*dt.Address, error) {
 	s = regexAddress.FindString(s)
 	if len(s) == 0 {

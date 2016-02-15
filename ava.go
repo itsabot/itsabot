@@ -29,7 +29,7 @@ import (
 var db *sqlx.DB
 var tc *twilio.Client
 var mc *dt.MailClient
-var ws dt.AtomicWebSocketMap = dt.NewAtomicWebSocketMap()
+var ws AtomicWebSocketSet = NewAtomicWebSocketSet()
 var ner nlp.Classifier
 var offensive map[string]struct{}
 var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)

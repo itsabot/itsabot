@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/avabot/ava/shared/language"
 	"github.com/avabot/ava/shared/nlp"
 	"github.com/avabot/ava/shared/pkg"
-	"github.com/avabot/ava/shared/prefs"
 	"github.com/avabot/ava/shared/task"
 )
 
@@ -527,11 +525,6 @@ func kwSearch(in *dt.Msg, _ int) string {
 	l.Debugln("hit kwSearch")
 	sm.SetMemory(in, "offset", 0)
 	sm.SetMemory(in, "query", in.StructuredInput.Objects.String())
-	err := prefs.Save(db, in.User.ID, pkgName, prefs.KeyTaste,
-		in.StructuredInput.Objects.String())
-	if err != nil {
-		l.Errorln("kwSearch", err)
-	}
 	cat := extractWineCategory(in.Sentence)
 	if len(cat) == 0 {
 		sm.Reset(in)
@@ -566,11 +559,6 @@ func kwMoreExpensive(in *dt.Msg, mod int) string {
 		tmp = 1000
 	}
 	sm.SetMemory(in, "budget", uint64(tmp))
-	err := prefs.Save(db, in.User.ID, pkgName, prefs.KeyBudget,
-		strconv.Itoa(tmp))
-	if err != nil {
-		l.Errorln("kwMoreExpensive", err)
-	}
 	return sm.SetState(in, "recommendations")
 }
 

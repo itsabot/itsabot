@@ -1,3 +1,5 @@
+// Package timeparse parses times in strings in a wide variety of formats to
+// corresponding time.Times.
 package timeparse
 
 import (
@@ -8,17 +10,20 @@ import (
 	"time"
 )
 
+// timeLocation tracks the timezone of a time. Since time.Location.String()
+// defaults to "UTC", the bool tz.utc tracks if the timezone was deliberately
+// set to UTC.
 type timeLocation struct {
 	loc *time.Location
 	utc bool
 }
 
-// TimeContext is a type used to extrapolate a single piece of info,
-// like AMPM or the month across multiple times. If any item in TimeContext is
-// nil, the information returned in the []time.Time slice corresponding to that
-// was arrived at on a best-guess basis. You can (and should) add a logic layer
-// to your own application which selects the most appropriate time based on
-// your known context beyond the text provided to timeparse.
+// TimeContext is a type used to extrapolate a single piece of info, like AMPM
+// or the month across multiple times. If any item in TimeContext is nil, the
+// information returned in the []time.Time slice corresponding to that was
+// arrived at on a best-guess basis. You can (and should) add a logic layer to
+// your own application which selects the most appropriate time based on your
+// known context beyond the text provided to timeparse.
 type TimeContext struct {
 	year  int
 	month time.Month
@@ -106,7 +111,10 @@ var days = map[string]time.Weekday{
 	"Sat": time.Weekday(6),
 }
 
-func normalizeTime(t string) (string, *time.Location, bool) {
+// normalizeTime translates a
+func normalizeTime(t string) (normalizedTime string, location *time.Location,
+	relativeTime bool) {
+
 	r := strings.NewReplacer(
 		".", "",
 		",", "",
@@ -122,13 +130,10 @@ func normalizeTime(t string) (string, *time.Location, bool) {
 		" P.M", "PM")
 	t = r.Replace(t)
 	t = strings.Title(t)
-
 	st := strings.Fields(t)
 	stFull := ""
-
 	relative := false
 	var loc *time.Location
-
 	for i := range st {
 		// Normalize days
 		switch st[i] {
@@ -181,8 +186,8 @@ func normalizeTime(t string) (string, *time.Location, bool) {
 			st[i] = "Dec"
 
 		// If non-deterministic timezone information is provided,
-		// e.g. ET or Eastern, then load the location. Daylight Savings
-		// will be determined on parsing
+		// e.g. ET or Eastern rather than EST, then load the location.
+		// Daylight Savings will be determined on parsing
 		case "Pacific", "PT":
 			st[i] = ""
 			loc = loadLocation("America/Los_Angeles")
@@ -195,12 +200,14 @@ func normalizeTime(t string) (string, *time.Location, bool) {
 		case "Eastern", "ET":
 			st[i] = ""
 			loc = loadLocation("America/New_York")
-		// TODO: Add the remaining timezones
+		// TODO Add the remaining timezones
 
+		// Handle relative times
 		case "Ago", "Previous", "Prev", "Last", "Next", "Upcoming",
 			"This", "Tomorrow", "Yesterday":
 			relative = true
 
+		// Remove unnecessary but common expressions
 		case "At", "Time", "Oclock":
 			st[i] = ""
 		}
@@ -226,21 +233,17 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 	var times []time.Time
 	tloc := timeLocation{loc: t.Location()}
 	ctx := &TimeContext{ampm: ampmNoTime, tz: tloc}
-
 	var ti time.Time
 	var rel bool
 	for _, nlTime := range nlTimes {
 		log.Printf("\n\n")
 		log.Println("Original:", nlTime)
-
 		var loc *time.Location
 		nlTime, loc, rel = normalizeTime(nlTime)
 		log.Println("Normalized:", nlTime)
-
 		var day bool
 		var err error
 		if rel {
-			log.Println("RELATIVE TIME")
 			ti = parseTimeRelative(nlTime, t)
 		} else if loc == nil {
 			ti, day, err = parseTime(nlTime)
@@ -251,7 +254,6 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 			log.Println("Couldn't parse time:", nlTime, err)
 			continue
 		}
-
 		if !rel {
 			ctx = updateContext(ctx, ti, day)
 			if strings.Contains(nlTime, "AM") {
@@ -261,7 +263,6 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 				ctx.tz.utc = true
 			}
 		}
-
 		times = append(times, ti)
 	}
 
@@ -310,7 +311,6 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 				ctx.tz.loc)
 		}
 	}
-
 	return times, nil
 }
 
@@ -364,8 +364,11 @@ func loadLocation(l string) *time.Location {
 	return loc
 }
 
-// TODO: This is a brute-force, "dumb" method of determining the time format.
-// Will be improved.
+// parseTime iterates through all known date formats on a normalized time
+// string, using Golang's standard lib to do the heavy lifting.
+//
+// TODO This is a brute-force, "dumb" method of determining the time format and
+// should be improved.
 func parseTime(t string) (time.Time, bool, error) {
 	for _, tf := range timeFormatsNoDay {
 		time, err := time.Parse(tf, t)
@@ -405,7 +408,6 @@ func parseTimeRelative(nlTime string, t time.Time) time.Time {
 	month := t.Month()
 	year := t.Year()
 	futureTime := 1
-
 	if strings.Contains(nlTime, "Tomorrow") {
 		day += 1
 	}
@@ -413,16 +415,14 @@ func parseTimeRelative(nlTime string, t time.Time) time.Time {
 		day -= 1
 	}
 	if strings.Contains(nlTime, "Month") {
-		// TODO
+		// TODO handle relative months
 		// "2 months", "2 months ago" format
 		// "next month", "last month" format
 	}
-
 	r := regexp.MustCompile(`(Ago|Prev|Previous|Last)\s`)
 	if r.FindString(nlTime) != "" {
 		futureTime = -1
 	}
-
 	r = regexp.MustCompile(`(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s`)
 	weekday := r.FindString(nlTime)
 	if weekday != "" {
@@ -435,8 +435,8 @@ func parseTimeRelative(nlTime string, t time.Time) time.Time {
 			day += 7
 		}
 	}
-
-	r = regexp.MustCompile(`(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
+	r = regexp.MustCompile(
+		`(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
 	m := r.FindString(nlTime)
 	if m != "" {
 		if months[m] > month {
@@ -453,7 +453,6 @@ func parseTimeRelative(nlTime string, t time.Time) time.Time {
 			month += 12
 		}
 	}
-
 	return time.Date(
 		year,
 		month,

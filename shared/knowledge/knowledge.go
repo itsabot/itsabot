@@ -23,11 +23,10 @@ func GetLocation(db *sqlx.DB, u *dt.User) (*dt.Location, string,
 	if u.LocationID == 0 {
 		return loc, language.QuestionLocation(""), nil
 	}
-	q := `
-		SELECT name, createdat
-		FROM locations
-		WHERE userid=$1
-		ORDER BY createdat DESC`
+	q := `SELECT name, createdat
+	      FROM locations
+	      WHERE userid=$1
+	      ORDER BY createdat DESC`
 	err := db.Get(loc, q, u.ID)
 	if err == sql.ErrNoRows {
 		return loc, language.QuestionLocation(""), nil
@@ -41,9 +40,12 @@ func GetLocation(db *sqlx.DB, u *dt.User) (*dt.Location, string,
 	return loc, "", nil
 }
 
-func GetAddress(db *sqlx.DB, u *dt.User, sent string) (*dt.Address, error) {
+// GetAddress returns an address for a given user's message, automatically
+// looking up previously seen addresses named "home" and "office". This enables
+// the user to, for example, ask that a package be sent to the office.
+func GetAddress(db *sqlx.DB, u *dt.User, msg string) (*dt.Address, error) {
 	var val string
-	for _, w := range strings.Fields(sent) {
+	for _, w := range strings.Fields(msg) {
 		if w == "home" || w == "office" {
 			val = w
 			break
@@ -52,9 +54,8 @@ func GetAddress(db *sqlx.DB, u *dt.User, sent string) (*dt.Address, error) {
 	if len(val) == 0 {
 		return nil, nil
 	}
-	q := `
-		SELECT name, line1, line2, city, state, country, zip
-		WHERE userid=$1 AND name=$2 AND cardid=0`
+	q := `SELECT name, line1, line2, city, state, country, zip
+	      WHERE userid=$1 AND name=$2 AND cardid=0`
 	var addr *dt.Address
 	if err := db.Get(addr, q, u.ID, val); err != nil {
 		return nil, err

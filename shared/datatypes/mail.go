@@ -21,7 +21,10 @@ type MailClient struct {
 	sgc *sendgrid.SGClient
 }
 
-// TODO add shipping information and purchase identifier (UUID)
+// SendPurchaseConfirmation emails the user a purchase confirmation including
+// pricing information and expected delivery dates in an HTML format.
+//
+// TODO Add shipping information and purchase identifier (UUID)
 func (sg *MailClient) SendPurchaseConfirmation(p *Purchase) error {
 	products := p.ProductSels
 	if len(products) == 0 {
@@ -62,6 +65,9 @@ func (sg *MailClient) SendPurchaseConfirmation(p *Purchase) error {
 	return sg.Send(subj, text, p.User)
 }
 
+// SendVendorRequest sends an email to a vendor informing them that payment has
+// been taken for a Purchase and asking that the vendor process the order.
+//
 // TODO add shipping information and purchase identifier (UUID)
 func (sg *MailClient) SendVendorRequest(p *Purchase) error {
 	if len(p.ProductSels) == 0 {
@@ -125,7 +131,7 @@ func (sg *MailClient) SendBug(err error) {
 	text := "<html><body>"
 	text += fmt.Sprintf("<p>%s</p>", err.Error())
 	text += "</body></html>"
-	if err := sg.Send(subj, text, GetAdmin()); err != nil {
+	if err := sg.Send(subj, text, Admin()); err != nil {
 		log.Errorln("sending bug report", err)
 	}
 }
@@ -146,6 +152,8 @@ func (sg *MailClient) Send(subj, html string, c Contactable) error {
 	return nil
 }
 
+// NewMailClient returns a new MailClient initialized with any private API keys
+// necessary to be immediately useful.
 func NewMailClient() *MailClient {
 	return &MailClient{
 		sgc: sendgrid.NewSendGridClientWithApiKey(

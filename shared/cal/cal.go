@@ -19,6 +19,8 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/oauth2/google"
 )
 
+// Event is a data structure that attempts to represent events across services
+// (Google, Outlook, etc.)
 type Event struct {
 	Title          string
 	Location       string
@@ -41,6 +43,8 @@ const (
 	RecurringFreqYearly
 )
 
+// Attendees are a simplified User struct useful for external services (Google,
+// Outlook, etc.)
 type Attendee struct {
 	Name  string
 	Email string
@@ -123,6 +127,7 @@ func base64Decode(s string) ([]byte, error) {
 	return base64.URLEncoding.DecodeString(s)
 }
 
+// Client returns a Google client for communicating with GCal.
 func Client(db *sqlx.DB, uid uint64) (*http.Client, error) {
 	context := context.Background()
 	var token string
@@ -135,6 +140,7 @@ func Client(db *sqlx.DB, uid uint64) (*http.Client, error) {
 	return config.Client(context, &t), nil
 }
 
+// Save a calendar event to GCal.
 func (e *Event) Save(client *http.Client) error {
 	srv, err := calendar.New(client)
 	if err != nil {
@@ -184,33 +190,4 @@ func (e *Event) Save(client *http.Client) error {
 	call := srv.Events.Insert("primary", event)
 	_, err = call.Do()
 	return err
-}
-
-func Events(client *http.Client) error {
-	srv, err := calendar.New(client)
-	if err != nil {
-		return err
-	}
-	t := time.Now().Format(time.RFC3339)
-	events, err := srv.Events.List("primary").ShowDeleted(false).
-		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
-	if err != nil {
-		return err
-	}
-	if len(events.Items) > 0 {
-		for _, i := range events.Items {
-			var when string
-			// If the DateTime is an empty string the Event is an
-			// all-day Event. So only Date is available.
-			if i.Start.DateTime != "" {
-				when = i.Start.DateTime
-			} else {
-				when = i.Start.Date
-			}
-			fmt.Printf("%s (%s)\n", i.Summary, when)
-		}
-	} else {
-		fmt.Printf("No upcoming events found.\n")
-	}
-	return nil
 }

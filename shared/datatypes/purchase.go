@@ -2,7 +2,6 @@ package dt
 
 import (
 	"database/sql"
-	"log"
 	"math"
 	"math/rand"
 	"strconv"
@@ -12,6 +11,9 @@ import (
 	"github.com/avabot/ava/shared/nlp"
 )
 
+// Purchase represents a user purchase and associated useful information such as
+// a breakdown of pricing, products purchased and the time a delivery is
+// expected.
 type Purchase struct {
 	ID                 uint64
 	UserID             uint64
@@ -33,10 +35,11 @@ type Purchase struct {
 	DeliveryExpectedAt *time.Time
 	EmailsSentAt       *time.Time
 	CreatedAt          *time.Time
-
-	db *sqlx.DB
+	db                 *sqlx.DB
 }
 
+// PurchaseConfig is a smaller set of purchase information that packages can use
+// to more easily build a full Purchase.
 type PurchaseConfig struct {
 	*User
 	Prices          []uint64
@@ -45,10 +48,14 @@ type PurchaseConfig struct {
 	ProductSels     ProductSels
 }
 
+// statesTax represents the percentage of tax paid on a state-by-state basis.
+// TODO This should be expanded beyond just California.
 var statesTax = map[string]float64{
 	"CA": 0.0925,
 }
 
+// NewPurchase creates a Purchase and fills in information like a pricing
+// breakdown automatically based on a provided PurchaseConfig.
 func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
 	p := &Purchase{db: db}
 	p.ID = uint64(rand.Int63n(8999999999) + 1000000000)
@@ -63,8 +70,9 @@ func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
 	p.Total = prices["total"]
 	p.Tax = prices["tax"]
 	p.Shipping = prices["shipping"]
-	// always round up fees to ensure we aren't losing money on fractional
-	// cents
+
+	// Always round up fees to ensure we aren't losing money on fractional
+	// cents.
 	p.AvaFee = uint64(math.Ceil(float64(p.Total) * 0.05))
 	p.CreditCardFee = uint64(math.Ceil((float64(p.Total)*0.029 + 0.3)))
 	p.TransferFee = uint64(math.Ceil((float64(p.Total-
@@ -82,10 +90,9 @@ func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
 	}
 	if p.Vendor == nil {
 		(*p).Vendor = &Vendor{}
-		q := `
-			SELECT id, businessname, contactname, contactemail
-			FROM vendors
-			WHERE id=$1`
+		q := `SELECT id, businessname, contactname, contactemail
+		      FROM vendors
+		      WHERE id=$1`
 		if err := p.db.Get((*p).Vendor, q, p.VendorID); err != nil {
 			return nil, err
 		}
@@ -96,32 +103,28 @@ func NewPurchase(db *sqlx.DB, pc *PurchaseConfig) (*Purchase, error) {
 	return p, nil
 }
 
+// Create saves a new Purchase to the database and returns an error, if any.
 func (p *Purchase) Create() error {
 	q := `INSERT INTO purchases
 	      (id, userid, vendorid, shippingaddressid, products, tax, shipping,
 		total, avafee, creditcardfee, transferfee, vendorpayout)
 	      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11)`
-	log.Println("tax", p.Tax)
-	log.Println("shipping", p.Shipping)
-	log.Println("total", p.Total)
-	log.Println("avafee", p.AvaFee)
-	log.Println("creditcardfee", p.CreditCardFee)
-	log.Println("vendorpayout", p.VendorPayout)
 	_, err := p.db.Exec(q, p.ID, p.User.ID, p.Vendor.ID,
 		p.ShippingAddressID, nlp.StringSlice(p.Products),
 		p.Tax, p.Shipping, p.Total, p.AvaFee, p.CreditCardFee,
 		p.VendorPayout)
-	if err != nil {
-		log.Println("ERR HERE")
-		return err
-	}
-	return nil
+	return err
 }
 
+// Subtotal is a helper function to return the purchase price before tax and
+// shipping, i.e. only the cost of the products purchased.
 func (p *Purchase) Subtotal() uint64 {
 	return p.Total - p.Tax - p.Shipping
 }
 
+// UpdateEmailsSent records the time at which a purchase confirmation and vendor
+// request were sent. See shared/task/request_auth.go:makePurchase for an
+// example.
 func (p *Purchase) UpdateEmailsSent() error {
 	t := time.Now()
 	(*p).EmailsSentAt = &t
@@ -130,6 +133,9 @@ func (p *Purchase) UpdateEmailsSent() error {
 	return err
 }
 
+// DisplayID returns a user-facing identifier for a purchase made that can be
+// referenced in future communications, such as if purchased items arrive
+// damaged.
 func (p *Purchase) DisplayID() string {
 	s := strconv.FormatUint(p.ID, 10)
 	return s[:len(s)/2] + "-" + s[len(s)/2:]

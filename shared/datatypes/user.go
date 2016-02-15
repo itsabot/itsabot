@@ -20,8 +20,22 @@ type User struct {
 	StripeCustomerID         string
 	AuthorizationID          sql.NullInt64
 	LastAuthenticated        *time.Time
-	LastAuthenticationMethod Method
+	LastAuthenticationMethod AuthMethod
 }
+
+// AuthMethod allows you as the package developer to control the level of
+// security required in an authentication. Select an appropriate security level
+// depending upon your risk tolerance for fraud compared against the quality and
+// ease of the user experience.
+//
+// NOTE this is just a stub and isn't implemented
+// TODO build the constants defining the types of AuthMethods
+type AuthMethod int
+
+const (
+	FlexIdTypeEmail int = iota + 1
+	FlexIdTypePhone
+)
 
 var ErrNoAddress = errors.New("no address")
 
@@ -35,7 +49,7 @@ func (u *User) GetEmail() string {
 	return u.Email
 }
 
-func (u *User) IsAuthenticated(m Method) (bool, error) {
+func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 	var oldTime time.Time
 	tmp := os.Getenv("REQUIRE_AUTH_IN_HOURS")
 	var t int

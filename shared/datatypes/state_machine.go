@@ -10,9 +10,21 @@ import (
 	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
 )
 
+// stateKey is a reserved key in the state of a package that tracks which state
+// the package is currently in for each user.
 const stateKey string = "__state"
+
+// stateKeyEntered keeps track of whether the current state has already been
+// "entered", which determines whether the OnEntry function should run or not.
+// As mentioned elsewhere, the OnEntry function is only ever run once.
 const stateEnteredKey string = "__state_entered"
 
+// stateMachine enables package developers to easily build complex state
+// machines given the constraints and use-cases of an A.I. bot. It primarily
+// holds a slice of function Handlers, which is all possible states for a given
+// stateMachine. The unexported variables are useful internally in keeping track
+// of state automatically for developers and make an easy API like
+// stateMachine.Next() possible.
 type StateMachine struct {
 	Handlers     []State
 	state        int
@@ -25,6 +37,8 @@ type StateMachine struct {
 	resetFn      func(*Msg)
 }
 
+// State is a collection of pre-defined functions that are run when a user
+// reaches the appropriate state within a stateMachine.
 type State struct {
 	// OnEntry preprocesses and asks the user for information. If you need
 	// to do something when the state begins, like run a search or hit an
@@ -53,14 +67,26 @@ type State struct {
 	// then it'll skip to the next state.
 	SkipIfComplete bool
 
-	// Label enables jumping directly to a State with stateMachine.SetState
+	// Label enables jumping directly to a State with stateMachine.SetState.
+	// Think of it as enabling a safe goto statement. This is especially
+	// useful when combined with a KeywordHandler, enabling a user to jump
+	// straight to something like a "checkout" state. The state machine
+	// checks before jumping that it has all required information before
+	// jumping ensuring Complete() == true at all skipped states, so the
+	// developer can be sure, for example, that the user has selected some
+	// products and picked a shipping address before arriving at the
+	// checkout step. In the case where one of the jumped Complete()
+	// functions returns false, the state machine will stop at that state,
+	// i.e. as close to the desired state as possible.
 	Label string
 }
 
 // EventRequest is sent to the state machine to request safely jumping between
-// states with guards checking that each new state is valid
+// states (directly to a specific Label) with guards checking that each new
+// state is valid.
 type EventRequest int
 
+// NewStateMachine initializes a stateMachine to its starting state.
 func NewStateMachine(pkgName string) *StateMachine {
 	sm := StateMachine{state: 0, pkgName: pkgName}
 	sm.states = map[string]int{}
@@ -71,6 +97,10 @@ func NewStateMachine(pkgName string) *StateMachine {
 	return &sm
 }
 
+// SetStates takes [][]State as an argument. Note that it's a slice of a slice,
+// which is used to enable tasks like requesting a user's shipping address,
+// which themselves are []Slice, to be included inline when defining the states
+// of a stateMachine. See packages/ava_purchase/ava_purchase.go as an example.
 func (sm *StateMachine) SetStates(sss ...[]State) {
 	for i, ss := range sss {
 		for j, s := range ss {
@@ -82,14 +112,31 @@ func (sm *StateMachine) SetStates(sss ...[]State) {
 	}
 }
 
+// SetLogger enables the logger with any package-defined settings to be used
+// internally by the stateMachine. This ensures consistency in the logs of a
+// package.
 func (sm *StateMachine) SetLogger(l *log.Entry) {
 	sm.logger = l
 }
 
+// SetDBConn gives a stateMachine shared access to a package's database
+// connection. This is required even if no states require database access, since
+// the stateMachine's current state (among other things) are peristed to the
+// database between user requests.
 func (sm *StateMachine) SetDBConn(s *sqlx.DB) {
 	sm.db = s
 }
 
+// SetOnReset sets the OnReset function for the stateMachine, which should be
+// called from a package's Run() function. See
+// packages/ava_purchase/ava_purchase.go for an example.
+func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
+	sm.resetFn = reset
+}
+
+// LoadState upserts state into the database. If there is an existing state for
+// a given user and package, the stateMachine will load it. If not, the
+// stateMachine will insert a starting state into the database.
 func (sm *StateMachine) LoadState(in *Msg) {
 	q := `INSERT INTO states
 	      (key, userid, value, pkgname) VALUES ($1, $2, $3, $4)
@@ -118,26 +165,33 @@ func (sm *StateMachine) LoadState(in *Msg) {
 		sm.logger.Errorln(err, "parsing state")
 	}
 	sm.state = int(tmp)
-	// Had we already entered a state?
+	// Have we already entered a state?
 	sm.stateEntered = sm.GetMemory(in, stateEnteredKey).Bool()
 	sm.logger.Debugln("set state to", sm.state)
 	sm.logger.Debugln("set state entered to", sm.stateEntered)
 	return
 }
 
+// State returns the current state of a stateMachine. state is an unexported
+// field to protect programmers from directly editing it. While reading state
+// can be done through this function, changing state should happen only through
+// the provided stateMachine API (stateMachine.Next(), stateMachine.SetState()),
+// which allows for safely moving between states.
 func (sm *StateMachine) State() int {
 	return sm.state
 }
 
+// GetDBConn allows for accessing a stateMachine's provided database connection.
 func (sm *StateMachine) GetDBConn() *sqlx.DB {
 	return sm.db
 }
 
-func (sm *StateMachine) SetPkgName(n string) {
-	sm.pkgName = n
-}
-
-func (sm *StateMachine) Next(in *Msg) string {
+// Next moves a stateMachine from its current state to its next state. Next
+// handles a variety of corner cases such as reaching the end of the states,
+// ensuring that the current state's Complete() == true, etc. It directly
+// returns the next response of the stateMachine, whether that's the Complete()
+// failed string or the OnEntry() string.
+func (sm *StateMachine) Next(in *Msg) (response string) {
 	h := sm.Handlers[sm.state]
 	if sm.state >= len(sm.Handlers) {
 		sm.logger.Debugln("state is >= len(handlers)")
@@ -157,7 +211,7 @@ func (sm *StateMachine) Next(in *Msg) string {
 	}
 	sm.logger.Debugln("state was already entered")
 	h.OnInput(in)
-	// check completion of current state
+	// Check completion of current state
 	done, str := h.Complete(in)
 	if done {
 		sm.logger.Debugln("state is done. going to next")
@@ -182,20 +236,30 @@ func (sm *StateMachine) Next(in *Msg) string {
 	return ""
 }
 
+// setEntered is used internally to set a state as having been entered both in
+// memory and persisted to the database. This ensures that a stateMachine does
+// not run a state's OnEntry function twice.
 func (sm *StateMachine) setEntered(in *Msg) {
 	sm.stateEntered = true
 	sm.SetMemory(in, stateEnteredKey, true)
-	sm.logger.Warnln("set state entered!")
 }
 
+// OnInput runs the stateMachine's current OnInput function. Most of the time
+// this is not used directly, since Next() will automatically run this function
+// when appropriate. It's an exported function to provide users more control
+// over their
 func (sm *StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.state].OnInput(in)
 }
 
-func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
-	sm.resetFn = reset
-}
-
+// SetMemory saves to some key to some value in Ava's memory, which can be
+// accessed by any state or package. Memories are stored in a key-value format,
+// and any marshalable/unmarshalable datatype can be stored and retrieved.
+// Note that Ava's memory is global, peristed across packages. This enables
+// packages that subscribe to an agreed-upon memory API to communicate between
+// themselves. Thus, if it's absolutely necessary that no some other packages
+// modify or access a memory, use a long key unlikely to collide with any other
+// package's.
 func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -210,9 +274,10 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 		sm.logger.Errorln(err, "setting memory at", k, "to", v)
 		return
 	}
-	// TODO set preference here as well
 }
 
+// GetMemory retrieves a memory for a given key. Accessing that Memory's value
+// is described in shared/datatypes/memory.go.
 func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 	q := `SELECT value FROM states WHERE userid=$1 AND pkgname=$2 AND key=$3`
 	var buf []byte
@@ -227,10 +292,17 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 	return Memory{Key: k, Val: buf, logger: sm.logger}
 }
 
+// HasMemory is a helper function to simply a common use-case, determing if some
+// key/value has been set in Ava, i.e. if the memory exists.
 func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
 	return len(sm.GetMemory(in, k).Val) > 0
 }
 
+// Reset the stateMachine both in memory and in the database. This also runs the
+// programmer-defined reset function (SetOnReset) to reset memories to some
+// starting state for running the same package multiple times. This is usually
+// called from a package's Run() function. See
+// packages/ava_purchase/ava_purchase.go for an example.
 func (sm *StateMachine) Reset(in *Msg) {
 	sm.state = 0
 	sm.stateEntered = false
@@ -239,12 +311,18 @@ func (sm *StateMachine) Reset(in *Msg) {
 	sm.resetFn(in)
 }
 
+// SetState jumps from one state to another by its label. It will safely jump
+// forward but NO safety checks are performed on backward jumps. It's therefore
+// up to the developer to ensure that data is still OK when jumping backward.
+// Any forward jump will check the Complete() function of each state and get as
+// close as it can to the desired state as long as each Complete() == true at
+// each state.
 func (sm *StateMachine) SetState(in *Msg, label string) string {
 	desiredState := sm.states[label]
 
 	// If we're in a state beyond the desired state, go back. There are NO
-	// checks for state, so if you're changing state after its been
-	// completed, you'll need to do sanity checks OnEntry.
+	// checks for state when going backward, so if you're changing state
+	// after its been completed, you'll need to do sanity checks OnEntry.
 	if sm.state > desiredState {
 		sm.state = desiredState
 		sm.stateEntered = false
@@ -252,7 +330,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 	}
 
 	// If we're in a state before the desired state, go forward only as far
-	// as we're allowed to by the Complete guards
+	// as we're allowed to by the Complete guards.
 	for s := sm.state; s < desiredState; s++ {
 		ok, _ := sm.Handlers[s].Complete(in)
 		if !ok {
@@ -263,7 +341,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 	}
 
 	// No guards were triggered (go to state), or the state == desiredState,
-	// so reset the state and run OnEntry again
+	// so reset the state and run OnEntry again.
 	sm.state = desiredState
 	sm.stateEntered = false
 	return sm.Handlers[desiredState].OnEntry(in)
