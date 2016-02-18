@@ -1,4 +1,20 @@
 body {
 	height: 100%;
 	font-family: Georgia, serif;
+	font-size: 1.2em;
+}
+p, ul {
+	font-size: 1.1em;
+}
+.main {
+	width: 700px;
+	display: block;
+	margin: 2em auto 0;
+}
+.main .centered {
+	text-align: center;
+}
+.main .big-icon {
+	margin-top: 3em;
+	width: 150px;
 }

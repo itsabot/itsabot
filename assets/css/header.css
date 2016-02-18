@@ -1,0 +1,11 @@
+header {
+	height: 2em;
+	width: 100%;
+}
+header .links {
+	float: right;
+	display: inline-block;
+}
+header .logo {
+	display: inline-block;
+}

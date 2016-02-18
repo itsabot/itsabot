@@ -12,8 +12,10 @@ ava.Profile.controller = function() {
 	if (!!redirect) {
 		m.route("/" + redirect.substring(1))
 	}
-
 	var ctrl = this
+	ava.loadJS("https://apis.google.com/js/client.js?onload", function() {
+		gapi.load("auth2", ctrl.auth2Callback)
+	})
 	ctrl.signout = function(ev) {
 		ev.preventDefault()
 		cookie.removeItem("id")
@@ -32,6 +34,46 @@ ava.Profile.controller = function() {
 			url: "/api/profile.json",
 			data: { UserID: parseInt(uid, 10) }
 		})
+	}
+	ctrl.auth2Callback = function() {
+		ava.auth2 = gapi.auth2.getAuthInstance()
+		if (!!ava.auth2) {
+			return
+		}
+		var gid = document.querySelector("meta[name=google-client-id]").getAttribute("content")
+		gapi.auth2.init({
+			client_id: gid,
+			scope: "https://www.googleapis.com/auth/calendar"
+		}).then(function(a) {
+			ava.auth2 = a
+			if (ava.auth2.isSignedIn.get()) {
+				var email = ava.auth2.currentUser.get().getBasicProfile().getEmail()
+				ctrl.toggleGoogleAccount(email)
+			}
+		}, function(err) {
+			console.error(err)
+		})
+	}
+	ctrl.toggleGoogleAccount = function(name) {
+		var googleLink = document.getElementById("oauth-google-success-a")
+		if (!googleLink) {
+			// Not on the Profile page. This function is called globally on
+			// Google's script loading, so it isn't dependent on any route.
+			// Ultimately Google's script should only load on the Profile route,
+			// which eliminates the need for this check
+			return
+		}
+		var signout = document.getElementById("oauth-google-success")
+		var signin = document.getElementById("signinButton")
+		if (!name) {
+			googleLink.text = ""
+			signout.classList.add("hidden")
+			signin.classList.remove("hidden")
+		} else {
+			googleLink.text = "Google - " + name
+			signout.classList.remove("hidden")
+			signin.classList.add("hidden")
+		}
 	}
 	ctrl.props = {
 		username: m.prop(""),

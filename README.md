@@ -48,3 +48,8 @@ Packages provide all of Ava's functionality. Further, they may depend on one ano
 ## Installing and Running
 
 `go install ./... && ava -s`
+
+## Credit
+
+The Abot logo is courtesy of Edward Boatman via TheNounProject and licensed via
+Creative Commons Attribution v3.

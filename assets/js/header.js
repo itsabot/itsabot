@@ -20,33 +20,20 @@ ava.Header.view = function() {
 			config: m.route
 		}, "Tour")
 	}
-	return m("header", { class: m.route()==="/"?"":"gradient" }, [
-		m("div", { class: "container" }, [
-			m("a", {
-				class: "navbar-brand",
-				href: "/",
-				config: m.route
-			}, [
-				m("div", [
-					m("img", {
-						src: "/public/images/logo.svg"
-					}),
-					m("span", {
-						class: "margin-top-xs hide-small"
-					}, m.trust(" &nbsp;Ava")),
-				])
-			]),
-			m("div", { class: "text-right navbar-right" }, [
+	return m("header", [
+		m("div", [
+			m(".links", [
 				m("a", {
 					href: "/",
 					config: m.route
 				}, "Home"),
-				tour,
-				m("a", {
-					href: "https://medium.com/ava-updates/latest",
-					class: "hide-small"
-				}, "Updates"),
 				profileOrLogin
+			]),
+			m(".logo", [
+				m("a", {
+					href: "/",
+					config: m.route
+				}, "Abot")
 			])
 		]),
 		m("div", { id: "content" })
