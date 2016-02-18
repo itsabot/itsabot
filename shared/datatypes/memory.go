@@ -3,7 +3,7 @@ package dt
 import (
 	"strconv"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 // Memory holds a generic "memory" of Ava's usually set by a package, such as

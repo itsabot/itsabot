@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/pkg"
+	log "github.com/Sirupsen/logrus"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/pkg"
 )
 
 type Ava int

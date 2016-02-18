@@ -3,7 +3,7 @@ package sms
 import (
 	"os"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
+	"github.com/subosito/twilio"
 )
 
 // NewClient returns an authorized Twilio client using TWILIO_ACCOUNT_SID and

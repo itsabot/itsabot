@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/dchest/stemmer/porter2"
+	log "github.com/Sirupsen/logrus"
+	"github.com/dchest/stemmer/porter2"
 )
 
 var (

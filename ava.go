@@ -10,20 +10,20 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/golang.org/x/net/websocket"
+	"golang.org/x/net/websocket"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/codegangsta/cli"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/labstack/echo"
-	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/stripe/stripe-go"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/subosito/twilio"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/nlp"
-	"github.com/avabot/ava/shared/pkg"
-	"github.com/avabot/ava/shared/sms"
+	log "github.com/Sirupsen/logrus"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/language"
+	"itsabot.org/abot/shared/nlp"
+	"itsabot.org/abot/shared/pkg"
+	"itsabot.org/abot/shared/sms"
+	"github.com/codegangsta/cli"
+	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo"
+	_ "github.com/lib/pq"
+	"github.com/stripe/stripe-go"
+	"github.com/subosito/twilio"
 )
 
 var db *sqlx.DB

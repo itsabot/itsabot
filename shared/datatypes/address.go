@@ -1,6 +1,6 @@
 package dt
 
-import "github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+import "github.com/jmoiron/sqlx"
 
 // Address holds all relevant information in an address for presentation to the
 // user and communication to external services, including the USPS address

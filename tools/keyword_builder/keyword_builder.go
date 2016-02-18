@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/avabot/ava/shared/datatypes"
+	"itsabot.org/abot/shared/datatypes"
 )
 
 type keyword struct {

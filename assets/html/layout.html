@@ -3,16 +3,7 @@
 
 <head>
 	<meta name="viewport" content="width=device-width, user-scalable=no" />
-	<meta name="google-client-id" content="{{.GoogleClientID}}" />
-	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
 	<link rel="stylesheet" href="/public/css/main.css">
-	<link href='https://fonts.googleapis.com/css?family=PT+Serif:400,400italic|700italic|Montserrat:400,700' rel='stylesheet' type='text/css'>
-	<script type="text/javascript" src="https://js.stripe.com/v2/"></script>
-	<script type="text/javascript" defer>
-		Stripe.setPublishableKey("{{.StripeKey}}");
-	</script>
-	<script src="https://apis.google.com/js/platform.js?onload=start" defer></script>
-	</script>
 	<script src="/public/js/main.js"></script>
 {{if not .IsProd}}
 <script>

@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/sendgrid/sendgrid-go"
+	log "github.com/Sirupsen/logrus"
+	"github.com/jmoiron/sqlx"
+	"github.com/sendgrid/sendgrid-go"
 )
 
 // MailClient provides a higher level API over a raw SendGrid client. This has

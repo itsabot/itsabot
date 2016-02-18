@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/language"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/language"
 )
 
 func getAddress(sm *dt.StateMachine, label string) []dt.State {

@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"strconv"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	log "github.com/Sirupsen/logrus"
+	"github.com/jmoiron/sqlx"
 )
 
 // stateKey is a reserved key in the state of a package that tracks which state
@@ -119,7 +119,7 @@ func (sm *StateMachine) SetLogger(l *log.Entry) {
 	sm.logger = l
 }
 
-// SetDBConn gives a stateMachine shared access to a package's database
+// SetDBConn gives a stateMachine itsabot.org/abot/shared access to a package's database
 // connection. This is required even if no states require database access, since
 // the stateMachine's current state (among other things) are peristed to the
 // database between user requests.
@@ -277,7 +277,7 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 }
 
 // GetMemory retrieves a memory for a given key. Accessing that Memory's value
-// is described in shared/datatypes/memory.go.
+// is described in itsabot.org/abot/shared/datatypes/memory.go.
 func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 	q := `SELECT value FROM states WHERE userid=$1 AND pkgname=$2 AND key=$3`
 	var buf []byte

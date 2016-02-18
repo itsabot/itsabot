@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/avabot/ava/shared/datatypes"
+	"itsabot.org/abot/shared/datatypes"
 )
 
 var ErrInvalidAddress = errors.New("invalid address")

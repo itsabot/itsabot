@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"os"
 
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/nlp"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/nlp"
 )
 
 // buildClassifier prepares the Named Entity Recognizer (NER) to find Commands

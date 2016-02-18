@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"os"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/mattbaird/elastigo/lib"
+	log "github.com/Sirupsen/logrus"
+	"github.com/mattbaird/elastigo/lib"
 )
 
 // SearchClient wraps an ElasticSearch client connection to provide a higher

@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/renstrom/fuzzysearch/fuzzy"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/language"
-	"github.com/avabot/ava/shared/nlp"
-	"github.com/avabot/ava/shared/pkg"
-	"github.com/avabot/ava/shared/task"
+	log "github.com/Sirupsen/logrus"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/language"
+	"itsabot.org/abot/shared/nlp"
+	"itsabot.org/abot/shared/pkg"
+	"itsabot.org/abot/shared/task"
+	"github.com/jmoiron/sqlx"
+	"github.com/renstrom/fuzzysearch/fuzzy"
 )
 
 type Purchase string

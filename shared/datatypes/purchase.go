@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/nlp"
+	"itsabot.org/abot/shared/nlp"
+	"github.com/jmoiron/sqlx"
 )
 
 // Purchase represents a user purchase and associated useful information such as
@@ -123,7 +123,7 @@ func (p *Purchase) Subtotal() uint64 {
 }
 
 // UpdateEmailsSent records the time at which a purchase confirmation and vendor
-// request were sent. See shared/task/request_auth.go:makePurchase for an
+// request were sent. See itsabot.org/abot/shared/task/request_auth.go:makePurchase for an
 // example.
 func (p *Purchase) UpdateEmailsSent() error {
 	t := time.Now()

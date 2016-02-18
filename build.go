@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
+	log "github.com/Sirupsen/logrus"
 )
 
 type packagesConf struct {

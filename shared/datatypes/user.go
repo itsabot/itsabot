@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx"
 )
 
 type User struct {

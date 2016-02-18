@@ -5,11 +5,11 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/NickPresta/GoURLShortener"
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/nlp"
-	"github.com/avabot/ava/shared/pkg"
+	"github.com/NickPresta/GoURLShortener"
+	log "github.com/Sirupsen/logrus"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/nlp"
+	"itsabot.org/abot/shared/pkg"
 )
 
 var p *pkg.Pkg

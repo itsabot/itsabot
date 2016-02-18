@@ -6,11 +6,11 @@ import (
 	"net/rpc"
 	"os"
 
-	log "github.com/avabot/ava/Godeps/_workspace/src/github.com/Sirupsen/logrus"
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	_ "github.com/avabot/ava/Godeps/_workspace/src/github.com/lib/pq"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/nlp"
+	log "github.com/Sirupsen/logrus"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/nlp"
+	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq"
 )
 
 type PkgWrapper struct {

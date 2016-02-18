@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 
-	"github.com/avabot/ava/shared/datatypes"
+	"itsabot.org/abot/shared/datatypes"
 )
 
 // checkActiveAuthorization determines if a message to Ava was fulfilling an

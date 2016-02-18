@@ -6,10 +6,10 @@ import (
 	"math/rand"
 	"os"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/nlp"
-	"github.com/avabot/ava/shared/pkg"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/nlp"
+	"itsabot.org/abot/shared/pkg"
+	"github.com/jmoiron/sqlx"
 )
 
 var db *sqlx.DB

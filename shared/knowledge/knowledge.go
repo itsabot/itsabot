@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avabot/ava/Godeps/_workspace/src/github.com/jmoiron/sqlx"
-	"github.com/avabot/ava/shared/datatypes"
-	"github.com/avabot/ava/shared/language"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/language"
+	"github.com/jmoiron/sqlx"
 )
 
 var ErrNoLocation = errors.New("no previous location")
