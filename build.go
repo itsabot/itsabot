@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -18,7 +19,7 @@ type packagesConf struct {
 // bootDependencies executes all binaries listed in "packages.json". each
 // dependencies is passed the rpc address of the ava core. it is expected that
 // each dependency respond with there own rpc address when registering
-// themselves with the ava core
+// themselves with the ava core.
 func bootDependencies(avaRPCAddr string) {
 	log.WithFields(log.Fields{
 		"ava_core_addr": avaRPCAddr,
@@ -31,10 +32,15 @@ func bootDependencies(avaRPCAddr string) {
 	if err := json.Unmarshal(content, &conf); err != nil {
 		log.Fatalln("err: unmarshaling packages", err)
 	}
-	for name := range conf.Dependencies {
+	for name, version := range conf.Dependencies {
+		_, name = filepath.Split(name)
+		if version == "*" {
+			name += "-master"
+		} else {
+			name += "-" + version
+		}
 		log.WithFields(log.Fields{"pkg": name}).Debugln("booting")
-		// NOTE assumes packages are installed with go install ./...,
-		// matching Heroku's Go buildpack
+		// This assumes packages are installed with go install ./...
 		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

@@ -3,7 +3,7 @@
 	"Version": "0.0.1",
 	"Dependencies": {
 		"github.com/itsabot/pkg_onboard": "*",
-		"github.com/itsabot/pkg_yelp": "*",
+		"github.com/itsabot/pkg_restaurants": "*",
 		"github.com/itsabot/pkg_mechanic": "*",
 		"github.com/itsabot/pkg_settings": "*",
 		"github.com/itsabot/pkg_purchase": "*"
