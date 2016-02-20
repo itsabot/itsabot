@@ -1,55 +1,26 @@
-# Ava
+# Abot
+ 
+Abot is a digital assistant framework that enables anyone to easily build a digital assistant similar to Apple's Siri, Microsoft's Cortana, Google Now, or Amazon Echo. Further, Abot supports a human-aided training backend enabling anyone to build services like Facebook M or Magic.
 
-Ava is a general-purpose A.I. platform similar to Apple's Siri, Microsoft's Cortana, Google Now, or Amazon Echo.  Unlike those proprietary systems, Ava is open-sourced and extensible. By providing an extensible platform onto which anyone can easily add functionality, Ava is the first A.I. platform that aims to be available everywhere and—ultimately—to do everything.
+Unlike those proprietary systems, Abot is open-sourced and extensible. By providing an extensible platform onto which anyone can easily add functionality, Abot is the first A.I. framework that aims to be available everywhere and—ultimately—to do everything.
+
+*Note:* This is pre-alpha software and shouldn't yet be considered for production use.
 
 ## Architecture
 
-Ava's core consists of three parts:
+Abot's core consists of three parts:
 
 1. An API that accepts natural language inputs.
 1. A state machine that tracks grammar and context across inputs, enabling the chaining of commands.
 1. A router that selects the appropriate packages to send the input based on the current command and past context.
 
-## About Packages
+It combines those three parts with tools and libraries designed to make programming a digital assistant as quick and fun as possible.
 
-Packages provide all of Ava's functionality. Further, they may depend on one another.
+Abot uses packages to easily extend functionality. If you want additional features, simply add the appropriate package to `packages.json` or build your own with the libraries and examples provided.
 
-## Setup
+## License
 
-1. Install Postgres
-1. Set up your environment vars (see below)
-1. Get credentials for Yelp, Twilio, AWS, Stripe, Bonsai ElasticSearch, USPS, SendGrid, Rollbar, and Google API access
-1. (Optional) Install npm and the npm package "rebuild". Use the following alias to automatically watch and cat your JS files
-
-	alias watch="rebuild -w assets/js \"cat assets/js/*.js > public/js/main.js\""
-
-	export BASE_URL="https://www.avabot.co/"
-	export PORT="4200"
-	export YELP_CONSUMER_KEY=""
-	export YELP_CONSUMER_SECRET=""
-	export YELP_TOKEN=""
-	export YELP_TOKEN_SECRET=""
-	export TWILIO_ACCOUNT_SID=""
-	export TWILIO_AUTH_TOKEN=""
-	export AWS_ACCESS_KEY_ID=""
-	export AWS_SECRET_ACCESS_KEY=""
-	export STRIPE_PUBLIC_KEY=""
-	export STRIPE_ACCESS_TOKEN=""
-	export ELASTICSEARCH_USERNAME=""
-	export ELASTICSEARCH_PASSWORD=""
-	export ELASTICSEARCH_DOMAIN=""
-	export USPS_USER_ID=""
-	export SENDGRID_KEY=""
-	export ROLLBAR_ACCESS_TOKEN=""
-	export ROLLBAR_ENDPOINT=""
-	export GOOGLE_CLIENT_ID=""
-	export GOOGLE_CLIENT_SECRET=""
-
-## Installing and Running
-
-`go install ./... && ava -s`
-
-## Credit
+Abot is MIT-licensed, a copy of which you can find in the repo.
 
 The Abot logo is courtesy of Edward Boatman via TheNounProject and licensed via
 Creative Commons Attribution v3.
