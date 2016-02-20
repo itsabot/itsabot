@@ -1,11 +1,11 @@
 {
-	"name": "ava",
-	"version": "0.0.1",
-	"dependencies": {
-		"ava_yelp": "*",
-		"ava_mechanic": "*",
-		"ava_onboard": "*",
-		"ava_purchase": "*",
-		"ava_settings": "*"
+	"Name": "abot",
+	"Version": "0.0.1",
+	"Dependencies": {
+		"github.com/itsabot/pkg_onboard": "*",
+		"github.com/itsabot/pkg_yelp": "*",
+		"github.com/itsabot/pkg_mechanic": "*",
+		"github.com/itsabot/pkg_settings": "*",
+		"github.com/itsabot/pkg_purchase": "*"
 	}
 }
