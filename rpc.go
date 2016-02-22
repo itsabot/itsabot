@@ -2,7 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
+	"io/ioutil"
 	"net/rpc"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -21,6 +26,13 @@ type Ava int
 type pkgMap struct {
 	pkgs  map[string]*pkg.PkgWrapper
 	mutex *sync.Mutex
+}
+
+// packagesConf holds the structure of the packages.json configuration file.
+type packagesConf struct {
+	Name         string
+	Version      string
+	Dependencies map[string]string
 }
 
 // regPkgs initializes a pkgMap and holds it in global memory, which works OK
@@ -138,6 +150,42 @@ func callPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (packageReply string,
 		return *reply, err
 	}
 	return *reply, nil
+}
+
+// bootDependencies executes all binaries listed in "packages.json". each
+// dependencies is passed the rpc address of the ava core. it is expected that
+// each dependency respond with there own rpc address when registering
+// themselves with the ava core.
+func bootDependencies(avaRPCAddr string) {
+	log.WithFields(log.Fields{
+		"ava_core_addr": avaRPCAddr,
+	}).Debugln("booting dependencies")
+	content, err := ioutil.ReadFile("packages.json")
+	if err != nil {
+		log.Fatalln("reading packages.json", err)
+	}
+	var conf packagesConf
+	if err := json.Unmarshal(content, &conf); err != nil {
+		log.Fatalln("err: unmarshaling packages", err)
+	}
+	for name, version := range conf.Dependencies {
+		_, name = filepath.Split(name)
+		if version == "*" {
+			name += "-master"
+		} else {
+			name += "-" + version
+		}
+		log.WithFields(log.Fields{"pkg": name}).Debugln("booting")
+		// This assumes packages are installed with go install ./...
+		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err = cmd.Start(); err != nil {
+			log.WithFields(log.Fields{
+				"pkg": name,
+			}).Fatalln(err)
+		}
+	}
 }
 
 // Get is a thread-safe, locking way to access the values of a pkgMap.
