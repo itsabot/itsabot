@@ -216,3 +216,18 @@ func (u *User) UpdateAddressName(db *sqlx.DB, id uint64, name string) (*Address,
 	}
 	return addr, nil
 }
+
+// CheckActiveAuthorization determines if a message to Ava was fulfilling an
+// authorization request. RequestAuth nulls out the authorizationid once auth
+// has been completed.
+func (u *User) CheckActiveAuthorization(db *sqlx.DB) (bool, error) {
+	q := `SELECT authorizationid FROM users WHERE id=$1`
+	var authID sql.NullInt64
+	if err := db.Get(&authID, q, u.ID); err != nil {
+		return false, err
+	}
+	if !authID.Valid {
+		return false, nil
+	}
+	return true, nil
+}
