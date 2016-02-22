@@ -1,10 +1,10 @@
 POS files in their original form were downloaded from
 http://www.ashley-bovan.co.uk/words/partsofspeech.html (Ashley Bovan). To
 compile them, Ashley used the MOBY word lists and UK Advanced Cryptics
-Dictionary. Each word was then lowercased using dd:
+Dictionary, and licenses of both have been included in this directory's LICENSE
+file. Each word was then lowercased using dd:
 
 	dd if=/input.txt of=/output.txt conv=lcase
 
 At this point in time we DO NOT HAVE PERMISSION from Ashley to use these, so we
-must obtain permission (and ensure licenses are OK from MOBY/UK Advanced
-Cryptics Dictionary) prior to any launch.
+must obtain permission prior to any launch.
