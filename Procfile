@@ -1,1 +1,0 @@
-web: ava -s
