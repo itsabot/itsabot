@@ -9,20 +9,29 @@ abot.Index.view = function() {
 		]),
 		m("p", "As next steps, try:"),
 		m("ul", [
-			m("li", m("a[href=/signup]", {
-				config: m.route,
-			}, "Creating an Account")),
-			m("li", m("a[href=#/]", "Speaking to Abot")),
 			m("li", [
 				"Reading the ",
-				m("a[href=#/]", "Getting Started guide.")
+				m("a[href=https://github.com/itsabot/abot/wiki/Getting-Started]", "Getting Started guide.")
 			]),
-			m("li", m("a[href=#/]", "Building a package")),
+			m("li", [
+				m("a[href=https://github.com/itsabot/abot/wiki/Getting-Started#communicating-with-abot]", "Communicating with Abot.")
+			]),
+			m("li", m("a[href=/signup]", {
+				config: m.route,
+			}, "Creating an Account.")),
+			m("li", m("a[href=https://github.com/itsabot/abot/wiki/Adding-SMS-Messaging-to-Abot]", "Adding SMS Messaging to Abot.")),
+			m("li", m("a[href=#/]", "Building a package.")),
+			m("li", [
+				"Learning the ",
+				m("a[href=https://github.com/itsabot/abot/wiki/Learning-the-Human-Aided-Training-Interface]", "Human-Aided Training Interface.")
+			]),
 			m("li", [
 				"Learning ",
-				m("a[href=#/]", "How to Contribute.")
+				m("a[href=https://github.com/itsabot/abot/wiki/How-to-Contribute]", "How to Contribute.")
 			]),
-			m("li", "Deploying to Heroku (coming soon)")
+			m("li", [
+				m("a[href=https://github.com/itsabot/abot/wiki/Getting-Started#deploying-your-abot]", "Deploying to Heroku."),
+			])
 		])
 	])
 }

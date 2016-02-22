@@ -46,7 +46,7 @@ abot.Signup.view = function(ctrl) {
 	if (!!ctrl.props.error()) {
 		errMsg = m(".alert.alert-danger", ctrl.props.error())
 	}
-	return m(".body", [
+	return m(".main", [
 		m.component(abot.Header),
 		m("#full.container", m(".row.margin-top-sm", [
 			m(".col-md-push-3.col-md-6.card", [

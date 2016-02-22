@@ -15,8 +15,7 @@ abot.Header.view = function(ctrl) {
 	var profileOrLogin
 	if (cookie.getItem("id") !== null) {
 		profileOrLogin = [
-			m("a", {
-				href: "/profile",
+			m("a[href=/profile]", {
 				config: m.route
 			}, "Profile"),
 			m("a[href=#/]", {
@@ -24,10 +23,14 @@ abot.Header.view = function(ctrl) {
 			}, "Sign out"),
 		]
 	} else {
-		profileOrLogin = m("a", {
-			href: "/login",
-			config: m.route
-		}, "Log in")
+		profileOrLogin = [
+			m("a[href=/login]", {
+				config: m.route
+			}, "Log in"),
+			m("a[href=/signup]", {
+				config: m.route
+			}, "Sign up"),
+		]
 	}
 	if (cookie.getItem("id") === null || m.route() === "/") {
 		tour = m("a", {

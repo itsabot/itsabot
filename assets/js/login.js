@@ -48,7 +48,7 @@ abot.Login.controller = function() {
 	ctrl.error = m.prop("")
 }
 abot.Login.view = function(ctrl) {
-	return m(".body", [
+	return m(".main", [
 		m.component(abot.Header),
 		m("#full.container", m(".row.margin-top-sm", m(".col-md-push-3.col-md-6.card", [
 			m(".row", [
