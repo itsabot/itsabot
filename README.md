@@ -18,10 +18,7 @@ production use.**
 
 ## Installation
 
-> **Dependencies**
->
-> Abot requires that the following are installed, so please do that before
-> continuing.
+> **Dependencies**: Abot requires that the following programs are installed:
 >
 > * [Go](https://golang.org/dl/) >= 1.6
 > * [PostgreSQL](http://www.postgresql.org/download/) >= 9.5
@@ -65,7 +62,14 @@ That will download the packages to the `/packages` directory. Be sure to follow
 the integration instructions in the README of each package you add (found in
 `/packages/pkgname/README.md`), as adding a package may require you to make some
 minor code changes in Abot. Once you've integrated the packages, recompile and
-run Abot again: `go install ./... && abot -s`.
+run Abot again: `go install ./... && abot -s`. You can use the included Abot
+console to communicate with Abot locally:
+
+```
+$ abotc
+> Hi
+Hello there!
+```
 
 You can learn more in our
 [Getting Started](https://github.com/itsabot/abot/wiki/Getting-Started) guide.
