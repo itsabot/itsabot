@@ -1,6 +1,6 @@
-(function(ava) {
-ava.Phones = {}
-ava.Phones.controller = function() {
+(function(abot) {
+abot.Phones = {}
+abot.Phones.controller = function() {
 	var ctrl = this
 	ctrl.format = function(number) {
 		var a1 = number.slice(0, 2);
@@ -9,23 +9,19 @@ ava.Phones.controller = function() {
 		return a1 + a2 + a3 + number.slice(8)
 	}
 }
-ava.Phones.view = function(ctrl, props) {
+abot.Phones.view = function(ctrl, props) {
 	return m('div', [
-		m("h3.margin-top-sm", "Phone numbers"),
-		m(".form-group.card", [
-			m("div.table-responsive", [
-				m("table.table", [
-					m("thead", m("tr", m("th", "Number"))),
-					m("tbody", props.map(function(phone) {
-						var fmtd = ctrl.format(phone.Number)
-						return m.component(ava.Phone, {
-							Id: phone.Id,
-							Number: fmtd
-						})
-					}))
-				])
-			])
+		m("h2", "Phone numbers"),
+		m("table", [
+			m("thead", m("tr", m("th", "Number"))),
+			m("tbody", props.map(function(phone) {
+				var fmtd = ctrl.format(phone.Number)
+				return m.component(abot.Phone, {
+					Id: phone.Id,
+					Number: fmtd
+				})
+			}))
 		])
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

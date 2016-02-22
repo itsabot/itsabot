@@ -1,13 +1,28 @@
-(function(ava) {
-ava.Header = {}
-ava.Header.view = function() {
+(function(abot) {
+abot.Header = {}
+abot.Header.controller = function() {
+	var ctrl = this
+	ctrl.signout = function(ev) {
+		ev.preventDefault()
+		cookie.removeItem("id")
+		cookie.removeItem("trainer")
+		cookie.removeItem("session_token")
+		m.route("/login")
+	}
+}
+abot.Header.view = function(ctrl) {
 	var tour = null
 	var profileOrLogin
 	if (cookie.getItem("id") !== null) {
-		profileOrLogin = m("a", {
-			href: "/profile",
-			config: m.route
-		}, "Profile")
+		profileOrLogin = [
+			m("a", {
+				href: "/profile",
+				config: m.route
+			}, "Profile"),
+			m("a[href=#/]", {
+				onclick: ctrl.signout,
+			}, "Sign out"),
+		]
 	} else {
 		profileOrLogin = m("a", {
 			href: "/login",
@@ -39,4 +54,4 @@ ava.Header.view = function() {
 		m("div", { id: "content" })
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

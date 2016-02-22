@@ -1,0 +1,10 @@
+input {
+	font-family: Georgia, serif;
+	font-size: 16px;	
+	padding: 0.5em 0.5em;
+	margin: 0.25em 0;
+	border: 1px solid #aaa;
+}
+.form-help {
+	margin-top: 1em;
+}

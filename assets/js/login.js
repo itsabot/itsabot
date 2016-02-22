@@ -1,12 +1,6 @@
-(function(ava) {
-ava.Login = {}
-ava.Login.controller = function() {
-	ava.Login.checkAuth = function(callback) {
-		if (cookie.getItem("id") !== null) {
-			callback(true)
-		}
-	}
-
+(function(abot) {
+abot.Login = {}
+abot.Login.controller = function() {
 	var ctrl = this
 	ctrl.login = function(ev) {
 		ev.preventDefault()
@@ -38,7 +32,7 @@ ava.Login.controller = function() {
 			ctrl.showError(err.Msg)
 		})
 	}
-	ava.Login.checkAuth(function(loggedIn) {
+	abot.Login.checkAuth(function(loggedIn) {
 		if (loggedIn) {
 			return m.route("/profile")
 		}
@@ -53,9 +47,9 @@ ava.Login.controller = function() {
 	}
 	ctrl.error = m.prop("")
 }
-ava.Login.view = function(ctrl) {
+abot.Login.view = function(ctrl) {
 	return m(".body", [
-		m.component(ava.Header),
+		m.component(abot.Header),
 		m("#full.container", m(".row.margin-top-sm", m(".col-md-push-3.col-md-6.card", [
 			m(".row", [
 				m(".col-md-12.text-center", [
@@ -119,8 +113,12 @@ ava.Login.view = function(ctrl) {
 					])
 				])
 			])
-		]))),
-		m.component(ava.Footer)
+		])))
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+abot.Login.checkAuth = function(callback) {
+	if (cookie.getItem("id") !== null) {
+		callback(true)
+	}
+}
+})(!window.abot ? window.abot={} : window.abot);

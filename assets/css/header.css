@@ -6,6 +6,9 @@ header .links {
 	float: right;
 	display: inline-block;
 }
+header .links a {
+	margin-right: 1em;
+}
 header .logo {
 	display: inline-block;
 }

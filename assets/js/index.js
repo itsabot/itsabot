@@ -1,15 +1,17 @@
-(function(ava) {
-ava.Index = {}
-ava.Index.view = function() {
+(function(abot) {
+abot.Index = {}
+abot.Index.view = function() {
 	return m(".main", [
-		m.component(ava.Header),
+		m.component(abot.Header),
 		m(".centered", [
 			m("img[src=/public/images/logo.svg].big-icon"),
 			m("h1", "Congratulations, you've set up Abot!"),
 		]),
 		m("p", "As next steps, try:"),
 		m("ul", [
-			m("li", m("a[href=#/]", "Creating an Account")),
+			m("li", m("a[href=/signup]", {
+				config: m.route,
+			}, "Creating an Account")),
 			m("li", m("a[href=#/]", "Speaking to Abot")),
 			m("li", [
 				"Reading the ",
@@ -24,4 +26,4 @@ ava.Index.view = function() {
 		])
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

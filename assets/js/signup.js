@@ -1,8 +1,8 @@
-(function(ava) {
-ava.Signup = {}
-ava.Signup.controller = function() {
+(function(abot) {
+abot.Signup = {}
+abot.Signup.controller = function() {
 	var ctrl = this
-	ava.Login.checkAuth(function(cb) {
+	abot.Login.checkAuth(function(cb) {
 		if (cb) {
 			return m.route("/profile")
 		}
@@ -41,13 +41,13 @@ ava.Signup.controller = function() {
 		return ctrl.props.phone().length > 0
 	}
 }
-ava.Signup.view = function(ctrl) {
+abot.Signup.view = function(ctrl) {
 	var errMsg = null
 	if (!!ctrl.props.error()) {
 		errMsg = m(".alert.alert-danger", ctrl.props.error())
 	}
 	return m(".body", [
-		m.component(ava.Header),
+		m.component(abot.Header),
 		m("#full.container", m(".row.margin-top-sm", [
 			m(".col-md-push-3.col-md-6.card", [
 				m(".row", [
@@ -120,8 +120,7 @@ ava.Signup.view = function(ctrl) {
 					])
 				])
 			])
-		])),
-		m.component(ava.Footer)
+		]))
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

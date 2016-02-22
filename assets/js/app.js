@@ -41,16 +41,14 @@ ava.loadJS = function(url, cb) {
 window.addEventListener('load', function() {
 	m.route.mode = "pathname"
 	m.route(document.body, "/", {
-		"/": ava.Index,
-		"/tour": ava.Tour,
-		"/train": ava.TrainIndex,
-		"/train/:id": ava.TrainShow,
-		"/signup": ava.Signup,
-		"/login": ava.Login,
-		"/forgot_password": ava.ForgotPassword,
-		"/reset_password": ResetPassword,
-		"/profile": ava.Profile,
-		"/cards/new": ava.NewCard,
+		"/": abot.Index,
+		"/train": abot.TrainIndex,
+		"/train/:id": abot.TrainShow,
+		"/signup": abot.Signup,
+		"/login": abot.Login,
+		"/forgot_password": abot.ForgotPassword,
+		"/reset_password": abot.ResetPassword,
+		"/profile": abot.Profile,
 	})
 })
 })(!window.ava ? window.ava={} : window.ava);

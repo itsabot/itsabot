@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="201px" height="170px" viewBox="0 0 201 170" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns">
+    <title>abot logo</title>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+        <path d="M45.5,12 L149.5,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45.5,60 L149.5,60" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M98,60.8950268 L98,80" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150.019226,80 L44.9952391,80" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150.019226,80 L150.019226,158.006165" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M132,158.006165 L150.019226,158.006165" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M113,142 L126,155" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M120,131 L112,139" id="Line" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M107,117 L120,131" id="Line" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45.0192261,80 L45.0192261,158.006165" id="Line-Copy-5" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45,158.006165 L63.0192261,158.006165" id="Line-Copy-4" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M69,143 L82,156" id="Line-Copy-3" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(75.500000, 149.500000) scale(-1, 1) translate(-75.500000, -149.500000) "></path>
+        <path d="M82,131 L74,139" id="Line-Copy-2" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(78.000000, 135.000000) scale(-1, 1) translate(-78.000000, -135.000000) "></path>
+        <path d="M75,116 L88,130" id="Line-Copy" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(81.500000, 123.000000) scale(-1, 1) translate(-81.500000, -123.000000) "></path>
+        <path d="M45,60 L45,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150,60 L150,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <circle id="Oval-1" fill="#000000" sketch:type="MSShapeGroup" cx="76.5" cy="34.5" r="6.5"></circle>
+        <circle id="Oval-1" fill="#000000" sketch:type="MSShapeGroup" cx="118.5" cy="34.5" r="6.5"></circle>
+        <rect id="Rectangle-1" fill="#000000" sketch:type="MSShapeGroup" x="89" y="122" width="16" height="16"></rect>
+    </g>
+</svg>
