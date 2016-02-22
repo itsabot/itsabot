@@ -1,6 +1,10 @@
 package dt
 
-import "github.com/jmoiron/sqlx"
+import (
+	"errors"
+
+	"github.com/jmoiron/sqlx"
+)
 
 // Address holds all relevant information in an address for presentation to the
 // user and communication to external services, including the USPS address
@@ -19,6 +23,8 @@ type Address struct {
 	Country        string
 	DisplayAddress string
 }
+
+var ErrNoAddress = errors.New("no address")
 
 // GetAddress searches the database for a specific address by its ID.
 func GetAddress(dest *Address, db *sqlx.DB, id uint64) error {

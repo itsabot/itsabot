@@ -37,12 +37,53 @@ type User struct {
 // TODO build the constants defining the types of AuthMethods
 type AuthMethod int
 
+// FlexIDType is used to identify a user when only an email, phone, or other "flexible" ID is available.
+type FlexIDType int
+
 const (
-	FlexIdTypeEmail int = iota + 1
-	FlexIdTypePhone
+	fidtInvalid FlexIDType = iota // 0
+	fidtEmail                     // 1
+	fidtPhone                     // 2
 )
 
-var ErrNoAddress = errors.New("no address")
+var (
+	ErrMissingUser       = errors.New("missing user")
+	ErrMissingFlexIdType = errors.New("missing flexidtype")
+	ErrMissingFlexID     = errors.New("missing flexid")
+	ErrInvalidFlexIDType = errors.New("invalid flexid type")
+)
+
+func GetUser(db *sqlx.DB, uid uint64, fid string, fidT FlexIDType) (*User,
+	error) {
+
+	if uid == 0 {
+		fidT = fidtPhone // XXX temporary. we only have phone numbers atm
+		if fid == "" {
+			return nil, ErrMissingFlexID
+		} else if fidT == fidtInvalid {
+			return nil, ErrInvalidFlexIDType
+		}
+		q := `SELECT userid
+		      FROM userflexids
+		      WHERE flexid=$1 AND flexidtype=$2
+		      ORDER BY createdat DESC`
+		if err := db.Get(&uid, q, fid, fidT); err != nil {
+			if err == sql.ErrNoRows {
+				return nil, ErrMissingUser
+			}
+			return nil, err
+		}
+	}
+	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
+	      FROM users
+	      WHERE id=$1`
+	var u User
+	if err := db.Get(&u, q, uid); err != nil {
+		// XXX if err == sql.ErrNoRows, if that also a ErrMissingUser case?
+		return nil, err
+	}
+	return &u, nil
+}
 
 // GetName satisfies the Contactable interface
 func (u *User) GetName() string {

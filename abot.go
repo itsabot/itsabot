@@ -34,10 +34,9 @@ var ner nlp.Classifier
 var offensive map[string]struct{}
 var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 var (
-	ErrInvalidCommand    = errors.New("invalid command")
-	ErrMissingPackage    = errors.New("missing package")
-	ErrInvalidUserPass   = errors.New("Invalid username/password combination")
-	ErrMissingFlexIdType = errors.New("missing flexidtype")
+	ErrInvalidCommand  = errors.New("invalid command")
+	ErrMissingPackage  = errors.New("missing package")
+	ErrInvalidUserPass = errors.New("Invalid username/password combination")
 )
 
 func main() {
@@ -143,7 +142,7 @@ func preprocess(c *echo.Context) (*dt.Msg, error) {
 		return nil, ErrInvalidCommand
 	}
 	uid, fid, fidT := validateParams(c)
-	u, err := getUser(uid, fid, flexIDType(fidT))
+	u, err := dt.GetUser(db, uid, fid, dt.FlexIDType(fidT))
 	if err != nil {
 		return nil, err
 	}

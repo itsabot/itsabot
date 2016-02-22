@@ -4,17 +4,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"itsabot.org/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
-)
-
-var (
-	ErrMissingUser = errors.New("missing user")
+	"itsabot.org/abot/shared/nlp"
 )
 
 type jsonState json.RawMessage
