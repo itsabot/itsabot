@@ -43,21 +43,17 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetLevel(log.DebugLevel)
 	app := cli.NewApp()
-	app.Name = "ava"
-	app.Usage = "general purpose ai platform"
+	app.Name = "abot"
+	app.Usage = "digital assistant framework"
 	app.Version = "0.0.1"
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "server, s",
 			Usage: "run server",
 		},
-		cli.StringFlag{
-			Name:  "port, p",
-			Usage: "set port for server",
-		},
 		cli.BoolFlag{
 			Name:  "install, i",
-			Usage: "install packages in package.json",
+			Usage: "install packages in packages.json",
 		},
 	}
 	app.Action = func(c *cli.Context) {
