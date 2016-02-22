@@ -56,7 +56,7 @@ func (u *User) GetEmail() string {
 
 func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 	var oldTime time.Time
-	tmp := os.Getenv("REQUIRE_AUTH_IN_HOURS")
+	tmp := os.Getenv("ABOT_REQUIRE_AUTH_IN_HOURS")
 	var t int
 	if len(tmp) > 0 {
 		var err error
@@ -65,10 +65,10 @@ func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 			return false, err
 		}
 		if t < 0 {
-			return false, errors.New("negative REQUIRE_AUTH_IN_HOURS")
+			return false, errors.New("negative ABOT_REQUIRE_AUTH_IN_HOURS")
 		}
 	} else {
-		log.Println("REQUIRE_AUTH_IN_HOURS environment variable is not set.",
+		log.Println("ABOT_REQUIRE_AUTH_IN_HOURS environment variable is not set.",
 			" Using 168 hours (one week) as the default.")
 		t = 168
 	}

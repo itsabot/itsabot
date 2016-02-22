@@ -16,9 +16,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"itsabot.org/abot/shared/cal"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/sms"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/satori/go.uuid"
@@ -27,6 +24,9 @@ import (
 	"github.com/stripe/stripe-go/customer"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/websocket"
+	"itsabot.org/abot/shared/cal"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/sms"
 )
 
 var letters = []rune(
@@ -565,7 +565,7 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	h := `<html><body>`
 	h += fmt.Sprintf("<p>Hi %s:</p>", user.Name)
 	h += "<p>Please click the following link to reset your password. This link will expire in 30 minutes.</p>"
-	h += fmt.Sprintf("<p>%s</p>", os.Getenv("BASE_URL")+"?/reset_password?s="+secret)
+	h += fmt.Sprintf("<p>%s</p>", os.Getenv("ABOT_URL")+"?/reset_password?s="+secret)
 	h += "<p>If you received this email in error, please ignore it.</p>"
 	h += "<p>Have a great day!</p>"
 	h += "<p>-Ava</p>"

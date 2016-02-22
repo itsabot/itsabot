@@ -13,17 +13,17 @@ import (
 	"golang.org/x/net/websocket"
 
 	log "github.com/Sirupsen/logrus"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/language"
-	"itsabot.org/abot/shared/nlp"
-	"itsabot.org/abot/shared/pkg"
-	"itsabot.org/abot/shared/sms"
 	"github.com/codegangsta/cli"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 	"github.com/stripe/stripe-go"
 	"github.com/subosito/twilio"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/language"
+	"itsabot.org/abot/shared/nlp"
+	"itsabot.org/abot/shared/pkg"
+	"itsabot.org/abot/shared/sms"
 )
 
 var db *sqlx.DB
@@ -107,7 +107,7 @@ func startServer() {
 	log.Infoln("booting ava http server")
 	e := echo.New()
 	initRoutes(e)
-	e.Run(":" + os.Getenv("PORT"))
+	e.Run(":" + os.Getenv("ABOT_PORT"))
 }
 
 // bootRPCServer starts the rpc for Ava core in a go routine and returns
@@ -274,20 +274,20 @@ func validateParams(c *echo.Context) (uid uint64, fid string, fidT int) {
 }
 
 func checkRequiredEnvVars() error {
-	port := os.Getenv("PORT")
+	port := os.Getenv("ABOT_PORT")
 	_, err := strconv.Atoi(port)
 	if err != nil {
-		return errors.New("PORT is not set to an integer")
+		return errors.New("ABOT_PORT is not set to an integer")
 	}
-	base := os.Getenv("BASE_URL")
+	base := os.Getenv("ABOT_URL")
 	l := len(base)
 	if l == 0 {
-		return errors.New("BASE_URL not set")
+		return errors.New("ABOT_URL not set")
 	}
 	if l < 4 || base[0:4] != "http" {
-		return errors.New("BASE_URL invalid. Must include http/https")
+		return errors.New("ABOT_URL invalid. Must include http/https")
 	}
-	// TODO Check for DATABASE_URL if AVA_ENV==production
+	// TODO Check for ABOT_DATABASE_URL if AVA_ENV==production
 	return nil
 }
 

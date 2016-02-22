@@ -7,10 +7,10 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"itsabot.org/abot/shared/datatypes"
+	"itsabot.org/abot/shared/nlp"
 )
 
 type PkgWrapper struct {
@@ -106,7 +106,7 @@ func ConnectDB() (*sqlx.DB, error) {
 	var db *sqlx.DB
 	var err error
 	if os.Getenv("AVA_ENV") == "production" {
-		db, err = sqlx.Connect("postgres", os.Getenv("DATABASE_URL"))
+		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
 	} else {
 		db, err = sqlx.Connect("postgres",
 			"user=postgres dbname=ava sslmode=disable")

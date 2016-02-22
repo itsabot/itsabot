@@ -153,11 +153,11 @@ func (sg *MailClient) SendTrainingNotification(db *sqlx.DB, m *Msg) error {
 		"<p>We received a request that needs your help: %s</p>",
 		m.Sentence)
 	var url string
-	if len(os.Getenv("PORT")) > 0 {
-		url = fmt.Sprintf("%s:%s/train/%d", os.Getenv("BASE_URL"),
-			os.Getenv("PORT"), m.ID)
+	if len(os.Getenv("ABOT_PORT")) > 0 {
+		url = fmt.Sprintf("%s:%s/train/%d", os.Getenv("ABOT_URL"),
+			os.Getenv("ABOT_PORT"), m.ID)
 	} else {
-		url = fmt.Sprintf("%s/train/%d", os.Getenv("BASE_URL"), m.ID)
+		url = fmt.Sprintf("%s/train/%d", os.Getenv("ABOT_URL"), m.ID)
 	}
 	text += fmt.Sprintf(
 		"<p><a href=\"%s\">Click here to help.</a></p>", url)
