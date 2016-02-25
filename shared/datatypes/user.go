@@ -3,12 +3,12 @@ package dt
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/itsabot/abot/shared/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 )
@@ -67,7 +67,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("extracted user params", p)
+	log.Debug("extracted user params", p)
 	if p.UserID == 0 {
 		// XXX temporary. we only have phone numbers atm
 		p.FlexIDType = fidtPhone
@@ -76,7 +76,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 		} else if p.FlexIDType == fidtInvalid {
 			return nil, ErrInvalidFlexIDType
 		}
-		log.Println("searching for user from", p.FlexID, p.FlexIDType)
+		log.Debug("searching for user from", p.FlexID, p.FlexIDType)
 		q := `SELECT userid
 		      FROM userflexids
 		      WHERE flexid=$1 AND flexidtype=$2
@@ -85,7 +85,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		}
-		log.Println("got uid", p.UserID)
+		log.Debug("got uid", p.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 			return false, errors.New("negative ABOT_REQUIRE_AUTH_IN_HOURS")
 		}
 	} else {
-		log.Println("ABOT_REQUIRE_AUTH_IN_HOURS environment variable is not set.",
+		log.Debug("ABOT_REQUIRE_AUTH_IN_HOURS environment variable is not set.",
 			" Using 168 hours (one week) as the default.")
 		t = 168
 	}
@@ -146,7 +146,7 @@ func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
 		       brand, stripeid, zip5hash
 		FROM cards
 		WHERE userid=$1`
-	log.Println("getting cards for user", u.ID)
+	log.Debug("getting cards for user", u.ID)
 	var cards []Card
 	err := db.Select(&cards, q, u.ID)
 	return cards, err
@@ -200,7 +200,7 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 		}
 	}
 	if len(name) == 0 {
-		log.Println("no address found: " + text)
+		log.Debug("no address found: " + text)
 		return nil, ErrNoAddress
 	}
 	q := `
@@ -212,7 +212,7 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 		return nil, ErrNoAddress
 	}
 	if err != nil {
-		log.Println("GET returned no address for", name)
+		log.Debug("GET returned no address for", name)
 		return nil, err
 	}
 	return addr, nil

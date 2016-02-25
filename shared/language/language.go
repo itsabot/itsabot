@@ -12,9 +12,10 @@ package language
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"strings"
+
+	"github.com/itsabot/abot/shared/log"
 )
 
 var yes map[string]bool = map[string]bool{
@@ -80,7 +81,7 @@ func Greeting(r *rand.Rand, name string) string {
 			return "Hello. What can I do for you?"
 		}
 	}
-	log.Println("greeting failed to return a response")
+	log.Debug("greeting failed to return a response")
 	return ""
 }
 
@@ -94,7 +95,7 @@ func FirstMeeting() string {
 	case 2:
 		return "Hi, my name's Ava. What's your name?"
 	}
-	log.Println("firstmeeting failed to return a response")
+	log.Debug("firstmeeting failed to return a response")
 	return ""
 }
 
@@ -111,7 +112,7 @@ func NiceMeetingYou() string {
 		return "Great to meet you! Can you sign up for me here to " +
 			"get started? "
 	}
-	log.Println("nicemeetingyou failed to return a response")
+	log.Debug("nicemeetingyou failed to return a response")
 	return ""
 }
 
@@ -127,7 +128,7 @@ func Confused() string {
 	case 3:
 		return "What should I do?"
 	}
-	log.Println("confused failed to return a response")
+	log.Debug("confused failed to return a response")
 	return ""
 }
 
@@ -141,7 +142,7 @@ func Positive() string {
 	case 2:
 		return "Great to hear!"
 	}
-	log.Println("positive failed to return a response")
+	log.Debug("positive failed to return a response")
 	return ""
 }
 
@@ -159,7 +160,7 @@ func Welcome() string {
 	case 4:
 		return "Sure."
 	}
-	log.Println("welcome failed to return a response")
+	log.Debug("welcome failed to return a response")
 	return ""
 }
 
@@ -175,7 +176,7 @@ func SuggestedPlace(s string) string {
 	case 3:
 		return "You could try this: " + s
 	}
-	log.Println("suggestedPlace failed to return a response")
+	log.Debug("suggestedPlace failed to return a response")
 	return ""
 }
 

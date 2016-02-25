@@ -15,10 +15,10 @@ import (
 	"text/template"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/cal"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/sms"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
@@ -35,6 +35,7 @@ var letters = []rune(
 
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
+	e.SetHTTPErrorHandler(handlerError)
 	e.SetDebug(true)
 
 	e.Static("/public/css", "public/css")
@@ -138,9 +139,10 @@ func initCMDGroup(g *echo.Group) {
 // handlerIndex presents the homepage to the user and populates the HTML with
 // server-side variables.
 func handlerIndex(c *echo.Context) error {
+	// TODO split out to main unless in development
 	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 	var s []byte
 	b := bytes.NewBuffer(s)
@@ -154,13 +156,9 @@ func handlerIndex(c *echo.Context) error {
 		IsProd:         os.Getenv("AVA_ENV") == "production",
 	}
 	if err := tmplLayout.Execute(b, data); err != nil {
-		log.Errorln(err)
-		mc.SendBug(err)
 		return err
 	}
 	if err = c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
-		log.Errorln(err)
-		mc.SendBug(err)
 		return err
 	}
 	return nil
@@ -177,16 +175,15 @@ func handlerTwilio(c *echo.Context) error {
 	errSent := false
 	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
 	if err != nil {
-		log.Errorln("processText", err)
 		ret = errMsg
-		mc.SendBug(err)
 		errSent = true
+		handlerError(err, c)
 	}
 	if err = ws.NotifySockets(c, uid, c.Form("Body"), ret); err != nil {
 		if !errSent {
-			log.Errorln("processText", err)
 			ret = errMsg
-			mc.SendBug(err)
+			errSent = true
+			handlerError(err, c)
 		}
 	}
 	var resp sms.TwilioResp
@@ -196,8 +193,9 @@ func handlerTwilio(c *echo.Context) error {
 		resp = sms.TwilioResp{Message: ret}
 	}
 	if err = c.XML(http.StatusOK, resp); err != nil {
-		log.Errorln(err)
-		mc.SendBug(err)
+		if !errSent {
+			handlerError(err, c)
+		}
 	}
 	return nil
 }
@@ -213,20 +211,19 @@ func handlerMain(c *echo.Context) error {
 	errSent := false
 	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
 	if err != nil {
-		log.Errorln(err)
-		mc.SendBug(err)
-		errSent = true
 		ret = errMsg
+		errSent = true
+		handlerError(err, c)
 	}
 	if err = ws.NotifySockets(c, uid, c.Form("cmd"), ret); err != nil {
 		if !errSent {
-			log.Errorln(err)
-			mc.SendBug(err)
+			handlerError(err, c)
 		}
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
-		log.Errorln(err)
-		mc.SendBug(err)
+		if !errSent {
+			handlerError(err, c)
+		}
 	}
 	return nil
 }
@@ -242,7 +239,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	}
 	pkg, route, _, err := core.GetPkg(db, msg)
 	if err != nil {
-		log.WithField("fn", "getPkg").Error(err)
+		log.Debug("could not get core package", err)
 		return jsonError(err)
 	}
 	msg.Route = route
@@ -253,11 +250,13 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	}
 	ret, err := core.CallPkg(pkg, msg, false)
 	if err != nil {
+		log.Debug("could not call package", err)
 		return jsonError(err)
 	}
 	if len(ret) == 0 {
-		log.Errorln("missing trigger/package for command", c.Get("cmd"))
-		return nil
+		tmp := fmt.Sprintf("%s %s", "missing trigger/pkg for cmd",
+			c.Get("cmd"))
+		return jsonError(errors.New(tmp))
 	}
 	m := &dt.Msg{}
 	m.AvaSent = true
@@ -267,6 +266,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 		m.Package = pkg.P.Config.Name
 	}
 	if err = m.Save(db); err != nil {
+		log.Debug("could not save Abot response message", err)
 		return jsonError(err)
 	}
 	resp := struct {
@@ -652,11 +652,10 @@ func handlerAPICardSubmit(c *echo.Context) error {
 	if err != nil {
 		return jsonError(err)
 	}
-	log.Println("submitting card for user", req.UserID)
+	log.Debug("submitting card for user", req.UserID)
 	var userStripeID string
 	q := `SELECT stripecustomerid FROM users WHERE id=$1`
 	if err := db.Get(&userStripeID, q, req.UserID); err != nil {
-		log.Println("err with db.Get")
 		return jsonError(err)
 	}
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
@@ -697,25 +696,25 @@ func handlerAPICardDelete(c *echo.Context) error {
 	q := `SELECT stripeid FROM cards WHERE id=$1`
 	var crd dt.Card
 	if err := db.Get(&crd, q, req.ID); err != nil {
-		log.Println("couldn't find stripeid", req.ID)
+		log.Debug("couldn't find stripeid", req.ID)
 		return jsonError(err)
 	}
 	q = `DELETE FROM cards WHERE id=$1 AND userid=$2`
 	if _, err := db.Exec(q, req.ID, req.UserID); err != nil {
-		log.Println("couldn't find card", req.ID, req.UserID)
+		log.Debug("couldn't find card", req.ID, req.UserID)
 		return jsonError(err)
 	}
 	q = `SELECT stripecustomerid FROM users WHERE id=$1`
 	var user dt.User
 	if err := db.Get(&user, q, req.UserID); err != nil {
-		log.Println("couldn't find stripecustomerid", req.UserID)
+		log.Debug("couldn't find stripecustomerid", req.UserID)
 		return jsonError(err)
 	}
 	_, err := card.Del(crd.StripeID, &stripe.CardParams{
 		Customer: user.StripeCustomerID,
 	})
 	if err != nil {
-		log.Println("couldn't delete stripe card", crd.StripeID,
+		log.Debug("couldn't delete stripe card", crd.StripeID,
 			user.StripeCustomerID)
 		return jsonError(err)
 	}
@@ -1096,6 +1095,11 @@ func handlerWSConversations(c *echo.Context) error {
 		}
 	}
 	return nil
+}
+
+func handlerError(err error, c *echo.Context) {
+	log.Debug("failed handling", err)
+	mc.SendBug(err)
 }
 
 // jsonError builds a simple JSON message from an error type in the format of

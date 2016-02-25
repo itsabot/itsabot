@@ -2,11 +2,11 @@ package address
 
 import (
 	"errors"
-	"log"
 	"regexp"
 	"strings"
 
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/log"
 )
 
 var ErrInvalidAddress = errors.New("invalid address")
@@ -94,21 +94,21 @@ var states = map[string]string{
 func Parse(s string) (*dt.Address, error) {
 	s = regexAddress.FindString(s)
 	if len(s) == 0 {
-		log.Println("missing address")
+		log.Debug("missing address")
 		return nil, ErrInvalidAddress
 	}
-	log.Println("address", s)
+	log.Debug("address", s)
 	tmp := regexZip.FindStringIndex(s)
 	var zip string
 	if tmp != nil {
 		zip = s[tmp[0]:tmp[1]]
 		s = s[:tmp[0]]
 	} else {
-		log.Println("no zip found")
+		log.Debug("no zip found")
 	}
 	tmp2 := regexState.FindStringIndex(s)
 	if tmp2 == nil && tmp == nil {
-		log.Println("no state found AND no zip found")
+		log.Debug("no state found AND no zip found")
 		return &dt.Address{}, ErrInvalidAddress
 	}
 	var city, state string
@@ -122,13 +122,13 @@ func Parse(s string) (*dt.Address, error) {
 		}
 		tmp = regexCity.FindStringIndex(s)
 		if tmp == nil {
-			log.Println("no city found")
+			log.Debug("no city found")
 			return &dt.Address{}, ErrInvalidAddress
 		}
 		city = s[tmp[0]:tmp[1]]
 		s = s[:tmp[0]]
 	} else {
-		log.Println("no state found")
+		log.Debug("no state found")
 	}
 	tmp = regexApartment.FindStringIndex(s)
 	var apartment string
@@ -141,12 +141,12 @@ func Parse(s string) (*dt.Address, error) {
 			s = s2
 		}
 	} else {
-		log.Println("no apartment found")
+		log.Debug("no apartment found")
 	}
 	tmp = regexStreet.FindStringIndex(s)
 	if tmp == nil {
-		log.Println(s)
-		log.Println("no street found")
+		log.Debug(s)
+		log.Debug("no street found")
 		return &dt.Address{}, ErrInvalidAddress
 	}
 	street := s[tmp[0]:tmp[1]]

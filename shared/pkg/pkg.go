@@ -6,8 +6,8 @@ import (
 	"net/rpc"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -63,39 +63,39 @@ func NewPackage(name, coreRPCAddr string,
 
 // Register with Ava to begin communicating over RPC.
 func (p *Pkg) Register(pkgT interface{}) error {
-	log.SetLevel(log.DebugLevel)
-	log.WithFields(log.Fields{"pkg": p.Config.Name}).Debugln("connecting")
+	log.Debug("connecting to", p.Config.Name)
 
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
-		log.WithField("pkg", p.Config.Name).Fatalln(err)
+		return err
 	}
 	p.Config.PkgRPCAddr = ln.Addr().String()
 
 	if err := rpc.Register(pkgT); err != nil {
-		log.WithField("pkg", p.Config.Name).Fatalln(err)
+		return err
 	}
 
 	client, err := rpc.Dial("tcp", p.Config.CoreRPCAddr)
 	if err != nil {
-		log.WithField("pkg", p.Config.Name).Fatalln(err)
+		return err
 	}
 
 	if err := client.Call("Abot.RegisterPackage", p, nil); err != nil {
-		log.WithField("pkg", p.Config.Name).Fatalln("calling", err)
+		return err
 	}
 
-	log.WithField("pkg", p.Config.Name).Debugln("connected")
+	log.Debug("connected to", p.Config.Name)
 
 	db, err = ConnectDB()
 	if err != nil {
-		log.WithField("pkg", p.Config.Name).Errorln("connectDB", err)
+		log.Debug("could not connect to database")
 		return err
 	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.WithField("pkg", p.Config.Name).Fatalln(err)
+			log.Debug("could not accept connections for",
+				p.Config.Name, ", ", err)
 		}
 		go rpc.ServeConn(conn)
 	}
@@ -110,11 +110,6 @@ func ConnectDB() (*sqlx.DB, error) {
 	} else {
 		db, err = sqlx.Connect("postgres",
 			"user=postgres dbname=ava sslmode=disable")
-	}
-	if err != nil {
-		log.WithFields(log.Fields{
-			"fn": "ConnectDB",
-		}).Errorln(err)
 	}
 	return db, err
 }

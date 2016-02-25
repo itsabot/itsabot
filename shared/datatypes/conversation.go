@@ -49,7 +49,7 @@ const (
 
 func (j *jsonState) Scan(value interface{}) error {
 	if err := json.Unmarshal(value.([]byte), *j); err != nil {
-		log.Println("unmarshal jsonState: ", err)
+		log.Debug("unmarshal jsonState: ", err)
 		return err
 	}
 	return nil
@@ -153,7 +153,7 @@ func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
 		return nil, nil
 	}
 	if err != nil {
-		log.Println("structscan row ", err)
+		log.Debug("structscan row ", err)
 		return nil, err
 	}
 	msg.User = m.User
@@ -165,16 +165,16 @@ func (m *Msg) GetLastState(db *sqlx.DB) error {
 	q := `SELECT state FROM states WHERE pkgname=$1`
 	err := db.Get(&state, q, m.Package)
 	if err == sql.ErrNoRows {
-		log.Errorln("WTF NO STATE FOUND for pkg", m.Package)
+		log.Error("WTF NO STATE FOUND for pkg", m.Package)
 		return nil
 	}
 	if err != nil {
-		log.Errorln(err, "WTF", m.Package)
+		log.Error(err, "WTF", m.Package)
 		return err
 	}
 	err = json.Unmarshal(state, &m.State)
 	if err != nil {
-		log.Println("unmarshaling state", err)
+		log.Debug("unmarshaling state", err)
 		return err
 	}
 	return nil

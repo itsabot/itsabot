@@ -61,7 +61,7 @@ func (v *Vocab) HandleKeywords(m *Msg) string {
 		if v.dict[w] == nil {
 			continue
 		}
-		log.Println("found fn in stems", w, v.dict[w])
+		log.Debug("found fn in stems", w, v.dict[w])
 		resp = (v.dict[w])(m, mod)
 		break
 	}

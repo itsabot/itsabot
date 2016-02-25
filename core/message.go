@@ -22,7 +22,7 @@ func NewMsg(db *sqlx.DB, classifier Classifier, u *dt.User,
 	/*
 		m, err = addContext(db, m)
 		if err != nil {
-			log.WithField("fn", "addContext").Errorln(err)
+			log.Debug(err)
 		}
 	*/
 	return m

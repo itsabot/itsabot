@@ -4,10 +4,11 @@ package timeparse
 
 import (
 	"errors"
-	"log"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/itsabot/abot/shared/log"
 )
 
 // timeLocation tracks the timezone of a time. Since time.Location.String()
@@ -236,11 +237,10 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 	var ti time.Time
 	var rel bool
 	for _, nlTime := range nlTimes {
-		log.Printf("\n\n")
-		log.Println("Original:", nlTime)
+		log.Debug("original:", nlTime)
 		var loc *time.Location
 		nlTime, loc, rel = normalizeTime(nlTime)
-		log.Println("Normalized:", nlTime)
+		log.Debug("normalized:", nlTime)
 		var day bool
 		var err error
 		if rel {
@@ -251,7 +251,7 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 			ti, day, err = parseTimeInLocation(nlTime, loc)
 		}
 		if err != nil {
-			log.Println("Couldn't parse time:", nlTime, err)
+			log.Debug("could not parse time", nlTime, err)
 			continue
 		}
 		if !rel {
@@ -280,7 +280,7 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 		halfLen := len(times)
 		// Double size of times for AM/PM
 		times = append(times, times...)
-		log.Println(times)
+		log.Debug(times)
 		for i := range times {
 			var hour int
 			t := times[i]
@@ -359,7 +359,7 @@ func completeContext(ctx *TimeContext, t time.Time) *TimeContext {
 func loadLocation(l string) *time.Location {
 	loc, err := time.LoadLocation(l)
 	if err != nil {
-		log.Println("Warning: Could not load location:", l)
+		log.Debug("could not load location", l)
 	}
 	return loc
 }
@@ -373,7 +373,7 @@ func parseTime(t string) (time.Time, bool, error) {
 	for _, tf := range timeFormatsNoDay {
 		time, err := time.Parse(tf, t)
 		if err == nil {
-			log.Println("FORMAT:", tf)
+			log.Debug("format", tf)
 			return time, noDay, nil
 		}
 	}

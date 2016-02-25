@@ -136,7 +136,7 @@ func (sg *MailClient) SendBug(err error) {
 	text += fmt.Sprintf("<p>%s</p>", err.Error())
 	text += "</body></html>"
 	if err := sg.Send(subj, text, Admin()); err != nil {
-		log.Errorln("sending bug report", err)
+		log.Error("sending bug report", err)
 	}
 }
 

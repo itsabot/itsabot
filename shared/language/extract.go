@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/xml"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/helpers/address"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -25,7 +25,7 @@ var regexNum = regexp.MustCompile(`\d+`)
 // found. This API design also maintains consistency when we want to extract and
 // return a struct (which should be returned as a pointer).
 func ExtractCurrency(s string) sql.NullInt64 {
-	log.Println("extracting currency")
+	log.Debug("extracting currency")
 	n := sql.NullInt64{
 		Int64: 0,
 		Valid: false,
@@ -38,7 +38,7 @@ func ExtractCurrency(s string) sql.NullInt64 {
 	if err != nil {
 		return n
 	}
-	log.Println("found value", val)
+	log.Debug("found value", val)
 	n.Int64 = int64(val * 100)
 	n.Valid = true
 	return n
@@ -77,7 +77,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	addr, err := address.Parse(s)
 	if err != nil {
 		// check DB for historical information associated with that user
-		log.Println("fetching historical address")
+		log.Debug("fetching historical address")
 		addr, err := u.GetAddress(db, s)
 		if err != nil {
 			return nil, false, err
@@ -122,7 +122,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	if err != nil {
 		return nil, false, err
 	}
-	log.Println(string(xmlAddr))
+	log.Debug(string(xmlAddr))
 	ul := "https://secure.shippingapis.com/ShippingAPI.dll?API=Verify&XML="
 	ul += url.QueryEscape(string(xmlAddr))
 	response, err := http.Get(ul)
@@ -143,7 +143,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 		Address:    addr2Stmp,
 	}
 	if err = xml.Unmarshal(contents, &resp); err != nil {
-		log.Println("USPS response", string(contents))
+		log.Debug("USPS response", string(contents))
 		return nil, false, err
 	}
 	a := dt.Address{
