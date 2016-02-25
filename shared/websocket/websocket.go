@@ -1,8 +1,12 @@
-package main
+package websocket
 
 import (
+	"errors"
 	"runtime"
 	"sync"
+	"time"
+
+	"github.com/labstack/echo"
 
 	"golang.org/x/net/websocket"
 )
@@ -40,4 +44,39 @@ func (as AtomicWebSocketSet) Set(userID uint64, conn *websocket.Conn) {
 	as.sockets[userID] = conn
 	as.mutex.Unlock()
 	runtime.Gosched()
+}
+
+// NotifySockets sends listening clients new messages over WebSockets,
+// eliminating the need for trainers to constantly reload the page.
+func (as AtomicWebSocketSet) NotifySockets(c *echo.Context, uid uint64, cmd,
+	ret string) error {
+
+	s := as.Get(uid)
+	if s == nil {
+		return errors.New("socket doesn't exist")
+	}
+	t := time.Now()
+	data := []struct {
+		Sentence  string
+		AvaSent   bool
+		CreatedAt *time.Time
+	}{
+		{
+			Sentence:  cmd,
+			AvaSent:   false,
+			CreatedAt: &t,
+		},
+	}
+	if len(ret) > 0 {
+		data = append(data, struct {
+			Sentence  string
+			AvaSent   bool
+			CreatedAt *time.Time
+		}{
+			Sentence:  ret,
+			AvaSent:   true,
+			CreatedAt: &t,
+		})
+	}
+	return websocket.JSON.Send(s, &data)
 }

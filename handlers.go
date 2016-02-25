@@ -16,6 +16,7 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/cal"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/sms"
@@ -174,25 +175,25 @@ func handlerTwilio(c *echo.Context) error {
 	c.Set("flexidtype", 2)
 	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
 	errSent := false
-	ret, uid, err := processText(c)
+	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
 	if err != nil {
 		log.Errorln("processText", err)
 		ret = errMsg
 		mc.SendBug(err)
 		errSent = true
 	}
-	if err = notifySockets(c, uid, c.Form("Body"), ret); err != nil {
+	if err = ws.NotifySockets(c, uid, c.Form("Body"), ret); err != nil {
 		if !errSent {
 			log.Errorln("processText", err)
 			ret = errMsg
 			mc.SendBug(err)
 		}
 	}
-	var resp twilioResp
+	var resp sms.TwilioResp
 	if len(ret) == 0 {
-		resp = twilioResp{}
+		resp = sms.TwilioResp{}
 	} else {
-		resp = twilioResp{Message: ret}
+		resp = sms.TwilioResp{Message: ret}
 	}
 	if err = c.XML(http.StatusOK, resp); err != nil {
 		log.Errorln(err)
@@ -210,14 +211,14 @@ func handlerMain(c *echo.Context) error {
 	c.Set("uid", c.Form("uid"))
 	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
 	errSent := false
-	ret, uid, err := processText(c)
+	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
 	if err != nil {
 		log.Errorln(err)
 		mc.SendBug(err)
 		errSent = true
 		ret = errMsg
 	}
-	if err = notifySockets(c, uid, c.Form("cmd"), ret); err != nil {
+	if err = ws.NotifySockets(c, uid, c.Form("cmd"), ret); err != nil {
 		if !errSent {
 			log.Errorln(err)
 			mc.SendBug(err)
@@ -235,11 +236,11 @@ func handlerMain(c *echo.Context) error {
 func handlerAPITriggerPkg(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("uid", c.Form("uid"))
-	msg, err := preprocess(c)
+	msg, err := core.Preprocess(db, ner, c)
 	if err != nil {
 		return jsonError(err)
 	}
-	pkg, route, _, err := getPkg(msg)
+	pkg, route, _, err := core.GetPkg(db, msg)
 	if err != nil {
 		log.WithField("fn", "getPkg").Error(err)
 		return jsonError(err)
@@ -250,7 +251,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	} else {
 		msg.Package = pkg.P.Config.Name
 	}
-	ret, err := callPkg(pkg, msg, false)
+	ret, err := core.CallPkg(pkg, msg, false)
 	if err != nil {
 		return jsonError(err)
 	}
@@ -1105,8 +1106,7 @@ func jsonError(err error) error {
 }
 
 func validatePhone(s string) error {
-	if len(s) < 10 || len(s) > 20 ||
-		!phoneRegex.MatchString(s) {
+	if len(s) < 10 || len(s) > 20 || !sms.PhoneRegex.MatchString(s) {
 		return errors.New(
 			"Your phone must be a valid U.S. number with the area code.")
 	}

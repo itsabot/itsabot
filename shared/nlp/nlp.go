@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/dchest/stemmer/porter2"
 )
 
@@ -40,33 +39,6 @@ const (
 	PersonI
 	ObjectI
 )
-
-// Classifier is a set of common english word stems unique among their
-// Structured Input Types. This enables extremely fast constant-time O(3)
-// lookups of stems to their SITs with high accuracy and no training
-// requirements. It consumes just a few MB in memory
-type Classifier map[string]struct{}
-
-func (c Classifier) ClassifyTokens(tokens []string) *StructuredInput {
-	var s StructuredInput
-	for _, t := range tokens {
-		t = strings.ToLower(t)
-		log.Debugln("checking", t)
-		_, exists := c["C"+t]
-		if exists {
-			s.Commands = append(s.Commands, t)
-		}
-		_, exists = c["O"+t]
-		if exists {
-			s.Objects = append(s.Objects, t)
-		}
-		_, exists = c["P"+t]
-		if exists {
-			s.People = append(s.People, t)
-		}
-	}
-	return &s
-}
 
 func TokenizeSentence(sent string) []string {
 	tokens := []string{}

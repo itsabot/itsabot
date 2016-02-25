@@ -2,9 +2,13 @@ package sms
 
 import (
 	"os"
+	"regexp"
 
 	"github.com/subosito/twilio"
 )
+
+// PhoneRegex determines whether a string is a phone number
+var PhoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 
 // NewClient returns an authorized Twilio client using TWILIO_ACCOUNT_SID and
 // TWILIO_AUTH_TOKEN environment variables.

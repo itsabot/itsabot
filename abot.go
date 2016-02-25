@@ -3,22 +3,17 @@ package main
 import (
 	"errors"
 	"math/rand"
-	"net"
-	"net/rpc"
 	"os"
-	"regexp"
 	"strconv"
 	"time"
 
-	"golang.org/x/net/websocket"
-
-	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/language"
-	"github.com/itsabot/abot/shared/nlp"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/pkg"
 	"github.com/itsabot/abot/shared/sms"
+	"github.com/itsabot/abot/shared/websocket"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
@@ -27,21 +22,18 @@ import (
 )
 
 var db *sqlx.DB
+var ner core.Classifier
 var tc *twilio.Client
 var mc *dt.MailClient
-var ws AtomicWebSocketSet = NewAtomicWebSocketSet()
-var ner nlp.Classifier
+var ws websocket.AtomicWebSocketSet = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
-var phoneRegex = regexp.MustCompile(`^\+?[0-9\-\s()]+$`)
 var (
-	ErrInvalidCommand  = errors.New("invalid command")
-	ErrMissingPackage  = errors.New("missing package")
 	ErrInvalidUserPass = errors.New("Invalid username/password combination")
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	log.SetLevel(log.DebugLevel)
+	log.DebugOn(true)
 	app := cli.NewApp()
 	app.Name = "abot"
 	app.Usage = "digital assistant framework"
@@ -55,6 +47,10 @@ func main() {
 			Name:  "install, i",
 			Usage: "install packages in packages.json",
 		},
+		cli.BoolFlag{
+			Name:  "console, c",
+			Usage: "communicate with a running abot server",
+		},
 	}
 	app.Action = func(c *cli.Context) {
 		showHelp := true
@@ -62,13 +58,19 @@ func main() {
 			log.Info("TODO: install packages")
 			showHelp = false
 		}
+		if c.Bool("console") {
+			log.Info("TODO: run console")
+			showHelp = false
+		}
 		if c.Bool("server") {
 			var err error
 			db, err = pkg.ConnectDB()
 			if err != nil {
-				log.Fatalln("connecting to db", err)
+				log.Fatal("could not connect to database", err)
 			}
-			startServer()
+			if err = startServer(); err != nil {
+				log.Fatal("could not start server", err)
+			}
 			showHelp = false
 		}
 		if showHelp {
@@ -79,193 +81,35 @@ func main() {
 }
 
 // startServer initializes any clients that are needed and boots packages
-func startServer() {
+func startServer() error {
 	if err := checkRequiredEnvVars(); err != nil {
-		log.Errorln("checking env vars", err)
+		return err
 	}
-	addr, err := bootRPCServer()
+	addr, err := core.BootRPCServer()
 	if err != nil {
-		log.Fatalln("unable to boot rpc server:", err)
+		return err
 	}
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	tc = sms.NewClient()
 	mc = dt.NewMailClient()
-	go bootDependencies(addr)
-	ner, err = buildClassifier()
-	if err != nil {
-		log.Errorln("loading classifier", err)
-	}
-	offensive, err = buildOffensiveMap()
-	if err != nil {
-		log.Errorln("building offensive map", err)
-	}
-	log.Infoln("booting ava http server")
-	e := echo.New()
-	initRoutes(e)
-	e.Run(":" + os.Getenv("ABOT_PORT"))
-}
-
-// bootRPCServer starts the rpc for Ava core in a go routine and returns
-// the server address
-func bootRPCServer() (addr string, err error) {
-	log.Debugln("booting ava core rpc server")
-	ava := new(Ava)
-	if err = rpc.Register(ava); err != nil {
-		return
-	}
-	var ln net.Listener
-	if ln, err = net.Listen("tcp", ":0"); err != nil {
-		return
-	}
-	addr = ln.Addr().String()
 	go func() {
-		for {
-			conn, err := ln.Accept()
-			if err != nil {
-				log.Errorln("rpc accept", err)
-			}
-			go rpc.ServeConn(conn)
+		if err := core.BootDependencies(addr); err != nil {
+			log.Debug("could not boot dependency", err)
 		}
 	}()
-	return addr, err
-}
-
-// preprocess converts a user input into a Msg that's been persisted to the
-// database
-func preprocess(c *echo.Context) (*dt.Msg, error) {
-	cmd := c.Get("cmd").(string)
-	if len(cmd) == 0 {
-		return nil, ErrInvalidCommand
-	}
-	uid, fid, fidT := validateParams(c)
-	u, err := dt.GetUser(db, uid, fid, dt.FlexIDType(fidT))
+	ner, err = core.BuildClassifier()
 	if err != nil {
-		return nil, err
+		log.Debug("could not build classifier", err)
 	}
-	msg := dt.NewMsg(db, ner, u, cmd)
-	// TODO trigger training if needed (see buildInput)
-	return msg, nil
-}
-
-// processText is Ava's core logic. This function processes a user's message,
-// routes it to the correct package, and handles edge cases like offensive
-// language before returning a response to the user. Any user-presentable error
-// is returned in the string. Errors returned from this function are not for the
-// user, so they are handled by Ava explicitly on this function's return
-// (logging, notifying admins, etc.).
-func processText(c *echo.Context) (ret string, uid uint64, err error) {
-	msg, err := preprocess(c)
+	offensive, err = core.BuildOffensiveMap()
 	if err != nil {
-		log.WithField("fn", "preprocessForMessage").Error(err)
-		return "", 0, err
+		log.Debug("could not build offensive map", err)
 	}
-	log.Debugln("processed input into message...")
-	log.Debugln("commands:", msg.StructuredInput.Commands)
-	log.Debugln(" objects:", msg.StructuredInput.Objects)
-	log.Debugln("  people:", msg.StructuredInput.People)
-	pkg, route, followup, err := getPkg(msg)
-	if err != nil {
-		log.WithField("fn", "getPkg").Error(err)
-		return "", msg.User.ID, err
-	}
-	msg.Route = route
-	if pkg == nil {
-		msg.Package = ""
-	} else {
-		msg.Package = pkg.P.Config.Name
-	}
-	if err = msg.Save(db); err != nil {
-		return "", msg.User.ID, err
-	}
-	ret = respondWithOffense(offensive, msg)
-	if len(ret) == 0 {
-		log.Debugln("followup?", followup)
-		ret, err = callPkg(pkg, msg, followup)
-		if err != nil {
-			return "", msg.User.ID, err
-		}
-		responseNeeded := true
-		if len(ret) == 0 {
-			responseNeeded, ret = respondWithNicety(msg)
-		}
-		if !responseNeeded {
-			return "", msg.User.ID, nil
-		}
-	}
-	log.Debugln("here...", ret)
-	m := &dt.Msg{}
-	m.AvaSent = true
-	m.User = msg.User
-	if len(ret) == 0 {
-		m.Sentence = language.Confused()
-		msg.NeedsTraining = true
-		if err = msg.Update(db, mc); err != nil {
-			return "", m.User.ID, err
-		}
-	} else {
-		m.Sentence = ret
-	}
-	if pkg != nil {
-		m.Package = pkg.P.Config.Name
-	}
-	if err = m.Save(db); err != nil {
-		return "", m.User.ID, err
-	}
-	/*
-		// TODO handle earlier when classifying
-		if ctx.NeedsTraining {
-			log.WithField("inputID", id).Infoln("needed training")
-			if err = supervisedTrain(ctx.Msg); err != nil {
-				return ret.Sentence, err
-			}
-		}
-	*/
-	return m.Sentence, m.User.ID, nil
-}
-
-func validateParams(c *echo.Context) (uid uint64, fid string, fidT int) {
-	var err error
-	tmp, ok := c.Get("uid").(string)
-	if !ok {
-		tmp = ""
-	}
-	if len(tmp) > 0 {
-		uid, err = strconv.ParseUint(tmp, 10, 64)
-		if err != nil && err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
-			uid = 0
-		} else if err != nil {
-			log.WithField("fn", "validateParams").Fatalln(err)
-		}
-	}
-	if uid > 0 {
-		return uid, "", 0
-	}
-	tmp, ok = c.Get("flexid").(string)
-	if !ok {
-		tmp = ""
-	}
-	if len(tmp) > 0 {
-		fid = tmp
-		if len(fid) == 0 {
-			log.WithField("fn", "validateParams").
-				Fatalln("flexid is blank")
-		}
-	}
-	tmp, ok = c.Get("flexidtype").(string)
-	if !ok {
-		tmp = ""
-	}
-	if len(tmp) > 0 {
-		fidT, err = strconv.Atoi(tmp)
-		if err != nil && err.Error() ==
-			`strconv.ParseInt: parsing "": invalid syntax` {
-			// default to 2 (SMS)
-			fidT = 2
-		} else if err != nil {
-			log.WithField("fn", "validateParams").Fatalln(err)
-		}
-	}
-	return uid, fid, fidT
+	e := echo.New()
+	initRoutes(e)
+	log.Info("booted ava http server")
+	e.Run(":" + os.Getenv("ABOT_PORT"))
+	return nil
 }
 
 func checkRequiredEnvVars() error {
@@ -284,37 +128,4 @@ func checkRequiredEnvVars() error {
 	}
 	// TODO Check for ABOT_DATABASE_URL if AVA_ENV==production
 	return nil
-}
-
-// notifySockets sends listening clients new messages over WebSockets,
-// eliminating the need for trainers to constantly reload the page.
-func notifySockets(c *echo.Context, uid uint64, cmd, ret string) error {
-	s := ws.Get(uid)
-	if s == nil {
-		return errors.New("socket doesn't exist")
-	}
-	t := time.Now()
-	data := []struct {
-		Sentence  string
-		AvaSent   bool
-		CreatedAt *time.Time
-	}{
-		{
-			Sentence:  cmd,
-			AvaSent:   false,
-			CreatedAt: &t,
-		},
-	}
-	if len(ret) > 0 {
-		data = append(data, struct {
-			Sentence  string
-			AvaSent   bool
-			CreatedAt *time.Time
-		}{
-			Sentence:  ret,
-			AvaSent:   true,
-			CreatedAt: &t,
-		})
-	}
-	return websocket.JSON.Send(s, &data)
 }

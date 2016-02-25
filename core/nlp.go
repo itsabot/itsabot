@@ -1,14 +1,42 @@
-package main
+package core
 
 import (
 	"bufio"
 	"os"
+	"strings"
 
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/nlp"
 )
 
-// buildClassifier prepares the Named Entity Recognizer (NER) to find Commands
+// Classifier is a set of common english word stems unique among their
+// Structured Input Types. This enables extremely fast constant-time O(1)
+// lookups of stems to their SITs with high accuracy and no training
+// requirements. It consumes just a few MB in memory.
+type Classifier map[string]struct{}
+
+// ClassifyTokens builds a StructuredInput from a tokenized sentence.
+func (c Classifier) ClassifyTokens(tokens []string) *nlp.StructuredInput {
+	var s nlp.StructuredInput
+	for _, t := range tokens {
+		t = strings.ToLower(t)
+		_, exists := c["C"+t]
+		if exists {
+			s.Commands = append(s.Commands, t)
+		}
+		_, exists = c["O"+t]
+		if exists {
+			s.Objects = append(s.Objects, t)
+		}
+		_, exists = c["P"+t]
+		if exists {
+			s.People = append(s.People, t)
+		}
+	}
+	return &s
+}
+
+// BuildClassifier prepares the Named Entity Recognizer (NER) to find Commands
 // and Objects using a simple dictionary lookup. This has the benefit of high
 // speed--constant time, O(1)--with insignificant memory use and high accuracy
 // given false positives (marking something as both a Command and an Object when
@@ -16,8 +44,8 @@ import (
 // pass, and any double-marked words should be passed through something like an
 // n-gram Bayesian filter to determine the correct part of speech within its
 // context in the sentence.
-func buildClassifier() (nlp.Classifier, error) {
-	ner := nlp.Classifier{}
+func BuildClassifier() (Classifier, error) {
+	ner := Classifier{}
 	fi, err := os.Open("data/ner/nouns.txt")
 	if err != nil {
 		return ner, err
@@ -61,11 +89,11 @@ func buildClassifier() (nlp.Classifier, error) {
 	return ner, nil
 }
 
-// buildOffensiveMap creates a map of offensive terms for which Ava will refuse
-// to respond. This helps ensure that users are somewhat respectful to Ava and
+// BuildOffensiveMap creates a map of offensive terms for which Abot will refuse
+// to respond. This helps ensure that users are somewhat respectful to Abot and
 // her human trainers, since sentences caught by the OffensiveMap are rejected
 // before any human ever sees them.
-func buildOffensiveMap() (map[string]struct{}, error) {
+func BuildOffensiveMap() (map[string]struct{}, error) {
 	o := map[string]struct{}{}
 	fi, err := os.Open("data/offensive.txt")
 	if err != nil {
@@ -80,11 +108,11 @@ func buildOffensiveMap() (map[string]struct{}, error) {
 	return o, nil
 }
 
-// respondWithNicety replies to niceties that humans use, but Ava can ignore.
-// Words like "Thank you" are not necessary for a robot, but it's important Ava
+// RespondWithNicety replies to niceties that humans use, but Abot can ignore.
+// Words like "Thank you" are not necessary for a robot, but it's important Abot
 // respond correctly nonetheless. The returned bool specifies whether a response
 // is necessary, and the returned string is the response, if any.
-func respondWithNicety(in *dt.Msg) (responseNecessary bool, response string) {
+func RespondWithNicety(in *dt.Msg) (responseNecessary bool, response string) {
 	for _, w := range in.Stems {
 		// Since these are stems, some of them look incorrectly spelled.
 		// Needless to say, these are the correct Porter2 Snowball stems
@@ -100,9 +128,9 @@ func respondWithNicety(in *dt.Msg) (responseNecessary bool, response string) {
 	return true, ""
 }
 
-// respondWithOffense is a one-off function to respond to rude user language by
+// RespondWithOffense is a one-off function to respond to rude user language by
 // refusing to process the command.
-func respondWithOffense(off map[string]struct{}, in *dt.Msg) string {
+func RespondWithOffense(off map[string]struct{}, in *dt.Msg) string {
 	for _, w := range in.Stems {
 		_, offensive := off[w]
 		if offensive {

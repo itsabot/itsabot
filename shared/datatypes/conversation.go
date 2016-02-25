@@ -59,26 +59,6 @@ func (j *jsonState) Value() (driver.Value, error) {
 	return j, nil
 }
 
-func NewMsg(db *sqlx.DB, classifier nlp.Classifier, u *User, cmd string) *Msg {
-	tokens := nlp.TokenizeSentence(cmd)
-	stems := nlp.StemTokens(tokens)
-	si := classifier.ClassifyTokens(tokens)
-	m := &Msg{
-		User:            u,
-		Sentence:        cmd,
-		Tokens:          tokens,
-		Stems:           stems,
-		StructuredInput: si,
-	}
-	/*
-		m, err = addContext(db, m)
-		if err != nil {
-			log.WithField("fn", "addContext").Errorln(err)
-		}
-	*/
-	return m
-}
-
 func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 	q := `SELECT id, sentence, avasent
 	      FROM messages

@@ -81,7 +81,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 		log.WithField("pkg", p.Config.Name).Fatalln(err)
 	}
 
-	if err := client.Call("Ava.RegisterPackage", p, nil); err != nil {
+	if err := client.Call("Abot.RegisterPackage", p, nil); err != nil {
 		log.WithField("pkg", p.Config.Name).Fatalln("calling", err)
 	}
 
