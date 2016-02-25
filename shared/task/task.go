@@ -1,6 +1,6 @@
 package task
 
-import "itsabot.org/abot/shared/datatypes"
+import "github.com/itsabot/abot/shared/datatypes"
 
 // Type references the type of task to perform. Valid options are constant
 type Type int

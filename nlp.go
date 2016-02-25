@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"os"
 
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/nlp"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/nlp"
 )
 
 // buildClassifier prepares the Named Entity Recognizer (NER) to find Commands

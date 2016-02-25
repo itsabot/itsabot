@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"itsabot.org/abot/shared/nlp"
+	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 )
 

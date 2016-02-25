@@ -16,6 +16,9 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/shared/cal"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/sms"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/satori/go.uuid"
@@ -24,9 +27,6 @@ import (
 	"github.com/stripe/stripe-go/customer"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/websocket"
-	"itsabot.org/abot/shared/cal"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/sms"
 )
 
 var letters = []rune(

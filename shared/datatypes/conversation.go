@@ -8,8 +8,8 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
-	"itsabot.org/abot/shared/nlp"
 )
 
 type jsonState json.RawMessage

@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/helpers/address"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/helpers/address"
 	"github.com/jmoiron/sqlx"
 )
 

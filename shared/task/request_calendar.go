@@ -1,6 +1,6 @@
 package task
 
-import "itsabot.org/abot/shared/datatypes"
+import "github.com/itsabot/abot/shared/datatypes"
 
 // getCalendar asks the user to connect their Google calendar via a secure web
 // interface (user profile). Eventually this will support adding additional

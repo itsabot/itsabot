@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/language"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/language"
 	"github.com/jmoiron/sqlx"
 )
 

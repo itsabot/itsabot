@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"itsabot.org/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/mattbaird/elastigo/lib"
 )
 

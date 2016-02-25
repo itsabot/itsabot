@@ -7,10 +7,10 @@ import (
 	"os"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/nlp"
 )
 
 type PkgWrapper struct {

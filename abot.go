@@ -14,16 +14,16 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/codegangsta/cli"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/language"
+	"github.com/itsabot/abot/shared/nlp"
+	"github.com/itsabot/abot/shared/pkg"
+	"github.com/itsabot/abot/shared/sms"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 	"github.com/stripe/stripe-go"
 	"github.com/subosito/twilio"
-	"itsabot.org/abot/shared/datatypes"
-	"itsabot.org/abot/shared/language"
-	"itsabot.org/abot/shared/nlp"
-	"itsabot.org/abot/shared/pkg"
-	"itsabot.org/abot/shared/sms"
 )
 
 var db *sqlx.DB
