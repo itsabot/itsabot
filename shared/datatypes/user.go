@@ -67,6 +67,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("extracted user params", p)
 	if p.UserID == 0 {
 		// XXX temporary. we only have phone numbers atm
 		p.FlexIDType = fidtPhone
@@ -75,6 +76,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 		} else if p.FlexIDType == fidtInvalid {
 			return nil, ErrInvalidFlexIDType
 		}
+		log.Println("searching for user from", p.FlexID, p.FlexIDType)
 		q := `SELECT userid
 		      FROM userflexids
 		      WHERE flexid=$1 AND flexidtype=$2
@@ -83,6 +85,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		}
+		log.Println("got uid", p.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +93,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
 	      FROM users
 	      WHERE id=$1`
-	var u *User
+	u := &User{}
 	if err := db.Get(u, q, p.UserID); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
@@ -249,7 +252,7 @@ func (u *User) CheckActiveAuthorization(db *sqlx.DB) (bool, error) {
 // extractUserParams splits out user-identifying params passed in through
 // endpoints.
 func extractUserParams(db *sqlx.DB, c *echo.Context) (*userParams, error) {
-	var p *userParams
+	p := &userParams{}
 	tmp, ok := c.Get("uid").(string)
 	if !ok {
 		tmp = ""
