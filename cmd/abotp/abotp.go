@@ -6,6 +6,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -91,6 +92,36 @@ func main() {
 			// Delete zip file
 			if err = os.Remove(fpZip); err != nil {
 				log.Fatalln(err)
+			}
+
+			// Anonymously increment the package's download count
+			// at itsabot.org
+			p := struct {
+				Path string
+			}{Path: url}
+			byt, err := json.Marshal(p)
+			if err != nil {
+				log.Println("WARN:", err)
+				wg.Done()
+				return
+			}
+			var u string
+			if len(os.Getenv("ITSABOT_URL")) > 0 {
+				u = os.Getenv("ITSABOT_URL") + "/api/packages.json"
+			} else {
+				u = "https://www.itsabot.org/api/packages.json"
+			}
+			resp, err = http.Post(u, "application/json",
+				bytes.NewBuffer(byt))
+			if err != nil {
+				log.Println("WARN:", err)
+				wg.Done()
+				return
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				log.Println("WARN:", resp.StatusCode, "-",
+					resp.Status)
 			}
 			wg.Done()
 		}(url)
