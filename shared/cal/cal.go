@@ -9,16 +9,17 @@
 package cal
 
 import (
+	"database/sql/driver"
 	"sort"
 	"sync"
 )
 
 var driversMu sync.RWMutex
-var drivers = make(map[string]Driver)
+var drivers = make(map[string]driver.Driver)
 
 // Register makes a calendar driver available by the provided name. If Register
 // is called twice with the same name or if driver is nill, it panics.
-func Register(name string, driver Driver) {
+func Register(name string, driver driver.Driver) {
 	driversMu.Lock()
 	defer driversMu.Unlock()
 	if driver == nil {

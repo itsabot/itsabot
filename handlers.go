@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/shared/cal"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/sms"
@@ -61,7 +60,6 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 	e.Post("/api/cards.json", handlerAPICardSubmit)
 	e.Delete("/api/cards.json", handlerAPICardDelete)
-	e.Post("/api/calendar/events.json", handlerAPICalendarEventCreate)
 	e.Get("/api/message.json", handlerAPIConversationsShow)
 	e.Post("/api/messages.json", handlerAPIMessagesCreate)
 	e.Get("/api/messages.json", handlerAPIMessages)
@@ -70,11 +68,6 @@ func initRoutes(e *echo.Echo) {
 		handlerAPIContactsConversationsCreate)
 	e.Get("/api/contacts/search.json", handlerAPIContactsSearch)
 	e.Post("/api/trigger.json", handlerAPITriggerPkg)
-
-	// OAuth routes
-	e.Post("/oauth/connect/gcal.json", handlerOAuthConnectGoogleCalendar)
-	e.Post("/oauth/disconnect/gcal.json",
-		handlerOAuthDisconnectGoogleCalendar)
 
 	// WebSockets
 	e.WebSocket("/ws", handlerWSConversations)
@@ -725,54 +718,6 @@ func handlerAPICardDelete(c *echo.Context) error {
 	return nil
 }
 
-// handlerAPICalendarEventCreate creates an event on a user's calendaer. Right
-// now support is built in for Google Calendar, but additional support will be
-// added for Office/Exchange and others.
-func handlerAPICalendarEventCreate(c *echo.Context) error {
-	var req struct {
-		Title          string
-		StartTime      uint64
-		DurationInMins int
-		AllDay         bool
-		Recurring      bool
-		RecurringFreq  cal.RecurringFreq
-		UserID         uint64
-	}
-	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
-	}
-	if len(req.Title) == 0 {
-		return jsonError(errors.New("Title cannot be blank"))
-	}
-	if req.DurationInMins <= 0 {
-		return jsonError(errors.New("DurationInMins must be > 0"))
-	}
-	if req.RecurringFreq > cal.RecurringFreqYearly {
-		return jsonError(errors.New("RecurringFreq is too high"))
-	}
-	if req.UserID <= 0 {
-		return jsonError(errors.New("UserID must be > 0"))
-	}
-	ev := &cal.Event{}
-	ev.Title = req.Title
-	var tmp time.Time
-	tmp = time.Unix(int64(req.StartTime), 0)
-	ev.StartTime = &tmp
-	ev.DurationInMins = req.DurationInMins
-	ev.AllDay = req.AllDay
-	ev.Recurring = req.Recurring
-	ev.RecurringFreq = req.RecurringFreq
-	ev.UserID = req.UserID
-	client, err := cal.Client(db, ev.UserID)
-	if err != nil {
-		return jsonError(err)
-	}
-	if err = ev.Save(client); err != nil {
-		return jsonError(err)
-	}
-	return nil
-}
-
 // handlerAPIMessages loads up conversations that need training for the
 // Training Index endpoint. A max of 1 message per user will be loaded, since
 // any user that needs help will receive help for their most recent request
@@ -1007,72 +952,6 @@ func handlerAPIContactsSearch(c *echo.Context) error {
 		}
 	*/
 	return jsonError(errors.New("not implemented"))
-}
-
-func handlerOAuthConnectGoogleCalendar(c *echo.Context) error {
-	var req struct {
-		UserID uint64
-		Code   string
-	}
-	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
-	}
-	accessToken, idToken, err := cal.Exchange(req.Code)
-	if err != nil {
-		return jsonError(err)
-	}
-	gID, err := cal.DecodeIdToken(idToken)
-	if err != nil {
-		return jsonError(err)
-	}
-	q := `INSERT INTO sessions (userid, label, token) VALUES ($1, $2, $3)
-	      ON CONFLICT (userid, label) DO UPDATE SET token=$3`
-	_, err = db.Exec(q, req.UserID, "gcal_token", accessToken)
-	if err != nil {
-		return jsonError(err)
-	}
-	_, err = db.Exec(q, req.UserID, "gcal_id", gID)
-	if err != nil {
-		return jsonError(err)
-	}
-	// Ensure we can connect to the client
-	_, err = cal.Client(db, req.UserID)
-	if err != nil {
-		return jsonError(err)
-	}
-	if err := c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
-	}
-	return nil
-}
-
-func handlerOAuthDisconnectGoogleCalendar(c *echo.Context) error {
-	var req struct {
-		UserID uint64
-	}
-	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
-	}
-	var token string
-	q := `SELECT token FROM sessions WHERE userid=$1 AND label='gcal_token'`
-	if err := db.Get(&token, q, req.UserID); err != nil {
-		return jsonError(err)
-	}
-	// Execute HTTP GET request to revoke current token
-	url := "https://accounts.google.com/o/oauth2/revoke?token=" + token
-	resp, err := http.Get(url)
-	if err != nil {
-		return jsonError(err)
-	}
-	defer resp.Body.Close()
-	q = `DELETE FROM sessions WHERE userid=$1 AND label='gcal_token'`
-	if _, err = db.Exec(q, req.UserID); err != nil {
-		return jsonError(err)
-	}
-	if err := c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
-	}
-	return nil
 }
 
 // handlerWSConversations establishes a socket connection for the training
