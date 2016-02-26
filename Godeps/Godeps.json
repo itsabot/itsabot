@@ -6,11 +6,6 @@
 	],
 	"Deps": [
 		{
-			"ImportPath": "bitbucket.org/pkg/inflect",
-			"Comment": "go.r60-12",
-			"Rev": "'8961c3750a47b8c0b3e118d52513b97adf85a7e8'"
-		},
-		{
 			"ImportPath": "github.com/agonopol/go-stem",
 			"Rev": "98588501825042276ca6d7cbc73bc8bb56ea8d77"
 		},
@@ -74,15 +69,6 @@
 			"ImportPath": "github.com/stripe/stripe-go",
 			"Comment": "v10.3.0-29-g41f8ed4",
 			"Rev": "41f8ed499f5ffd7ce3f474bdbe5e1bd4ffd9cad6"
-		},
-		{
-			"ImportPath": "github.com/subosito/figo",
-			"Rev": "4f2709582c104a76b1ef6c24d47a682ec1b085c3"
-		},
-		{
-			"ImportPath": "github.com/subosito/twilio",
-			"Comment": "v0.0.1-24-g2a2109f",
-			"Rev": "2a2109f2a1482f7e34b8018db21fab8b02335f43"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",

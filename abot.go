@@ -12,18 +12,15 @@ import (
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/pkg"
-	"github.com/itsabot/abot/shared/sms"
 	"github.com/itsabot/abot/shared/websocket"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 	"github.com/stripe/stripe-go"
-	"github.com/subosito/twilio"
 )
 
 var db *sqlx.DB
 var ner core.Classifier
-var tc *twilio.Client
 var mc *dt.MailClient
 var ws = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
@@ -90,7 +87,6 @@ func startServer() error {
 		return err
 	}
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
-	tc = sms.NewClient()
 	mc = dt.NewMailClient()
 	go func() {
 		if err := core.BootDependencies(addr); err != nil {

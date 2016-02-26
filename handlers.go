@@ -18,7 +18,6 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/itsabot/abot/shared/sms"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"github.com/satori/go.uuid"
@@ -51,7 +50,6 @@ func initRoutes(e *echo.Echo) {
 
 	// API routes
 	e.Post("/", handlerMain)
-	e.Post("/twilio", handlerTwilio)
 	e.Get("/api/profile.json", handlerAPIProfile)
 	e.Put("/api/profile.json", handlerAPIProfileView)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
@@ -157,44 +155,8 @@ func handlerIndex(c *echo.Context) error {
 	return nil
 }
 
-// handlerTwilio responds to SMS messages sent through Twilio. Unlike other
-// handlers, we process internal errors without returning here, since any errors
-// should not be presented directly to the user -- they should be "humanized"
-func handlerTwilio(c *echo.Context) error {
-	c.Set("cmd", c.Form("Body"))
-	c.Set("flexid", c.Form("From"))
-	c.Set("flexidtype", 2)
-	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
-	errSent := false
-	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
-	if err != nil {
-		ret = errMsg
-		errSent = true
-		handlerError(err, c)
-	}
-	if err = ws.NotifySockets(c, uid, c.Form("Body"), ret); err != nil {
-		if !errSent {
-			ret = errMsg
-			errSent = true
-			handlerError(err, c)
-		}
-	}
-	var resp sms.TwilioResp
-	if len(ret) == 0 {
-		resp = sms.TwilioResp{}
-	} else {
-		resp = sms.TwilioResp{Message: ret}
-	}
-	if err = c.XML(http.StatusOK, resp); err != nil {
-		if !errSent {
-			handlerError(err, c)
-		}
-	}
-	return nil
-}
-
-// handlerMain is the endpoint to hit when you want to speak to Ava outside of
-// Twilio/SMS. This endpoint enables avarepl.
+// handlerMain is the endpoint to hit when you want a direct response via JSON.
+// The Abot console (abotc) uses this endpoint.
 func handlerMain(c *echo.Context) error {
 	c.Set("cmd", c.Form("cmd"))
 	c.Set("flexid", c.Form("flexid"))
@@ -344,12 +306,15 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return jsonError(errors.New(
 			"Your password must be at least 8 characters."))
 	}
-	if err := validatePhone(req.FID); err != nil {
-		return jsonError(err)
-	}
+	// TODO use new SMS interface
+	/*
+		if err := validatePhone(req.FID); err != nil {
+			return jsonError(err)
+		}
+	*/
 
 	// create the password hash
-	//   TODO format phone number for Twilio (international format)
+	// TODO format phone number for SMS interface (international format)
 	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
 		return jsonError(err)
@@ -420,9 +385,12 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		fName := strings.Fields(req.Name)[0]
 		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
 		msg += "How can I help? Try asking me to help you find a nice bottle of wine."
-		if err = sms.SendMessage(tc, req.FID, msg); err != nil {
-			return jsonError(err)
-		}
+		// TODO move to the new SMS interface
+		/*
+			if err = sms.SendMessage(tc, req.FID, msg); err != nil {
+				return jsonError(err)
+			}
+		*/
 	}
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
@@ -986,22 +954,6 @@ func handlerError(err error, c *echo.Context) {
 func jsonError(err error) error {
 	tmp := strings.Replace(err.Error(), `"`, "'", -1)
 	return errors.New(`{"Msg":"` + tmp + `"}`)
-}
-
-func validatePhone(s string) error {
-	if len(s) < 10 || len(s) > 20 || !sms.PhoneRegex.MatchString(s) {
-		return errors.New(
-			"Your phone must be a valid U.S. number with the area code.")
-	}
-	if len(s) == 11 && s[0] != '1' {
-		return errors.New(
-			"Sorry, Ava only serves U.S. customers for now.")
-	}
-	if len(s) == 12 && s[0] == '+' && s[1] != '1' {
-		return errors.New(
-			"Sorry, Ava only serves U.S. customers for now.")
-	}
-	return nil
 }
 
 // randSeq generates a random string of letters to provide a secure password
