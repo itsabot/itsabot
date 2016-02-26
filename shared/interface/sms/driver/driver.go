@@ -1,3 +1,5 @@
+// Package driver defines interfaces to be implemented by SMS drivers as used
+// by package sms.
 package driver
 
 // Driver is the interface that must be implemented by an SMS driver.

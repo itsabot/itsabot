@@ -5,6 +5,7 @@ package driver
 import (
 	"time"
 
+	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -20,7 +21,7 @@ type Driver interface {
 type Conn interface {
 	// GetEvents returns events with a given time range. Further searching
 	// should be done on the retrieved events.
-	GetEvents(TimeRange) ([]Event, error)
+	GetEvents(dt.TimeRange) ([]Event, error)
 
 	// Close the connection.
 	Close() error
@@ -71,13 +72,6 @@ type Attendee interface {
 
 	// Phone number of the attendee
 	Phone() string
-}
-
-// TimeRange defines a range of time in searching for events or creating an
-// event for a specified duration.
-type TimeRange struct {
-	Start *time.Time
-	End   *time.Time
 }
 
 // RecurringFreq specifies how often an event recurs.

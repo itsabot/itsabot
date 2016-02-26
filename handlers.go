@@ -164,7 +164,7 @@ func handlerMain(c *echo.Context) error {
 	c.Set("uid", c.Form("uid"))
 	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
 	errSent := false
-	ret, uid, err := core.ProcessText(db, mc, ner, offensive, c)
+	ret, uid, err := core.ProcessText(db, ner, offensive, c)
 	if err != nil {
 		ret = errMsg
 		errSent = true
@@ -524,17 +524,13 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	if _, err := db.Exec(q, user.ID, secret); err != nil {
 		return jsonError(err)
 	}
-	h := `<html><body>`
-	h += fmt.Sprintf("<p>Hi %s:</p>", user.Name)
-	h += "<p>Please click the following link to reset your password. This link will expire in 30 minutes.</p>"
-	h += fmt.Sprintf("<p>%s</p>", os.Getenv("ABOT_URL")+"?/reset_password?s="+secret)
-	h += "<p>If you received this email in error, please ignore it.</p>"
-	h += "<p>Have a great day!</p>"
-	h += "<p>-Ava</p>"
-	h += "</body></html>"
-	if err := mc.Send("Password reset", h, &user); err != nil {
-		return jsonError(err)
-	}
+	// TODO implement mail interface
+	/*
+		h := template.ForgotPasswordEmail(user.Name, secret)
+		if err := mc.Send("Password reset", h, &user); err != nil {
+			return jsonError(err)
+		}
+	*/
 	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return jsonError(err)
 	}
@@ -946,7 +942,8 @@ func handlerWSConversations(c *echo.Context) error {
 
 func handlerError(err error, c *echo.Context) {
 	log.Debug("failed handling", err)
-	mc.SendBug(err)
+	// TODO implement mail interface
+	// mc.SendBug(err)
 }
 
 // jsonError builds a simple JSON message from an error type in the format of

@@ -9,7 +9,6 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/pkg"
 	"github.com/itsabot/abot/shared/websocket"
@@ -21,7 +20,6 @@ import (
 
 var db *sqlx.DB
 var ner core.Classifier
-var mc *dt.MailClient
 var ws = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
 var (
@@ -87,7 +85,6 @@ func startServer() error {
 		return err
 	}
 	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
-	mc = dt.NewMailClient()
 	go func() {
 		if err := core.BootDependencies(addr); err != nil {
 			log.Debug("could not boot dependency", err)

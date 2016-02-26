@@ -30,15 +30,14 @@ func Preprocess(db *sqlx.DB, ner Classifier, c *echo.Context) (*dt.Msg, error) {
 	return msg, nil
 }
 
-// ProcessText is Ava's core logic. This function processes a user's message,
+// ProcessText is Abot's core logic. This function processes a user's message,
 // routes it to the correct package, and handles edge cases like offensive
 // language before returning a response to the user. Any user-presentable error
 // is returned in the string. Errors returned from this function are not for the
-// user, so they are handled by Ava explicitly on this function's return
+// user, so they are handled by Abot explicitly on this function's return
 // (logging, notifying admins, etc.).
-func ProcessText(db *sqlx.DB, mc *dt.MailClient, ner Classifier,
-	offensive map[string]struct{}, c *echo.Context) (ret string, uid uint64,
-	err error) {
+func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
+	c *echo.Context) (ret string, uid uint64, err error) {
 
 	msg, err := Preprocess(db, ner, c)
 	if err != nil {
@@ -85,7 +84,7 @@ func ProcessText(db *sqlx.DB, mc *dt.MailClient, ner Classifier,
 	if len(ret) == 0 {
 		m.Sentence = language.Confused()
 		msg.NeedsTraining = true
-		if err = msg.Update(db, mc); err != nil {
+		if err = msg.Update(db); err != nil {
 			return "", m.User.ID, err
 		}
 	} else {
