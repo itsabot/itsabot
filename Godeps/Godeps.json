@@ -15,14 +15,6 @@
 			"Rev": "98588501825042276ca6d7cbc73bc8bb56ea8d77"
 		},
 		{
-			"ImportPath": "github.com/araddon/gou",
-			"Rev": "1fd0868458fb611a8a956fae0ed0d0cc657cd321"
-		},
-		{
-			"ImportPath": "github.com/bitly/go-hostpool",
-			"Rev": "d0e59c22a56e8dadfed24f74f452cea5a52722d2"
-		},
-		{
 			"ImportPath": "github.com/codegangsta/cli",
 			"Comment": "1.2.0-197-gcf1f63a",
 			"Rev": "cf1f63a7274872768d4037305d572b70b1199397"
@@ -55,11 +47,6 @@
 			"ImportPath": "github.com/lib/pq",
 			"Comment": "go1.0-cutoff-74-g8ad2b29",
 			"Rev": "8ad2b298cadd691a77015666a5372eae5dbfac8f"
-		},
-		{
-			"ImportPath": "github.com/mattbaird/elastigo/lib",
-			"Comment": "v1.0-308-g6846107",
-			"Rev": "6846107dcb6b61f78681686b1d6b27787aa8f881"
 		},
 		{
 			"ImportPath": "github.com/mattn/go-colorable",
