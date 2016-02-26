@@ -1,7 +1,7 @@
 (function(abot) {
 abot.Phone = {}
 abot.Phone.view = function(_, props) {
-	return m("tr", { "attr-id": props.Id }, [
+	return m("tr", { "attr-id": props.ID }, [
 		m("td", props.Number),
 		m("td.text-right", [
 			m("img.icon.icon-xs.icon-delete", {

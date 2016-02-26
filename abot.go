@@ -28,7 +28,7 @@ var mc *dt.MailClient
 var ws = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
 var (
-	ErrInvalidUserPass = errors.New("Invalid username/password combination")
+	errInvalidUserPass = errors.New("Invalid username/password combination")
 )
 
 func main() {

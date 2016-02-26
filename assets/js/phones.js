@@ -17,7 +17,7 @@ abot.Phones.view = function(ctrl, props) {
 			m("tbody", props.map(function(phone) {
 				var fmtd = ctrl.format(phone.Number)
 				return m.component(abot.Phone, {
-					Id: phone.Id,
+					ID: phone.ID,
 					Number: fmtd
 				})
 			}))

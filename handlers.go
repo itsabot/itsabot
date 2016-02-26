@@ -289,33 +289,33 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		return jsonError(err)
 	}
 	var u struct {
-		Id       int
+		ID       int
 		Password []byte
 		Trainer  bool
 	}
 	q := `SELECT id, password, trainer FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
-		return jsonError(ErrInvalidUserPass)
+		return jsonError(errInvalidUserPass)
 	} else if err != nil {
 		return jsonError(err)
 	}
-	if u.Id == 0 {
-		return jsonError(ErrInvalidUserPass)
+	if u.ID == 0 {
+		return jsonError(errInvalidUserPass)
 	}
 	err = bcrypt.CompareHashAndPassword(u.Password, []byte(req.Password))
 	if err == bcrypt.ErrMismatchedHashAndPassword ||
 		err == bcrypt.ErrHashTooShort {
-		return jsonError(ErrInvalidUserPass)
+		return jsonError(errInvalidUserPass)
 	} else if err != nil {
 		return jsonError(err)
 	}
 	var resp struct {
-		Id           int
+		ID           int
 		SessionToken string
 		Trainer      bool
 	}
-	resp.Id = u.Id
+	resp.ID = u.ID
 	resp.Trainer = u.Trainer
 	tmp := uuid.NewV4().Bytes()
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
@@ -417,11 +417,11 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	// End DB access
 
 	var resp struct {
-		Id           int
+		ID           int
 		SessionToken string
 	}
 	tmp := uuid.NewV4().Bytes()
-	resp.Id = uid
+	resp.ID = uid
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	if os.Getenv("AVA_ENV") == "production" {
 		fName := strings.Fields(req.Name)[0]
@@ -450,7 +450,7 @@ func handlerAPIProfile(c *echo.Context) error {
 		Email  string
 		Phones []dt.Phone
 		Cards  []struct {
-			Id             int
+			ID             int
 			CardholderName string
 			Last4          string
 			ExpMonth       string `db:"expmonth"`
@@ -458,7 +458,7 @@ func handlerAPIProfile(c *echo.Context) error {
 			Brand          string
 		}
 		Addresses []struct {
-			Id      int
+			ID      int
 			Name    string
 			Line1   string
 			Line2   string

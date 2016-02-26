@@ -21,7 +21,7 @@ ava.Card.controller = function(props) {
 	}
 	ctrl.del = function() {
 		var data = {
-			ID: props.Id,
+			ID: props.ID,
 			UserID: parseInt(cookie.getItem("id"))
 		}
 		m.request({
@@ -35,7 +35,7 @@ ava.Card.controller = function(props) {
 	}
 }
 ava.Card.view = function(ctrl, props) {
-	return m("tr", { key: props.Id }, [
+	return m("tr", { key: props.ID }, [
 		m("td", { style: "width: 10%" }, ctrl.brandIcon(props.Brand)),
 		m("td", props.CardholderName),
 		m("td", {class: "subtle"}, "XXXX-" + props.Last4),

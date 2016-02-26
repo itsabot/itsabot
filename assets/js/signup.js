@@ -30,7 +30,7 @@ abot.Signup.controller = function() {
 		}).then(function(data) {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
-			cookie.setItem("id", data.Id, exp, null, null, false)
+			cookie.setItem("id", data.ID, exp, null, null, false)
 			cookie.setItem("session_token", data.SessionToken, exp, null, null, false)
 			m.route("/profile")
 		}, function(err) {
