@@ -47,17 +47,29 @@ var (
 	instID  = &cachedValue{k: "instance/id", trim: true}
 )
 
-var metaClient = &http.Client{
-	Transport: &internal.Transport{
-		Base: &http.Transport{
-			Dial: (&net.Dialer{
-				Timeout:   750 * time.Millisecond,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			ResponseHeaderTimeout: 750 * time.Millisecond,
+var (
+	metaClient = &http.Client{
+		Transport: &internal.Transport{
+			Base: &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout:   750 * time.Millisecond,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				ResponseHeaderTimeout: 750 * time.Millisecond,
+			},
 		},
-	},
-}
+	}
+	subscribeClient = &http.Client{
+		Transport: &internal.Transport{
+			Base: &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout:   750 * time.Millisecond,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+			},
+		},
+	}
+)
 
 // NotDefinedError is returned when requested metadata is not defined.
 //
@@ -80,13 +92,13 @@ func (suffix NotDefinedError) Error() string {
 // If the requested metadata is not defined, the returned error will
 // be of type NotDefinedError.
 func Get(suffix string) (string, error) {
-	val, _, err := getETag(suffix)
+	val, _, err := getETag(metaClient, suffix)
 	return val, err
 }
 
 // getETag returns a value from the metadata service as well as the associated
-// ETag. This func is otherwise equivalent to Get.
-func getETag(suffix string) (value, etag string, err error) {
+// ETag using the provided client. This func is otherwise equivalent to Get.
+func getETag(client *http.Client, suffix string) (value, etag string, err error) {
 	// Using a fixed IP makes it very difficult to spoof the metadata service in
 	// a container, which is an important use-case for local testing of cloud
 	// deployments. To enable spoofing of the metadata service, the environment
@@ -104,7 +116,7 @@ func getETag(suffix string) (value, etag string, err error) {
 	url := "http://" + host + "/computeMetadata/v1/" + suffix
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Metadata-Flavor", "Google")
-	res, err := metaClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		return "", "", err
 	}
@@ -172,6 +184,7 @@ func OnGCE() bool {
 
 // Subscribe subscribes to a value from the metadata service.
 // The suffix is appended to "http://${GCE_METADATA_HOST}/computeMetadata/v1/".
+// The suffix may contain query parameters.
 //
 // Subscribe calls fn with the latest metadata value indicated by the provided
 // suffix. If the metadata value is deleted, fn is called with the empty string
@@ -182,7 +195,7 @@ func Subscribe(suffix string, fn func(v string, ok bool) error) error {
 	const failedSubscribeSleep = time.Second * 5
 
 	// First check to see if the metadata value exists at all.
-	val, lastETag, err := getETag(suffix)
+	val, lastETag, err := getETag(subscribeClient, suffix)
 	if err != nil {
 		return err
 	}
@@ -192,9 +205,13 @@ func Subscribe(suffix string, fn func(v string, ok bool) error) error {
 	}
 
 	ok := true
-	suffix += "?wait_for_change=true&last_etag="
+	if strings.ContainsRune(suffix, '?') {
+		suffix += "&wait_for_change=true&last_etag="
+	} else {
+		suffix += "?wait_for_change=true&last_etag="
+	}
 	for {
-		val, etag, err := getETag(suffix + url.QueryEscape(lastETag))
+		val, etag, err := getETag(subscribeClient, suffix+url.QueryEscape(lastETag))
 		if err != nil {
 			if _, deleted := err.(NotDefinedError); !deleted {
 				time.Sleep(failedSubscribeSleep)
