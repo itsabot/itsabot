@@ -15,7 +15,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
-	"github.com/stripe/stripe-go"
 )
 
 var db *sqlx.DB
@@ -84,7 +83,6 @@ func startServer() error {
 	if err != nil {
 		return err
 	}
-	stripe.Key = os.Getenv("STRIPE_ACCESS_TOKEN")
 	go func() {
 		if err := core.BootDependencies(addr); err != nil {
 			log.Debug("could not boot dependency", err)

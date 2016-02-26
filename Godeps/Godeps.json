@@ -56,11 +56,6 @@
 			"Rev": "d41af8bb6a7704f00bc3b7cba9355ae6a5a80048"
 		},
 		{
-			"ImportPath": "github.com/stripe/stripe-go",
-			"Comment": "v10.3.0-29-g41f8ed4",
-			"Rev": "41f8ed499f5ffd7ce3f474bdbe5e1bd4ffd9cad6"
-		},
-		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
 			"Rev": "1f22c0103821b9390939b6776727195525381532"
 		},
