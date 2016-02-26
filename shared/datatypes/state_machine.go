@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -32,7 +32,7 @@ type StateMachine struct {
 	states       map[string]int
 	keys         []string
 	pkgName      string
-	logger       *log.Entry
+	logger       *log.Logger
 	db           *sqlx.DB
 	resetFn      func(*Msg)
 }
@@ -91,9 +91,7 @@ func NewStateMachine(pkgName string) *StateMachine {
 	sm := StateMachine{state: 0, pkgName: pkgName}
 	sm.states = map[string]int{}
 	sm.resetFn = func(*Msg) {}
-	sm.logger = log.WithFields(log.Fields{
-		"pkg": pkgName,
-	})
+	sm.logger = log.New(pkgName)
 	return &sm
 }
 
@@ -115,7 +113,7 @@ func (sm *StateMachine) SetStates(sss ...[]State) {
 // SetLogger enables the logger with any package-defined settings to be used
 // internally by the stateMachine. This ensures consistency in the logs of a
 // package.
-func (sm *StateMachine) SetLogger(l *log.Entry) {
+func (sm *StateMachine) SetLogger(l *log.Logger) {
 	sm.logger = l
 }
 
@@ -146,7 +144,7 @@ func (sm *StateMachine) LoadState(in *Msg) {
 	err := sm.db.QueryRowx(q, stateKey, in.User.ID, 0, sm.pkgName,
 		sm.state).Scan(&val)
 	if err != nil && err != sql.ErrNoRows {
-		sm.logger.Errorln(err, "fetching value from states")
+		sm.logger.Debug("could not fetch value from states", err)
 		sm.state = 0
 		return
 	}
@@ -162,13 +160,13 @@ func (sm *StateMachine) LoadState(in *Msg) {
 			sm.state = 0
 			return
 		}
-		sm.logger.Errorln(err, "parsing state")
+		sm.logger.Debug("could not parse state", err)
 	}
 	sm.state = int(tmp)
 	// Have we already entered a state?
 	sm.stateEntered = sm.GetMemory(in, stateEnteredKey).Bool()
-	sm.logger.Debugln("set state to", sm.state)
-	sm.logger.Debugln("set state entered to", sm.stateEntered)
+	sm.logger.Debug("set state to", sm.state)
+	sm.logger.Debug("set state entered to", sm.stateEntered)
 	return
 }
 
@@ -194,45 +192,45 @@ func (sm *StateMachine) GetDBConn() *sqlx.DB {
 func (sm *StateMachine) Next(in *Msg) (response string) {
 	h := sm.Handlers[sm.state]
 	if sm.state >= len(sm.Handlers) {
-		sm.logger.Debugln("state is >= len(handlers)")
+		sm.logger.Debug("state is >= len(handlers)")
 		return ""
 	}
 	if !sm.stateEntered {
 		if h.SkipIfComplete {
 			done, _ := h.Complete(in)
 			if done {
-				sm.logger.Debugln("state was complete. moving on")
+				sm.logger.Debug("state was complete. moving on")
 				return sm.Next(in)
 			}
 		}
 		sm.setEntered(in)
-		sm.logger.Debugln("setting state entered")
+		sm.logger.Debug("setting state entered")
 		return h.OnEntry(in)
 	}
-	sm.logger.Debugln("state was already entered")
+	sm.logger.Debug("state was already entered")
 	h.OnInput(in)
 	// Check completion of current state
 	done, str := h.Complete(in)
 	if done {
-		sm.logger.Debugln("state is done. going to next")
+		sm.logger.Debug("state is done. going to next")
 		if sm.state+1 >= len(sm.Handlers) {
-			sm.logger.Debugln("finished states, nothing to do")
+			sm.logger.Debug("finished states, nothing to do")
 			return ""
 		}
 		q := `UPDATE states SET value=$1 WHERE key=$2`
 		b := make([]byte, 8) // space for int64
 		binary.LittleEndian.PutUint64(b, uint64(sm.state))
 		if err, _ := sm.db.Exec(q, b, stateKey); err != nil {
-			sm.logger.Errorln(err, "updating state")
+			sm.logger.Debug("could not update state", err)
 		}
 		sm.state++
 		sm.setEntered(in)
 		return sm.Handlers[sm.state].OnEntry(in)
 	} else if len(str) > 0 {
-		sm.logger.Debugln("incomplete with message")
+		sm.logger.Debug("incomplete with message")
 		return str
 	}
-	sm.logger.Debugln("reached here")
+	sm.logger.Debug("reached here")
 	return ""
 }
 
@@ -263,7 +261,8 @@ func (sm *StateMachine) OnInput(in *Msg) {
 func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		sm.logger.Errorln(err, "marhsalling interface to json", v)
+		sm.logger.Debug("could not marshal memory interface to json at",
+			k, ":", err)
 		return
 	}
 	q := `INSERT INTO states (key, value, pkgname, userid)
@@ -271,7 +270,7 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	      ON CONFLICT (userid, pkgname, key) DO UPDATE SET value=$2`
 	_, err = sm.db.Exec(q, k, b, sm.pkgName, in.User.ID)
 	if err != nil {
-		sm.logger.Errorln(err, "setting memory at", k, "to", v)
+		sm.logger.Debug("could not set memory at", k, "to", v, ":", err)
 		return
 	}
 }
@@ -286,7 +285,7 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	if err != nil {
-		sm.logger.Errorln(err, "getMemory for key", k)
+		sm.logger.Debug("could not get memory for key", k, ":", err)
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	return Memory{Key: k, Val: buf, logger: sm.logger}
