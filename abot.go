@@ -25,7 +25,7 @@ var db *sqlx.DB
 var ner core.Classifier
 var tc *twilio.Client
 var mc *dt.MailClient
-var ws websocket.AtomicWebSocketSet = websocket.NewAtomicWebSocketSet()
+var ws = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
 var (
 	ErrInvalidUserPass = errors.New("Invalid username/password combination")

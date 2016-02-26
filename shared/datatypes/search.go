@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/mattbaird/elastigo/lib"
 )
 
@@ -68,11 +67,6 @@ func (ec *SearchClient) FindProducts(query, category, typ string,
 		return []Product{}, err
 	}
 	if res.Hits.Total == 0 {
-		log.WithFields(log.Fields{
-			"q":      query,
-			"cat":    category,
-			"budget": budget,
-		}).Infoln("no results")
 		return []Product{}, nil
 	}
 	var products []Product

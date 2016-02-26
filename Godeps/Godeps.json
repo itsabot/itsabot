@@ -1,0 +1,153 @@
+{
+	"ImportPath": "github.com/itsabot/abot",
+	"GoVersion": "go1.6",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "bitbucket.org/pkg/inflect",
+			"Comment": "go.r60-12",
+			"Rev": "'8961c3750a47b8c0b3e118d52513b97adf85a7e8'"
+		},
+		{
+			"ImportPath": "github.com/agonopol/go-stem",
+			"Rev": "98588501825042276ca6d7cbc73bc8bb56ea8d77"
+		},
+		{
+			"ImportPath": "github.com/araddon/gou",
+			"Rev": "1fd0868458fb611a8a956fae0ed0d0cc657cd321"
+		},
+		{
+			"ImportPath": "github.com/bitly/go-hostpool",
+			"Rev": "d0e59c22a56e8dadfed24f74f452cea5a52722d2"
+		},
+		{
+			"ImportPath": "github.com/codegangsta/cli",
+			"Comment": "1.2.0-197-gcf1f63a",
+			"Rev": "cf1f63a7274872768d4037305d572b70b1199397"
+		},
+		{
+			"ImportPath": "github.com/dchest/stemmer",
+			"Rev": "f1ab276e6cf5fad3f8db813f22e25b1939c8ef70"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "45bba206dd5270d96bac4942dcfe515726613249"
+		},
+		{
+			"ImportPath": "github.com/jmoiron/sqlx",
+			"Comment": "sqlx-v1.1-61-g398dd58",
+			"Rev": "398dd5876282499cdfd4cb8ea0f31a672abe9495"
+		},
+		{
+			"ImportPath": "github.com/labstack/echo",
+			"Comment": "v1.3-64-g30ee5fb",
+			"Rev": "30ee5fbb95aa1fc1c09f101fc7f9a1022a78da38"
+		},
+		{
+			"ImportPath": "github.com/labstack/gommon/color",
+			"Comment": "v0.0.3-39-gbfff5bf",
+			"Rev": "bfff5bf04688a4048a5cb4dd3b3f0697caaad19c"
+		},
+		{
+			"ImportPath": "github.com/labstack/gommon/log",
+			"Comment": "v0.0.3-39-gbfff5bf",
+			"Rev": "bfff5bf04688a4048a5cb4dd3b3f0697caaad19c"
+		},
+		{
+			"ImportPath": "github.com/lib/pq",
+			"Comment": "go1.0-cutoff-74-g8ad2b29",
+			"Rev": "8ad2b298cadd691a77015666a5372eae5dbfac8f"
+		},
+		{
+			"ImportPath": "github.com/mattbaird/elastigo/lib",
+			"Comment": "v1.0-308-g6846107",
+			"Rev": "6846107dcb6b61f78681686b1d6b27787aa8f881"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-colorable",
+			"Rev": "9cbef7c35391cca05f15f8181dc0b18bc9736dbb"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-isatty",
+			"Rev": "56b76bdf51f7708750eac80fa38b952bb9f32639"
+		},
+		{
+			"ImportPath": "github.com/satori/go.uuid",
+			"Rev": "d41af8bb6a7704f00bc3b7cba9355ae6a5a80048"
+		},
+		{
+			"ImportPath": "github.com/sendgrid/sendgrid-go",
+			"Comment": "v2.0.0-18-g618ae01",
+			"Rev": "618ae01fc450f11509a8dee37756036780338593"
+		},
+		{
+			"ImportPath": "github.com/sendgrid/smtpapi-go",
+			"Comment": "v0.4.0",
+			"Rev": "08102729bcf72bfe74dde6c0da8e0423e94090ca"
+		},
+		{
+			"ImportPath": "github.com/stripe/stripe-go",
+			"Comment": "v10.3.0-29-g41f8ed4",
+			"Rev": "41f8ed499f5ffd7ce3f474bdbe5e1bd4ffd9cad6"
+		},
+		{
+			"ImportPath": "github.com/subosito/figo",
+			"Rev": "4f2709582c104a76b1ef6c24d47a682ec1b085c3"
+		},
+		{
+			"ImportPath": "github.com/subosito/twilio",
+			"Comment": "v0.0.1-24-g2a2109f",
+			"Rev": "2a2109f2a1482f7e34b8018db21fab8b02335f43"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/bcrypt",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/blowfish",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "6acef71eb69611914f7a30939ea9f6e194c78172"
+		},
+		{
+			"ImportPath": "golang.org/x/net/websocket",
+			"Rev": "6acef71eb69611914f7a30939ea9f6e194c78172"
+		},
+		{
+			"ImportPath": "golang.org/x/oauth2",
+			"Rev": "8a57ed94ffd43444c0879fe75701732a38afc985"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "eb2c74142fd19a79b3f237334c7384d5167b1b46"
+		},
+		{
+			"ImportPath": "google.golang.org/api/calendar/v3",
+			"Rev": "f6ba98773d96b877b246f3a9266493dfc11e276b"
+		},
+		{
+			"ImportPath": "google.golang.org/api/gensupport",
+			"Rev": "f6ba98773d96b877b246f3a9266493dfc11e276b"
+		},
+		{
+			"ImportPath": "google.golang.org/api/googleapi",
+			"Rev": "f6ba98773d96b877b246f3a9266493dfc11e276b"
+		},
+		{
+			"ImportPath": "google.golang.org/appengine",
+			"Rev": "6bde959377a90acb53366051d7d587bfd7171354"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/compute/metadata",
+			"Rev": "fb10e8da373d97f6ba5e648299a10b3b91f14cd5"
+		},
+		{
+			"ImportPath": "google.golang.org/cloud/internal",
+			"Rev": "fb10e8da373d97f6ba5e648299a10b3b91f14cd5"
+		}
+	]
+}

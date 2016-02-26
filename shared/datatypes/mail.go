@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/sendgrid/sendgrid-go"
 )
@@ -136,7 +136,7 @@ func (sg *MailClient) SendBug(err error) {
 	text += fmt.Sprintf("<p>%s</p>", err.Error())
 	text += "</body></html>"
 	if err := sg.Send(subj, text, Admin()); err != nil {
-		log.Error("sending bug report", err)
+		log.Debug("could not send bug report", err)
 	}
 }
 

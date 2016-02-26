@@ -1,8 +1,8 @@
 package dt
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"github.com/dchest/stemmer/porter2"
+	"github.com/itsabot/abot/shared/log"
 )
 
 // Vocab maintains sets of Commands and Objects recognized by packages as well
