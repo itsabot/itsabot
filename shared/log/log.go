@@ -77,7 +77,7 @@ type Logger struct {
 	prefix string
 }
 
-func (l *Logger) New(pkgName string) *Logger {
+func New(pkgName string) *Logger {
 	return &Logger{
 		prefix: fmt.Sprintf("[%s] ", pkgName),
 	}
