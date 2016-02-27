@@ -36,7 +36,7 @@ func initRoutes(e *echo.Echo) {
 	e.Static("/public/js", "public/js")
 	e.Static("/public/images", "assets/images")
 
-	if os.Getenv("AVA_ENV") != "production" {
+	if os.Getenv("ABOT_ENV") != "production" {
 		cmd := e.Group("/_/cmd")
 		initCMDGroup(cmd)
 	}
@@ -132,11 +132,9 @@ func handlerIndex(c *echo.Context) error {
 	var s []byte
 	b := bytes.NewBuffer(s)
 	data := struct {
-		GoogleClientID string
-		IsProd         bool
+		IsProd bool
 	}{
-		GoogleClientID: os.Getenv("GOOGLE_CLIENT_ID"),
-		IsProd:         os.Getenv("AVA_ENV") == "production",
+		IsProd: os.Getenv("ABOT_ENV") == "production",
 	}
 	if err := tmplLayout.Execute(b, data); err != nil {
 		return err
@@ -355,7 +353,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	tmp := uuid.NewV4().Bytes()
 	resp.ID = uid
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
-	if os.Getenv("AVA_ENV") == "production" {
+	if os.Getenv("ABOT_ENV") == "production" {
 		fName := strings.Fields(req.Name)[0]
 		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
 		msg += "How can I help? Try asking me to help you find a nice bottle of wine."

@@ -105,7 +105,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 func ConnectDB() (*sqlx.DB, error) {
 	var db *sqlx.DB
 	var err error
-	if os.Getenv("AVA_ENV") == "production" {
+	if os.Getenv("ABOT_ENV") == "production" {
 		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
 	} else {
 		db, err = sqlx.Connect("postgres",

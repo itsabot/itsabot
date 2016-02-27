@@ -117,6 +117,6 @@ func checkRequiredEnvVars() error {
 	if l < 4 || base[0:4] != "http" {
 		return errors.New("ABOT_URL invalid. Must include http/https")
 	}
-	// TODO Check for ABOT_DATABASE_URL if AVA_ENV==production
+	// TODO Check for ABOT_DATABASE_URL if ABOT_ENV==production
 	return nil
 }
