@@ -9,9 +9,9 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
+	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/pkg"
-	"github.com/itsabot/abot/shared/websocket"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
