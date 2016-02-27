@@ -110,7 +110,7 @@ func GetPkg(db *sqlx.DB, m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	if err != nil && err != sql.ErrNoRows {
 		return nil, "", false, err
 	}
-	log.Debug("found user's last route: %q\n", prevRoute)
+	log.Debugf("found user's last route: %q\n", prevRoute)
 
 	// Iterate over all command/object pairs and see if any package has been
 	// registered for the resulting route
