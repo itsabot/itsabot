@@ -1,7 +1,6 @@
 package websocket
 
 import (
-	"errors"
 	"runtime"
 	"sync"
 	"time"
@@ -53,7 +52,8 @@ func (as AtomicWebSocketSet) NotifySockets(c *echo.Context, uid uint64, cmd,
 
 	s := as.Get(uid)
 	if s == nil {
-		return errors.New("socket doesn't exist")
+		// Trainer is not online.
+		return nil
 	}
 	t := time.Now()
 	data := []struct {
