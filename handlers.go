@@ -52,8 +52,6 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
-	e.Post("/api/cards.json", handlerAPICardSubmit)
-	e.Delete("/api/cards.json", handlerAPICardDelete)
 	e.Get("/api/message.json", handlerAPIConversationsShow)
 	e.Post("/api/messages.json", handlerAPIMessagesCreate)
 	e.Get("/api/messages.json", handlerAPIMessages)

@@ -2,6 +2,8 @@
 // used by package payment.
 package driver
 
+import "github.com/itsabot/abot/shared/datatypes"
+
 // Driver is the interface that must be implemented by a payment driver.
 type Driver interface {
 	// Open returns a new connection to the payment server. The name is a
@@ -13,7 +15,7 @@ type Driver interface {
 type Conn interface {
 	// Charge a customer for something. The isoCurrency is the currency in
 	// its 3-letter ISO code.
-	Send(amountInCents uint64, isoCurrency string, user *User) error
+	Send(amountInCents uint64, isoCurrency string, user *dt.User) error
 
 	// Close the connection.
 	Close() error
