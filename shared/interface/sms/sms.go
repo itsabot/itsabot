@@ -4,9 +4,11 @@
 package sms
 
 import (
-	"database/sql/driver"
+	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/itsabot/abot/shared/interface/sms/driver"
 )
 
 var driversMu sync.RWMutex
@@ -36,4 +38,36 @@ func Drivers() []string {
 	}
 	sort.Strings(list)
 	return list
+}
+
+type Conn struct {
+	driver driver.Driver
+	conn   driver.Conn
+}
+
+func Open(driverName, auth string) (*Conn, error) {
+	driversMu.RLock()
+	driveri, ok := drivers[driverName]
+	driversMu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("sms: unknown driver %q (forgotten import?)",
+			driverName)
+	}
+	conn, err := driveri.Open(auth)
+	if err != nil {
+		return nil, err
+	}
+	c := &Conn{
+		driver: driveri,
+		conn:   conn,
+	}
+	return c, nil
+}
+
+func (c *Conn) Send(from, to, msg string) error {
+	return c.conn.Send(from, to, msg)
+}
+
+func (c *Conn) Driver() driver.Driver {
+	return c.driver
 }

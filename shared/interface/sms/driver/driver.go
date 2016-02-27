@@ -8,10 +8,17 @@ type Driver interface {
 	// in a driver-specific format.
 	Open(name string) (Conn, error)
 
-	// SetKeys saves the keys used by an external SMS service in an HTTP
-	// request to Abot. These keys are used to retrieve the contents of To,
-	// From, and Message from that HTTP request.
-	SetKeys(to, from, msg string)
+	// FromKey is the key in an SMS service's request that contains the
+	// From telephone number.
+	FromKey() string
+
+	// ToKey is the key in an SMS service's request that contains the
+	// To telephone number.
+	ToKey() string
+
+	// MsgKey is the key in an SMS service's request that contains the
+	// content of the message.
+	MsgKey() string
 }
 
 // Conn is a connection to the external SMS service.
@@ -26,7 +33,17 @@ type Conn interface {
 
 // SMS defines an interface with basic getters to interact with an SMS message.
 type SMS interface {
-	To() string
+	// From is the sending phone number.
 	From() string
+
+	// To are all of the receiving phone numbers.
+	To() []string
+
+	// Content is the body of the message. Currently there is no support for
+	// MMS, but we'd like to add it.
 	Content() string
+}
+
+type PhoneNumber interface {
+	Valid() bool
 }
