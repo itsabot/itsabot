@@ -99,15 +99,15 @@ func startServer() error {
 	e := echo.New()
 	initRoutes(e)
 	log.Info("booted ava http server")
-	e.Run(":" + os.Getenv("ABOT_PORT"))
+	e.Run(":" + os.Getenv("PORT"))
 	return nil
 }
 
 func checkRequiredEnvVars() error {
-	port := os.Getenv("ABOT_PORT")
+	port := os.Getenv("PORT")
 	_, err := strconv.Atoi(port)
 	if err != nil {
-		return errors.New("ABOT_PORT is not set to an integer")
+		return errors.New("PORT is not set to an integer")
 	}
 	base := os.Getenv("ABOT_URL")
 	l := len(base)
