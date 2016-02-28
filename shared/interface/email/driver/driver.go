@@ -6,15 +6,13 @@ import (
 	"time"
 
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/jmoiron/sqlx"
 )
 
 // Driver is the interface that must be implemented by an email driver.
 type Driver interface {
 	// Open returns a new connection to the email server. The name is a
-	// string in a driver-specific format. A database connection is passed
-	// in to enable the driver to retrieve existing auth tokens.
-	Open(db *sqlx.DB, name string) (Conn, error)
+	// string in a driver-specific format, often for authentication.
+	Open(name string) (Conn, error)
 }
 
 // Conn is a connection to the external email service.

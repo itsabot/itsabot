@@ -1,15 +1,16 @@
-// Package email enables Abot to send and receive email through any external
-// service. It implements a standardized interface through which Gmail, Outlook
-// and more can be supported. It's up to individual drivers to add support for
-// each of these email services.
-package email
+// Package emailsender enables Abot to send email through any external service.
+// It implements a standardized interface through which Sendgrid and more can
+// be supported. It's up to individual drivers to add support for each of these
+// email sending services. To both send and receive emails, use interface/email
+// instead.
+package emailsender
 
 import (
 	"fmt"
 	"sort"
 	"sync"
 
-	"github.com/itsabot/abot/shared/interface/email/driver"
+	"github.com/itsabot/abot/shared/interface/emailsender/driver"
 )
 
 var driversMu sync.RWMutex
@@ -65,8 +66,12 @@ func Open(driverName, auth string) (*Conn, error) {
 	return c, nil
 }
 
-func (c *Conn) Send(from, to, html string) error {
-	return c.conn.Send(from, to, html)
+func (c *Conn) SendHTML(to []string, from, subj, html string) error {
+	return c.conn.SendHTML(to, from, subj, html)
+}
+
+func (c *Conn) SendPlainText(to []string, from, subj, plaintext string) error {
+	return c.conn.SendPlainText(to, from, subj, plaintext)
 }
 
 func (c *Conn) Driver() driver.Driver {
