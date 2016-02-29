@@ -5,9 +5,13 @@
 package payment
 
 import (
-	"database/sql/driver"
+	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/itsabot/abot/shared/interface/payment/driver"
+	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo"
 )
 
 var driversMu sync.RWMutex
@@ -37,4 +41,34 @@ func Drivers() []string {
 	}
 	sort.Strings(list)
 	return list
+}
+
+type Conn struct {
+	driver driver.Driver
+	conn   driver.Conn
+}
+
+func Open(driverName string, db *sqlx.DB, e *echo.Echo, auth string) (*Conn,
+	error) {
+
+	driversMu.RLock()
+	driveri, ok := drivers[driverName]
+	driversMu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("sms: unknown driver %q (forgotten import?)",
+			driverName)
+	}
+	conn, err := driveri.Open(db, e, auth)
+	if err != nil {
+		return nil, err
+	}
+	c := &Conn{
+		driver: driveri,
+		conn:   conn,
+	}
+	return c, nil
+}
+
+func (c *Conn) Driver() driver.Driver {
+	return c.driver
 }

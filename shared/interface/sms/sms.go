@@ -64,10 +64,10 @@ func Open(driverName, auth string) (*Conn, error) {
 	return c, nil
 }
 
-func (c *Conn) Send(from, to, msg string) error {
-	return c.conn.Send(from, to, msg)
-}
-
 func (c *Conn) Driver() driver.Driver {
 	return c.driver
+}
+
+func (c *Conn) Send(from, to, msg string) error {
+	return c.conn.Send(from, to, msg)
 }

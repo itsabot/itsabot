@@ -18,7 +18,7 @@ type User struct {
 	Name                     string
 	Email                    string
 	LocationID               int
-	StripeCustomerID         string
+	PaymentServiceID         string
 	AuthorizationID          sql.NullInt64
 	LastAuthenticated        *time.Time
 	LastAuthenticationMethod AuthMethod

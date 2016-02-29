@@ -16,6 +16,17 @@ type Card struct {
 	ExpMonth       int
 	ExpYear        int
 	Brand          string
-	StripeID       string
+	ServiceToken   string
 	Zip5Hash       []byte `sql:"zip5hash"`
+}
+
+// CardParams is used when saving a new card.
+type CardParams struct {
+	ServiceToken   string
+	CardholderName string
+	Last4          string
+	Brand          string
+	ExpMonth       int
+	ExpYear        int
+	AddressZip     string
 }

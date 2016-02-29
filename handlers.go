@@ -180,12 +180,12 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	c.Set("uid", c.Form("uid"))
 	msg, err := core.Preprocess(db, ner, c)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	pkg, route, _, err := core.GetPkg(db, msg)
 	if err != nil {
 		log.Debug("could not get core package", err)
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	msg.Route = route
 	if pkg == nil {
@@ -196,12 +196,12 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	ret, err := core.CallPkg(pkg, msg, false)
 	if err != nil {
 		log.Debug("could not call package", err)
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if len(ret) == 0 {
 		tmp := fmt.Sprintf("%s %s", "missing trigger/pkg for cmd",
 			c.Get("cmd"))
-		return jsonError(errors.New(tmp))
+		return core.JSONError(errors.New(tmp))
 	}
 	m := &dt.Msg{}
 	m.AvaSent = true
@@ -212,13 +212,13 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	}
 	if err = m.Save(db); err != nil {
 		log.Debug("could not save Abot response message", err)
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	resp := struct {
 		Msg string
 	}{Msg: ret}
 	if err = c.JSON(http.StatusOK, resp); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -231,7 +231,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		Password string
 	}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var u struct {
 		ID       int
@@ -241,19 +241,19 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	q := `SELECT id, password, trainer FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
-		return jsonError(errInvalidUserPass)
+		return core.JSONError(errInvalidUserPass)
 	} else if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if u.ID == 0 {
-		return jsonError(errInvalidUserPass)
+		return core.JSONError(errInvalidUserPass)
 	}
 	err = bcrypt.CompareHashAndPassword(u.Password, []byte(req.Password))
 	if err == bcrypt.ErrMismatchedHashAndPassword ||
 		err == bcrypt.ErrHashTooShort {
-		return jsonError(errInvalidUserPass)
+		return core.JSONError(errInvalidUserPass)
 	} else if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var resp struct {
 		ID           int
@@ -266,7 +266,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -281,25 +281,25 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		FID      string
 	}{}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 
 	// validate the request parameters
 	if len(req.Name) == 0 {
-		return jsonError(errors.New("You must enter a name."))
+		return core.JSONError(errors.New("You must enter a name."))
 	}
 	if len(req.Email) == 0 || !strings.ContainsAny(req.Email, "@") ||
 		!strings.ContainsAny(req.Email, ".") {
-		return jsonError(errors.New("You must enter a valid email."))
+		return core.JSONError(errors.New("You must enter a valid email."))
 	}
 	if len(req.Password) < 8 {
-		return jsonError(errors.New(
+		return core.JSONError(errors.New(
 			"Your password must be at least 8 characters."))
 	}
 	// TODO use new SMS interface
 	/*
 		if err := validatePhone(req.FID); err != nil {
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 	*/
 
@@ -307,13 +307,13 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	// TODO format phone number for SMS interface (international format)
 	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 
 	// Begin DB access
 	tx, err := db.Beginx()
 	if err != nil {
-		return jsonError(errors.New("Something went wrong. Try again."))
+		return core.JSONError(errors.New("Something went wrong. Try again."))
 	}
 
 	q := `INSERT INTO users (name, email, password, locationid)
@@ -324,11 +324,11 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	if err != nil && err.Error() ==
 		`pq: duplicate key value violates unique constraint "users_email_key"` {
 		_ = tx.Rollback()
-		return jsonError(errors.New("Sorry, that email is taken."))
+		return core.JSONError(errors.New("Sorry, that email is taken."))
 	}
 	if uid == 0 {
 		_ = tx.Rollback()
-		return jsonError(errors.New(
+		return core.JSONError(errors.New(
 			"Something went wrong. Please try again."))
 	}
 
@@ -337,11 +337,11 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	_, err = tx.Exec(q, uid, req.FID, 2)
 	if err != nil {
 		_ = tx.Rollback()
-		return jsonError(errors.New(
+		return core.JSONError(errors.New(
 			"Couldn't sign up. Did you use the link sent to you?"))
 	}
 	if err = tx.Commit(); err != nil {
-		return jsonError(errors.New(
+		return core.JSONError(errors.New(
 			"Something went wrong. Please try again."))
 	}
 	// End DB access
@@ -360,13 +360,13 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		// TODO move to the new SMS interface
 		/*
 			if err = sms.SendMessage(tc, req.FID, msg); err != nil {
-				return jsonError(err)
+				return core.JSONError(err)
 			}
 		*/
 	}
 	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -376,7 +376,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 func handlerAPIProfile(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var user struct {
 		Name   string
@@ -404,14 +404,14 @@ func handlerAPIProfile(c *echo.Context) error {
 	q := `SELECT name, email FROM users WHERE id=$1`
 	err = db.Get(&user, q, uid)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q = `SELECT flexid FROM userflexids
 	     WHERE flexidtype=2 AND userid=$1
 	     LIMIT 10`
 	err = db.Select(&user.Phones, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q = `SELECT id, cardholdername, last4, expmonth, expyear, brand
 	     FROM cards
@@ -419,7 +419,7 @@ func handlerAPIProfile(c *echo.Context) error {
 	     LIMIT 10`
 	err = db.Select(&user.Cards, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q = `SELECT id, name, line1, line2, city, state, country, zip
 	     FROM addresses
@@ -427,10 +427,10 @@ func handlerAPIProfile(c *echo.Context) error {
 	     LIMIT 10`
 	err = db.Select(&user.Addresses, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if err = c.JSON(http.StatusOK, user); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -450,12 +450,12 @@ func handlerAPIProfileView(c *echo.Context) error {
 		UserID uint64
 	}{}
 	if err = c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q := `SELECT authorizationid FROM users WHERE id=$1`
 	var authID sql.NullInt64
 	if err = db.Get(&authID, q, req.UserID); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if !authID.Valid {
 		goto Response
@@ -463,12 +463,12 @@ func handlerAPIProfileView(c *echo.Context) error {
 	q = `UPDATE authorizations SET authorizedat=$1 WHERE id=$2`
 	_, err = db.Exec(q, time.Now(), authID)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 Response:
 	err = c.JSON(http.StatusOK, nil)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -480,31 +480,31 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 		Email string
 	}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var user dt.User
 	q := `SELECT id, name, email FROM users WHERE email=$1`
 	err := db.Get(&user, q, req.Email)
 	if err == sql.ErrNoRows {
-		return jsonError(errors.New("Sorry, there's no record of that email. Are you sure that's the email you used to sign up with and that you typed it correctly?"))
+		return core.JSONError(errors.New("Sorry, there's no record of that email. Are you sure that's the email you used to sign up with and that you typed it correctly?"))
 	}
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	secret := randSeq(40)
 	q = `INSERT INTO passwordresets (userid, secret) VALUES ($1, $2)`
 	if _, err := db.Exec(q, user.ID, secret); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	// TODO implement mail interface
 	/*
 		h := template.ForgotPasswordEmail(user.Name, secret)
 		if err := mc.Send("Password reset", h, &user); err != nil {
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 	*/
 	if err = c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -519,10 +519,10 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 		Password string
 	}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if len(req.Password) < 8 {
-		return jsonError(errors.New("Your password must be at least 8 characters"))
+		return core.JSONError(errors.New("Your password must be at least 8 characters"))
 	}
 	userid := uint64(0)
 	q := `SELECT userid FROM passwordresets
@@ -530,32 +530,32 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	            createdat >= CURRENT_TIMESTAMP - interval '30 minutes'`
 	err := db.Get(&userid, q, req.Secret)
 	if err == sql.ErrNoRows {
-		return jsonError(errors.New("Sorry, that information doesn't match our records."))
+		return core.JSONError(errors.New("Sorry, that information doesn't match our records."))
 	}
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	tx, err := db.Begin()
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q = `UPDATE users SET password=$1 WHERE id=$2`
 	if _, err = tx.Exec(q, hpw, userid); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q = `DELETE FROM passwordresets WHERE secret=$1`
 	if _, err = tx.Exec(q, req.Secret); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if err = tx.Commit(); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -579,10 +579,10 @@ func handlerAPIMessages(c *echo.Context) error {
 	      LIMIT 25`
 	err := db.Select(&msgs, q)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	if err = c.JSON(http.StatusOK, msgs); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -592,7 +592,7 @@ func handlerAPIMessages(c *echo.Context) error {
 func handlerAPIConversationsComplete(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	q := `UPDATE messages SET needstraining=FALSE WHERE userid=$1`
 	_, err = db.Exec(q, uid)
@@ -605,7 +605,7 @@ func handlerAPIConversationsComplete(c *echo.Context) error {
 func handlerAPIConversationsShow(c *echo.Context) error {
 	uid, err := strconv.Atoi(c.Query("uid"))
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var ret []struct {
 		Sentence  string
@@ -618,12 +618,12 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	      ORDER BY createdat DESC
 	      LIMIT 10`
 	if err := db.Select(&ret, q, uid); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var username string
 	q = `SELECT name FROM users WHERE id=$1`
 	if err := db.Get(&username, q, uid); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	// reverse order of messages for display
 	for i, j := 0, len(ret)-1; i < j; i, j = i+1, j-1 {
@@ -640,7 +640,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	}
 	err = db.Select(&prefsTmp, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var prefs []string
 	for _, p := range prefsTmp {
@@ -652,7 +652,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	     WHERE label='gcal_token' AND userid=$1 AND token IS NOT NULL`
 	err = db.Select(&tmp, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	cals := []string{}
 	if len(tmp) > 0 {
@@ -665,7 +665,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	q = `SELECT name, line1 FROM addresses WHERE userid=$1`
 	err = db.Select(&addrsTmp, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var addrs []string
 	for _, addr := range addrsTmp {
@@ -683,7 +683,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 	q = `SELECT brand, last4 FROM cards WHERE userid=$1`
 	err = db.Select(&cardsTmp, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var cards []string
 	for _, card := range cardsTmp {
@@ -710,7 +710,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 		Cards:       cards,
 	}
 	if err := c.JSON(http.StatusOK, resp); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -723,7 +723,7 @@ func handlerAPIMessagesCreate(c *echo.Context) error {
 		UserID   uint64
 	}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	// TODO record the last flextype used and send the user a response via
 	// that. e.g. if message was received from a secondary phone number,
@@ -732,26 +732,26 @@ func handlerAPIMessagesCreate(c *echo.Context) error {
 	var fid string
 	q := `SELECT flexid FROM userflexids WHERE flexidtype=2 AND userid=$1`
 	if err := db.Get(&fid, q, req.UserID); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	var id uint64
 	q = `INSERT INTO messages
 	     (userid, sentence, avasent) VALUES ($1, $2, TRUE) RETURNING id`
 	err := db.QueryRowx(q, req.UserID, req.Sentence).Scan(&id)
 	if err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	/*
 		if err = sms.SendMessage(tc, fid, req.Sentence); err != nil {
 			q = `DELETE FROM messages WHERE id=$1`
 			if _, err = db.Exec(q, id); err != nil {
-				return jsonError(err)
+				return core.JSONError(err)
 			}
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 	*/
 	if err := c.JSON(http.StatusOK, nil); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	return nil
 }
@@ -766,10 +766,10 @@ func handlerAPIContactsConversationsCreate(c *echo.Context) error {
 		ContactMethod string
 	}
 	if err := c.Bind(&req); err != nil {
-		return jsonError(err)
+		return core.JSONError(err)
 	}
 	// TODO insert into contact's messages, send message
-	return jsonError(errors.New("ContactsConversationsCreate not implemented"))
+	return core.JSONError(errors.New("ContactsConversationsCreate not implemented"))
 }
 
 // handlerAPIContactsSearch provides a way to query for contacts using full-text
@@ -780,20 +780,20 @@ func handlerAPIContactsSearch(c *echo.Context) error {
 	/*
 		uid, err := strconv.Atoi(c.Query("UserID"))
 		if err != nil {
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 		var results []dt.Contact
 		q := `SELECT name, email, phone FROM contacts
 		      WHERE userid=$1 AND name ILIKE $2`
 		term := "%" + c.Query("Query") + "%"
 		if err := db.Select(&results, q, uid, term); err != nil {
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 		if err := c.JSON(http.StatusOK, results); err != nil {
-			return jsonError(err)
+			return core.JSONError(err)
 		}
 	*/
-	return jsonError(errors.New("not implemented"))
+	return core.JSONError(errors.New("not implemented"))
 }
 
 // handlerWSConversations establishes a socket connection for the training
@@ -822,13 +822,6 @@ func handlerError(err error, c *echo.Context) {
 	log.Debug("failed handling", err)
 	// TODO implement mail interface
 	// mc.SendBug(err)
-}
-
-// jsonError builds a simple JSON message from an error type in the format of
-// { "Msg": err.Error() }
-func jsonError(err error) error {
-	tmp := strings.Replace(err.Error(), `"`, "'", -1)
-	return errors.New(`{"Msg":"` + tmp + `"}`)
 }
 
 // randSeq generates a random string of letters to provide a secure password

@@ -2,20 +2,36 @@
 // used by package payment.
 package driver
 
-import "github.com/itsabot/abot/shared/datatypes"
+import (
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo"
+)
 
 // Driver is the interface that must be implemented by a payment driver.
 type Driver interface {
-	// Open returns a new connection to the payment server. The name is a
-	// string in a driver-specific format.
-	Open(name string) (Conn, error)
+	// Open returns a new connection to the payment server. The echo router
+	// is included to drivers to extend routes at runtime. The database
+	// connection allows the implementation to set and retrieve
+	// User.PaymentServiceID in the database.The name is a string in a
+	// driver-specific format.
+	Open(db *sqlx.DB, e *echo.Echo, name string) (Conn, error)
 }
 
 // Conn is a connection to the external payment service.
 type Conn interface {
+	// SaveCard saves limited information about the card to the Cards table
+	// in the database including a hashed zipcode and a payment service card
+	// token. Returns the ID of the newly created card from the database.
+	SaveCard(params *dt.CardParams, user *dt.User) (cardID uint64, err error)
+
 	// Charge a customer for something. The isoCurrency is the currency in
 	// its 3-letter ISO code.
-	Send(amountInCents uint64, isoCurrency string, user *dt.User) error
+	ChargeCard(cardID uint64, amountInCents uint64, isoCurrency string) error
+
+	// RegisterUser on the external payment service, saving the customer
+	// identifying token to User.PaymentServiceID in the database.
+	RegisterUser(user *dt.User) error
 
 	// Close the connection.
 	Close() error
