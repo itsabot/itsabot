@@ -2,4 +2,4 @@
 
 set -e
 
-ls db/migrations/up/*.sql | xargs -I{} -- psql -U postgres ava -f {}
+ls db/migrations/up/*.sql | xargs -I{} -- psql -U postgres abot -f {}
