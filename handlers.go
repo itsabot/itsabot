@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -23,9 +22,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/websocket"
 )
-
-var letters = []rune(
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
@@ -822,14 +818,4 @@ func handlerError(err error, c *echo.Context) {
 	log.Debug("failed handling", err)
 	// TODO implement mail interface
 	// mc.SendBug(err)
-}
-
-// randSeq generates a random string of letters to provide a secure password
-// reset token.
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }

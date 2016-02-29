@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"log"
+	"os"
 )
 
 var debugprefix = "DEBUG: "
@@ -75,11 +76,17 @@ func Fatalf(format string, v ...interface{}) {
 // prefix of the package name with each log and follows the convention of.
 type Logger struct {
 	prefix string
+	logger *log.Logger
 }
 
 func New(pkgName string) *Logger {
+	lg := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+	if len(pkgName) == 0 {
+		return &Logger{logger: lg}
+	}
 	return &Logger{
 		prefix: fmt.Sprintf("[%s] ", pkgName),
+		logger: lg,
 	}
 }
 
@@ -99,13 +106,17 @@ func (l *Logger) Info(v ...interface{}) {
 
 func (l *Logger) Infof(format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
-	log.Print(msg)
+	l.logger.Printf(msg)
 }
 
 func (l *Logger) Fatal(v ...interface{}) {
-	l.Fatalf("%s", l.prefix+fmt.Sprintln(v...))
+	l.logger.Fatalf("%s", l.prefix+fmt.Sprintln(v...))
 }
 
 func (l *Logger) Fatalf(format string, v ...interface{}) {
-	log.Fatalf(format, v...)
+	l.logger.Fatalf(format, v...)
+}
+
+func (l *Logger) SetFlags(flag int) {
+	l.logger.SetFlags(flag)
 }
