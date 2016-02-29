@@ -109,7 +109,7 @@ func ConnectDB() (*sqlx.DB, error) {
 		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
 	} else {
 		db, err = sqlx.Connect("postgres",
-			"user=postgres dbname=ava sslmode=disable")
+			"user=postgres dbname=abot sslmode=disable")
 	}
 	return db, err
 }
