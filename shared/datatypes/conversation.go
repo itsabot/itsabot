@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
-	"errors"
 	"strings"
 	"time"
 
@@ -34,19 +33,6 @@ type Msg struct {
 	Tokens []string
 	Route  string
 }
-
-type Feedback struct {
-	Id        uint64
-	Sentence  string
-	Sentiment int
-	CreatedAt time.Time
-}
-
-const (
-	SentimentNegative = -1
-	SentimentNeutral  = 0
-	SentimentPositive = 1
-)
 
 func (j *jsonState) Scan(value interface{}) error {
 	if err := json.Unmarshal(value.([]byte), *j); err != nil {
@@ -158,23 +144,6 @@ func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
 	}
 	msg.User = m.User
 	return &msg, nil
-}
-
-func (m *Msg) GetLastState(db *sqlx.DB) error {
-	var state []byte
-	q := `SELECT state FROM states WHERE pkgname=$1`
-	err := db.Get(&state, q, m.Package)
-	if err == sql.ErrNoRows {
-		return errors.New("missing state for package")
-	}
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(state, &m.State)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 /*

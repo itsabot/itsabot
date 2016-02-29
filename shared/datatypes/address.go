@@ -28,6 +28,8 @@ var ErrNoAddress = errors.New("no address")
 
 // GetAddress searches the database for a specific address by its ID.
 func GetAddress(dest *Address, db *sqlx.DB, id uint64) error {
-	q := `SELECT id, line1, line2, city, state, country, zip WHERE id=$1`
+	q := `SELECT id, line1, line2, city, state, country, zip
+	      FROM addresses
+	      WHERE id=$1`
 	return db.Get(dest, q, id)
 }
