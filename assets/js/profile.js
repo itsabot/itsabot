@@ -14,16 +14,15 @@ abot.Profile.controller = function() {
 	}
 	var ctrl = this
 	ctrl.data = function(uid) {
-		return m.request({
+		return abot.request({
 			method: "GET",
-			url: "/api/profile.json?uid=" + uid
+			url: "/api/user/profile.json",
 		})
 	},
-	ctrl.sendView = function(uid) {
-		return m.request({
+	ctrl.sendView = function() {
+		return abot.request({
 			method: "PUT",
-			url: "/api/profile.json",
-			data: { UserID: parseInt(uid, 10) }
+			url: "/api/user/profile.json",
 		})
 	}
 	ctrl.props = {

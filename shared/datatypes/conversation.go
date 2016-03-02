@@ -25,8 +25,8 @@ type Msg struct {
 	Package         string
 	State           map[string]interface{}
 	CreatedAt       *time.Time
-	// AvaSent determines if msg is from the user or Ava
-	AvaSent       bool
+	// AbotSent determines if msg is from the user or Ava
+	AbotSent      bool
 	NeedsTraining bool
 	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
 	// individual words.
@@ -47,7 +47,7 @@ func (j *jsonState) Value() (driver.Value, error) {
 }
 
 func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
-	q := `SELECT id, sentence, avasent
+	q := `SELECT id, sentence, abotsent
 	      FROM messages
 	      WHERE id=$1`
 	m := &Msg{}
@@ -72,10 +72,10 @@ func (m *Msg) Update(db *sqlx.DB /*, mc *MailClient */) error {
 
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, package, route, avasent, needstraining)
+	      (userid, sentence, package, route, abotsent, needstraining)
 	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
-		m.AvaSent, m.NeedsTraining)
+		m.AbotSent, m.NeedsTraining)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (m *Msg) Save(db *sqlx.DB) error {
 func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 	var route string
 	q := `SELECT route FROM messages
-	      WHERE userid=$1 AND avasent IS FALSE
+	      WHERE userid=$1 AND abotsent IS FALSE
 	      ORDER BY createdat DESC`
 	err := db.Get(&route, q, m.User.ID)
 	if err != nil && err != sql.ErrNoRows {
@@ -98,7 +98,7 @@ func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 func (m *Msg) GetLastUserMessage(db *sqlx.DB) error {
 	log.Debug("getting last input")
 	q := `SELECT id, sentence FROM messages
-	      WHERE userid=$1 AND avasent IS FALSE
+	      WHERE userid=$1 AND abotsent IS FALSE
 	      ORDER BY createdat DESC`
 	if err := db.Get(&m.LastUserMsg, q, m.User.ID); err != nil {
 		return err
@@ -131,7 +131,7 @@ func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
 	}
 	q := `SELECT id, route, sentence
 	      FROM messages
-	      WHERE userid=$1 AND avasent IS TRUE
+	      WHERE userid=$1 AND abotsent IS TRUE
 	      ORDER BY createdat DESC`
 	row := db.QueryRowx(q, m.User.ID)
 	var msg Msg

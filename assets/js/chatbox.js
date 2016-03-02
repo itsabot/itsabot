@@ -1,6 +1,6 @@
-(function(ava) {
-ava.Chatbox = {}
-ava.Chatbox.controller = function(_, pctrl) {
+(function(abot) {
+abot.Chatbox = {}
+abot.Chatbox.controller = function(_, pctrl) {
 	var ctrl = this
 	ctrl.handleSend = function(ev) {
 		if (ev.keyCode === 13 /* enter */ && !ev.shiftKey) {
@@ -12,7 +12,7 @@ ava.Chatbox.controller = function(_, pctrl) {
 			// user that's cycled every so often
 			ctrl.send(m.route.param("uid"), sentence).then(function() {
 				// TODO there's a better way to do this...
-				//ctrl.vm.showAvaMsg(sentence)
+				//ctrl.vm.showabotMsg(sentence)
 				pctrl.loadConversation()
 			}, function(err) {
 				// TODO display error to the user
@@ -29,9 +29,9 @@ ava.Chatbox.controller = function(_, pctrl) {
 	ctrl.send = function(uid, sentence) {
 		if (ctrl.props.Contact().length === 0) {
 			// Send to the user
-			return m.request({
+			return abot.request({
 				method: "POST",
-				url: "/api/messages.json",
+				url: "/api/trainer/messages.json",
 				data: {
 					UserID: parseInt(uid),
 					Sentence: sentence,
@@ -57,7 +57,7 @@ ava.Chatbox.controller = function(_, pctrl) {
 		ContactMethod: m.prop(""), // Email or Phone
 	}
 }
-ava.Chatbox.view = function(ctrl, props) {
+abot.Chatbox.view = function(ctrl, props) {
 	if (props == null) {
 		props = {
 			Username: m.prop(""),
@@ -66,21 +66,21 @@ ava.Chatbox.view = function(ctrl, props) {
 		}
 	}
 	return m("div.chat-container", [
-		m.component(ava.Searchbox, props, ctrl),
+		m.component(abot.Searchbox, props, ctrl),
 		m("ol#chat-box.chat-box", {
 			config: ctrl.scrollToBottom,
 		}, props.Messages().map(function(c) {
 			var d = {
 				Username: props.Username(),
 				Sentence: c.Sentence,
-				AvaSent: c.AvaSent,
+				abotSent: c.abotSent,
 				CreatedAt: c.CreatedAt,
 			}
-			return m.component(ava.ChatboxItem, d)
+			return m.component(abot.ChatboxItem, d)
 		})),
 		m("textarea.chat-textarea[rows=4][placeholder=Your message]", {
 			onkeydown: ctrl.handleSend,
 		})
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

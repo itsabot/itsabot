@@ -1,15 +1,15 @@
-(function(ava) {
-ava.ChatboxItem = {}
-ava.ChatboxItem.view = function(_, props) {
-	var c = props.AvaSent ? "chat-ava" : "chat-user"
-	var u = props.AvaSent ? "Ava" : props.Username
-	return m("li.c", [
+(function(abot) {
+abot.ChatboxItem = {}
+abot.ChatboxItem.view = function(_, props) {
+	var c = props.abotSent ? "chat-abot" : "chat-user"
+	var u = props.abotSent ? "abot" : props.Username
+	return m("li", { class: c }, [
 		m(".messages", [
 			m("p", props.Sentence),
 			m("time", {
 				datetime: props.CreatedAt
-			}, u + " • " + ava.prettyDate(props.CreatedAt))
+			}, u + " • " + abot.prettyDate(props.CreatedAt))
 		])
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

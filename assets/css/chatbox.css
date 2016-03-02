@@ -1,0 +1,39 @@
+.chat-container {
+	width: 30%;
+	display: inline-block;
+	vertical-align: top;
+}
+.chat-container .chat-box {
+	max-width: 100%;
+	border: 1px solid #aaa;
+	background-color: #ddd;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	height: 400px;
+	overflow-y: auto;
+}
+.chat-container .chat-box .chat-user {
+	float: left;
+}
+.chat-container .chat-box .chat-abot {
+	float: right;
+}
+.chat-container .chat-box .messages p {
+	font-size: 1em;
+	background-color: white;
+	padding: 1em;
+	margin: 0.5em;
+}
+.chat-container .chat-box .messages time {
+	margin-right: 1em;
+	margin-bottom: 1em;
+	font-size: 0.8em;
+	color: #666;
+	text-align: right;
+	display: block;
+}
+.chat-container .chat-textarea {
+	width: 100%;
+	border-top: none;
+}

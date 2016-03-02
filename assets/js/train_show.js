@@ -1,11 +1,11 @@
-(function(ava) {
-ava.TrainShow = {}
-ava.TrainShow.controller = function() {
-	if (!ava.isLoggedIn()) {
+(function(abot) {
+abot.TrainShow = {}
+abot.TrainShow.controller = function() {
+	if (!abot.isLoggedIn()) {
 		m.route("/login?r=" + encodeURIComponent(window.location.search))
 		return
 	}
-	if (!ava.isTrainer()) {
+	if (!abot.isTrainer()) {
 		m.route("/profile")
 		return
 	}
@@ -18,12 +18,12 @@ ava.TrainShow.controller = function() {
 	var sockInterval
 	var ctrl = this
 	ctrl.connectSocket = function() {
-		ava.socket = new WebSocket(uri)
-		ava.socket.onopen = function() {
+		abot.socket = new WebSocket(uri)
+		abot.socket.onopen = function() {
 			console.log("opened socket")
 			clearInterval(sockInterval)
 		}
-		ava.socket.onmessage = function(ev) {
+		abot.socket.onmessage = function(ev) {
 			console.log("message received")
 			try { var msgs = JSON.parse(ev.data) } catch(err) { return }
 			for (var i = 0; i < msgs.length; ++i) {
@@ -31,7 +31,7 @@ ava.TrainShow.controller = function() {
 			}
 			m.redraw(true)
 		}
-		ava.socket.onclose = function() {
+		abot.socket.onclose = function() {
 			console.log("socket closed, setting retry interval")
 			sockInterval = setInterval(function() {
 				console.log("retrying socket...")
@@ -43,9 +43,9 @@ ava.TrainShow.controller = function() {
 	id = m.route.param("id")
 	uid = cookie.getItem("id")
 	ctrl.loadConversation = function() {
-		m.request({
+		abot.request({
 			method: "GET",
-			url: "/api/message.json?id=" + id + "&uid=" + uid
+			url: "/api/trainer/message.json?id=" + id
 		}).then(function(resp) {
 			ctrl.props.Messages(resp.Chats)
 			ctrl.props.Username(resp.Username)
@@ -69,9 +69,9 @@ ava.TrainShow.controller = function() {
 	ctrl.confirmComplete = function() {
 		if (confirm("Are you sure you want to mark the conversation as complete? You won't be able to message the user again.")) {
 			var userId = cookie.getItem("id")
-			m.request({
+			abot.request({
 				method: "PATCH",
-				url: "/api/conversation.json?uid=" + userId,
+				url: "/api/trainer/conversation.json?uid=" + userId,
 			}).then(function() {
 				m.route("/train?trained=true")
 			}, function(err) {
@@ -81,9 +81,9 @@ ava.TrainShow.controller = function() {
 	}
 	ctrl.confirmAddCalendar = function() {
 		if (confirm("Are you sure you want to have the user add a calendar?")) {
-			m.request({
+			abot.request({
 				method: "POST",
-				url: "/api/trigger.json?cmd=add calendar&uid=" + cookie.getItem("id"),
+				url: "/api/trainer/trigger.json?cmd=add calendar&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				ctrl.loadConversation()
 			}, function(err) {
@@ -93,9 +93,9 @@ ava.TrainShow.controller = function() {
 	}
 	ctrl.confirmAddCreditCard = function() {
 		if (confirm("Are you sure you want to have the user add a credit card?")) {
-			m.request({
+			abot.request({
 				method: "POST",
-				url: "/api/trigger.json?cmd=add credit card&uid=" + cookie.getItem("id"),
+				url: "/api/trainer/trigger.json?cmd=add credit card&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				ctrl.loadConversation()
 			}, function(err) {
@@ -105,9 +105,9 @@ ava.TrainShow.controller = function() {
 	}
 	ctrl.confirmAddShippingAddr = function() {
 		if (confirm("Are you sure you want to have the user add a shipping address?")) {
-			m.request({
+			abot.request({
 				method: "POST",
-				url: "/api/trigger.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
+				url: "/api/trainer/trigger.json?cmd=add shipping address&uid=" + cookie.getItem("id"),
 			}).then(function(res) {
 				m.route("/train/" + m.route.param("id") +
 						"?uid=" + cookie.getItem("id"))
@@ -127,42 +127,37 @@ ava.TrainShow.controller = function() {
 	}
 	ctrl.loadConversation()
 }
-ava.TrainShow.view = function(ctrl) {
-	return m(".body", [
-		m.component(ava.Header),
-		ava.TrainShow.viewFull(ctrl),
-		m.component(ava.Footer)
+abot.TrainShow.view = function(ctrl) {
+	return m(".main", [
+		m.component(abot.Header),
+		abot.TrainShow.viewFull(ctrl),
 	])
 }
-ava.TrainShow.viewFull = function(ctrl) {
-	return m("#full.container", [
-		m(".row", [
-			m(".col-md-12", [
-				m(".pull-right margin-top-sm", [
-					m("a[href=#/]", {
-						onclick: ctrl.newChatWindow,
-						class: "btn btn-xs"
-					}, "New conversation"),
-					m("button[href=#/]", {
-						onclick: ctrl.confirmComplete,
-						class: "btn btn-primary btn-sm margin-left"
-					}, "Mark Complete")
-				]),
-				m("h1", "Training")
-			])
+abot.TrainShow.viewFull = function(ctrl) {
+	return m("#full", [
+		m(".pull-right margin-top-sm", [
+			m("a[href=#/]", {
+				onclick: ctrl.newChatWindow,
+				class: "btn btn-xs"
+			}, "New conversation"),
+			m("button[href=#/]", {
+				onclick: ctrl.confirmComplete,
+				class: "btn btn-primary btn-sm margin-left"
+			}, "Mark Complete")
 		]),
+		m("h1", "Training"),
 		m(".row.margin-top-sm", [
-			m(".col-md-4", m.component(ava.Chatbox, ctrl.props, ctrl)),
+			m.component(abot.Chatbox, ctrl.props, ctrl),
 			function() {
 				var windows = []
 				for (var i = 1; i < ctrl.props.chatWindowsOpen(); ++i) {
 					windows.push(
-						m(".col-md-4", m.component(ava.Chatbox, null, ctrl)))
+						m(".col-md-4", m.component(abot.Chatbox, null, ctrl)))
 				}
 				return windows
 			}(),
-			m(".col-md-4.options", [
-				m("h4", "Quick Functions"),
+			m(".train-show-options", [
+				m("h4.train-show-options-title", "Quick Functions"),
 				m("ul.list-unstyled", [
 					m("li", [
 						m("a[href=#/]", {
@@ -173,7 +168,7 @@ ava.TrainShow.viewFull = function(ctrl) {
 						}, [
 							function() {
 								if (ctrl.props.Calendars().length > 0) {
-									return m.component(ava.CalendarSelector, ctrl.props)
+									return m.component(abot.CalendarSelector, ctrl.props)
 								}
 								return m("div", "Please connect a calendar")
 							}()
@@ -240,4 +235,4 @@ ava.TrainShow.viewFull = function(ctrl) {
 		])
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha512"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -18,14 +22,22 @@ import (
 	"github.com/itsabot/abot/shared/log"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
-	"github.com/satori/go.uuid"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/websocket"
 )
 
+const bearerAuthKey = "Bearer"
+
+type authHeader struct {
+	ID       uint64
+	Email    string
+	Scopes   []string
+	IssuedAt int64
+}
+
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
-	e.SetHTTPErrorHandler(handlerError)
+	//e.SetHTTPErrorHandler(handlerError)
 	e.SetDebug(true)
 
 	e.Static("/public/css", "public/css")
@@ -39,23 +51,31 @@ func initRoutes(e *echo.Echo) {
 
 	// Web routes
 	e.Get("/*", handlerIndex)
-
-	// API routes
 	e.Post("/", handlerMain)
-	e.Get("/api/profile.json", handlerAPIProfile)
-	e.Put("/api/profile.json", handlerAPIProfileView)
+
+	// API routes (no restrictions)
 	e.Post("/api/login.json", handlerAPILoginSubmit)
+	e.Post("/api/logout.json", handlerAPILogoutSubmit)
 	e.Post("/api/signup.json", handlerAPISignupSubmit)
 	e.Post("/api/forgot_password.json", handlerAPIForgotPasswordSubmit)
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
-	e.Get("/api/message.json", handlerAPIConversationsShow)
-	e.Post("/api/messages.json", handlerAPIMessagesCreate)
-	e.Get("/api/messages.json", handlerAPIMessages)
-	e.Patch("/api/conversation.json", handlerAPIConversationsComplete)
-	e.Post("/api/contacts/conversations.json",
+
+	// API routes (restricted by login)
+	api := e.Group("/api/user", authLoggedIn(), validateCSRF())
+	api.Get("/profile.json", handlerAPIProfile)
+	api.Put("/profile.json", handlerAPIProfileView)
+
+	// API routes (restricted to trainers)
+	apiTrainer := e.Group("/api/trainer", authLoggedIn(), authTrainer(),
+		validateCSRF())
+	apiTrainer.Get("/message.json", handlerAPIConversationsShow)
+	apiTrainer.Get("/messages.json", handlerAPIMessages)
+	apiTrainer.Get("/contacts/search.json", handlerAPIContactsSearch)
+	apiTrainer.Post("/trigger.json", handlerAPITriggerPkg)
+	apiTrainer.Post("/messages.json", handlerAPIMessagesCreate)
+	apiTrainer.Patch("/conversation.json", handlerAPIConversationsComplete)
+	apiTrainer.Post("/contacts/conversations.json",
 		handlerAPIContactsConversationsCreate)
-	e.Get("/api/contacts/search.json", handlerAPIContactsSearch)
-	e.Post("/api/trigger.json", handlerAPITriggerPkg)
 
 	// WebSockets
 	e.WebSocket("/ws", handlerWSConversations)
@@ -127,9 +147,7 @@ func handlerIndex(c *echo.Context) error {
 	}
 	var s []byte
 	b := bytes.NewBuffer(s)
-	data := struct {
-		IsProd bool
-	}{
+	data := struct{ IsProd bool }{
 		IsProd: os.Getenv("ABOT_ENV") == "production",
 	}
 	if err := tmplLayout.Execute(b, data); err != nil {
@@ -200,7 +218,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 		return core.JSONError(errors.New(tmp))
 	}
 	m := &dt.Msg{}
-	m.AvaSent = true
+	m.AbotSent = true
 	m.User = msg.User
 	m.Sentence = ret
 	if pkg != nil {
@@ -219,8 +237,28 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	return nil
 }
 
-// handlerAPILoginSubmit processes a login request providing back a session
-// token to be saved client-side for security.
+// handlerAPILogoutSubmit processes a logout request deleting the session from
+// the server.
+func handlerAPILogoutSubmit(c *echo.Context) error {
+	uid, err := cookieVal(c, "id")
+	if err != nil {
+		return core.JSONError(err)
+	}
+	if uid == "null" {
+		return nil
+	}
+	q := `DELETE FROM sessions WHERE userid=$1`
+	if _, err = db.Exec(q, uid); err != nil {
+		return core.JSONError(err)
+	}
+	if err = c.JSON(http.StatusOK, nil); err != nil {
+		return core.JSONError(err)
+	}
+	return nil
+}
+
+// handlerAPILoginSubmit processes a logout request deleting the session from
+// the server.
 func handlerAPILoginSubmit(c *echo.Context) error {
 	var req struct {
 		Email    string
@@ -230,7 +268,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		return core.JSONError(err)
 	}
 	var u struct {
-		ID       int
+		ID       uint64
 		Password []byte
 		Trainer  bool
 	}
@@ -245,22 +283,39 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		return core.JSONError(errInvalidUserPass)
 	}
 	err = bcrypt.CompareHashAndPassword(u.Password, []byte(req.Password))
-	if err == bcrypt.ErrMismatchedHashAndPassword ||
-		err == bcrypt.ErrHashTooShort {
+	if err == bcrypt.ErrMismatchedHashAndPassword || err == bcrypt.ErrHashTooShort {
 		return core.JSONError(errInvalidUserPass)
 	} else if err != nil {
 		return core.JSONError(err)
 	}
-	var resp struct {
-		ID           int
-		SessionToken string
-		Trainer      bool
+	user := &dt.User{
+		ID:      u.ID,
+		Email:   req.Email,
+		Trainer: u.Trainer,
 	}
-	resp.ID = u.ID
-	resp.Trainer = u.Trainer
-	tmp := uuid.NewV4().Bytes()
-	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
-	// TODO save session token
+	csrfToken, err := createCSRFToken(user)
+	if err != nil {
+		return core.JSONError(err)
+	}
+	header, token, err := getAuthToken(user)
+	if err != nil {
+		return core.JSONError(err)
+	}
+	resp := struct {
+		ID        uint64
+		Email     string
+		Scopes    []string
+		AuthToken string
+		IssuedAt  int64
+		CSRFToken string
+	}{
+		ID:        user.ID,
+		Email:     user.Email,
+		Scopes:    header.Scopes,
+		AuthToken: token,
+		IssuedAt:  header.IssuedAt,
+		CSRFToken: csrfToken,
+	}
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return core.JSONError(err)
 	}
@@ -306,16 +361,14 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return core.JSONError(err)
 	}
 
-	// Begin DB access
 	tx, err := db.Beginx()
 	if err != nil {
 		return core.JSONError(errors.New("Something went wrong. Try again."))
 	}
-
 	q := `INSERT INTO users (name, email, password, locationid)
 	      VALUES ($1, $2, $3, 0)
 	      RETURNING id`
-	var uid int
+	var uid uint64
 	err = tx.QueryRowx(q, req.Name, req.Email, hpw).Scan(&uid)
 	if err != nil && err.Error() ==
 		`pq: duplicate key value violates unique constraint "users_email_key"` {
@@ -327,7 +380,6 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return core.JSONError(errors.New(
 			"Something went wrong. Please try again."))
 	}
-
 	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
 	     VALUES ($1, $2, $3)`
 	_, err = tx.Exec(q, uid, req.FID, 2)
@@ -340,15 +392,16 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return core.JSONError(errors.New(
 			"Something went wrong. Please try again."))
 	}
-	// End DB access
-
+	// TODO createCSRFToken
 	var resp struct {
-		ID           int
-		SessionToken string
+		ID        uint64
+		Email     string
+		Scopes    []string
+		AuthToken string
+		IssuedAt  uint64
+		CSRFToken string
 	}
-	tmp := uuid.NewV4().Bytes()
 	resp.ID = uid
-	resp.SessionToken = base64.StdEncoding.EncodeToString(tmp)
 	if os.Getenv("ABOT_ENV") == "production" {
 		fName := strings.Fields(req.Name)[0]
 		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
@@ -360,7 +413,6 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 			}
 		*/
 	}
-	// TODO save session token
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return core.JSONError(err)
 	}
@@ -370,7 +422,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 // handlerAPIProfile shows a user profile with the user's current addresses,
 // credit cards, and contact information.
 func handlerAPIProfile(c *echo.Context) error {
-	uid, err := strconv.Atoi(c.Query("uid"))
+	uid, err := cookieVal(c, "id")
 	if err != nil {
 		return core.JSONError(err)
 	}
@@ -441,16 +493,13 @@ func handlerAPIProfile(c *echo.Context) error {
 // site offers the developer a better guarantee that information entered is
 // coming from the correct person.
 func handlerAPIProfileView(c *echo.Context) error {
-	var err error
-	req := struct {
-		UserID uint64
-	}{}
-	if err = c.Bind(&req); err != nil {
+	uid, err := cookieVal(c, "id")
+	if err != nil {
 		return core.JSONError(err)
 	}
 	q := `SELECT authorizationid FROM users WHERE id=$1`
 	var authID sql.NullInt64
-	if err = db.Get(&authID, q, req.UserID); err != nil {
+	if err = db.Get(&authID, q, uid); err != nil {
 		return core.JSONError(err)
 	}
 	if !authID.Valid {
@@ -462,8 +511,7 @@ func handlerAPIProfileView(c *echo.Context) error {
 		return core.JSONError(err)
 	}
 Response:
-	err = c.JSON(http.StatusOK, nil)
-	if err != nil {
+	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return core.JSONError(err)
 	}
 	return nil
@@ -599,16 +647,16 @@ func handlerAPIConversationsComplete(c *echo.Context) error {
 // single conversation to enable trainers to get a sense of what happened in the
 // messages leading up to this problem and provide a better and faster solution.
 func handlerAPIConversationsShow(c *echo.Context) error {
-	uid, err := strconv.Atoi(c.Query("uid"))
+	uid, err := cookieVal(c, "id")
 	if err != nil {
 		return core.JSONError(err)
 	}
 	var ret []struct {
 		Sentence  string
-		AvaSent   bool
+		AbotSent  bool
 		CreatedAt time.Time
 	}
-	q := `SELECT sentence, avasent, createdat
+	q := `SELECT sentence, abotsent, createdat
 	      FROM messages
 	      WHERE userid=$1
 	      ORDER BY createdat DESC
@@ -690,7 +738,7 @@ func handlerAPIConversationsShow(c *echo.Context) error {
 		Username string
 		Chats    []struct {
 			Sentence  string
-			AvaSent   bool
+			AbotSent  bool
 			CreatedAt time.Time
 		}
 		Preferences []string
@@ -732,7 +780,7 @@ func handlerAPIMessagesCreate(c *echo.Context) error {
 	}
 	var id uint64
 	q = `INSERT INTO messages
-	     (userid, sentence, avasent) VALUES ($1, $2, TRUE) RETURNING id`
+	     (userid, sentence, abotsent) VALUES ($1, $2, TRUE) RETURNING id`
 	err := db.QueryRowx(q, req.UserID, req.Sentence).Scan(&id)
 	if err != nil {
 		return core.JSONError(err)
@@ -818,4 +866,189 @@ func handlerError(err error, c *echo.Context) {
 	log.Debug("failed handling", err)
 	// TODO implement mail interface
 	// mc.SendBug(err)
+}
+
+// createCSRFToken creates a new token, invalidating any existing token.
+func createCSRFToken(u *dt.User) (token string, err error) {
+	q := `INSERT INTO sessions (token, userid, label)
+	      VALUES ($1, $2, 'csrfToken')
+	      ON CONFLICT (userid, label) DO UPDATE SET token=$1`
+	token = randSeq(32)
+	if _, err := db.Exec(q, token, u.ID); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// getAuthToken returns a token used for future client authorization with a CSRF
+// token.
+func getAuthToken(u *dt.User) (header *authHeader, authToken string,
+	err error) {
+
+	scopes := []string{}
+	if u.Trainer {
+		scopes = append(scopes, "trainer")
+	}
+	header = &authHeader{
+		ID:       u.ID,
+		Email:    u.Email,
+		Scopes:   scopes,
+		IssuedAt: time.Now().Unix(),
+	}
+	byt, err := json.Marshal(header)
+	if err != nil {
+		return nil, "", core.JSONError(err)
+	}
+	hash := hmac.New(sha512.New, []byte(os.Getenv("ABOT_SECRET")))
+	_, err = hash.Write(byt)
+	if err != nil {
+		return nil, "", err
+	}
+	authToken = base64.StdEncoding.EncodeToString(hash.Sum(nil))
+	return header, authToken, nil
+}
+
+func authLoggedIn() echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		log.Debug("validating logged in")
+		// Skip WebSocket
+		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
+			return nil
+		}
+		c.Response().Header().Set(echo.WWWAuthenticate, bearerAuthKey+" realm=Restricted")
+		auth := c.Request().Header.Get(echo.Authorization)
+		l := len(bearerAuthKey)
+		// Ensure client sent the token
+		if len(auth) <= l+1 || auth[:l] != bearerAuthKey {
+			log.Debug("client did not send token")
+			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
+		}
+		// Ensure the token is still valid
+		tmp, err := cookieVal(c, "issuedAt")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		issuedAt, err := strconv.ParseInt(tmp, 10, 64)
+		if err != nil {
+			return core.JSONError(err)
+		}
+		t := time.Unix(issuedAt, 0)
+		if t.Add(72 * time.Hour).Before(time.Now()) {
+			log.Debug("token expired")
+			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
+		}
+		// Ensure the token has not been tampered with
+		b, err := base64.StdEncoding.DecodeString(auth[l+1:])
+		if err != nil {
+			return core.JSONError(err)
+		}
+		tmp, err = cookieVal(c, "scopes")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		scopes := strings.Fields(tmp)
+		tmp, err = cookieVal(c, "id")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		userID, err := strconv.ParseUint(tmp, 10, 64)
+		if err != nil {
+			return core.JSONError(err)
+		}
+		email, err := cookieVal(c, "email")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		a := authHeader{
+			ID:       userID,
+			Email:    email,
+			Scopes:   scopes,
+			IssuedAt: issuedAt,
+		}
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return core.JSONError(err)
+		}
+		known := hmac.New(sha512.New, []byte(os.Getenv("ABOT_SECRET")))
+		_, err = known.Write(byt)
+		if err != nil {
+			return core.JSONError(err)
+		}
+		ok := hmac.Equal(known.Sum(nil), b)
+		if !ok {
+			log.Debug("token tampered")
+			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
+		}
+		log.Debug("validated logged in")
+		return nil
+	}
+}
+
+func authTrainer() echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		// Since the headers are validated in authLoggedIn, we can trust
+		// these scopes and can avoid a DB request
+		log.Debug("validating trainer")
+		tmp, err := cookieVal(c, "scopes")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		scopes := strings.Fields(tmp)
+		for _, scope := range scopes {
+			if scope == "trainer" {
+				log.Debug("validated trainer")
+				return nil
+			}
+		}
+		return echo.NewHTTPError(http.StatusUnauthorized)
+	}
+}
+
+// validateCSRF ensures that any forms posted to Abot are protected against
+// Cross-Site Request Forgery. Without this function, Abot would be vulnerable
+// to the attack because tokens are stored client-side in cookies.
+func validateCSRF() echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		// TODO look into other session-based temporary storage systems
+		// for these csrf tokens to prevent hitting the database.
+		// Whatever is selected must *not* introduce a dependency
+		// (memcached/Redis). Bolt might be an option.
+		if c.Request().Method == "GET" {
+			return nil
+		}
+		log.Debug("validating csrf")
+		var label string
+		q := `SELECT label FROM sessions
+		      WHERE userid=$1 AND label='csrfToken' AND token=$2`
+		uid, err := cookieVal(c, "id")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		token, err := cookieVal(c, "csrfToken")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		err = db.Get(&label, q, uid, token)
+		if err == sql.ErrNoRows {
+			return echo.NewHTTPError(http.StatusUnauthorized)
+		}
+		if err != nil {
+			return core.JSONError(err)
+		}
+		log.Debug("validated csrf")
+		return nil
+	}
+}
+
+// cookieVal retrieves a cookie
+func cookieVal(c *echo.Context, name string) (value string, err error) {
+	ck, err := c.Request().Cookie(name)
+	if err != nil {
+		return "", fmt.Errorf("%s: %s", err, name)
+	}
+	val, err := url.QueryUnescape(ck.Value)
+	if err != nil {
+		return "", err
+	}
+	return val, nil
 }

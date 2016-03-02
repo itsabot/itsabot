@@ -1,11 +1,11 @@
-(function(ava) {
-ava.TrainIndex = {}
-ava.TrainIndex.controller = function() {
-	if (!ava.isLoggedIn()) {
+(function(abot) {
+abot.TrainIndex = {}
+abot.TrainIndex.controller = function() {
+	if (!abot.isLoggedIn()) {
 		m.route("/login?r=" + encodeURIComponent(window.location.search))
 		return
 	}
-	if (!ava.isTrainer()) {
+	if (!abot.isTrainer()) {
 		m.route("/profile")
 		return
 	}
@@ -17,14 +17,14 @@ ava.TrainIndex.controller = function() {
 		m.route("/train/" + id)
 	}
 	ctrl.props = {
-		convos: m.request({
+		convos: abot.request({
 			method: "GET",
-			url: "/api/messages.json"
+			url: "/api/trainer/messages.json"
 		}),
 		isTrained: m.prop(!!m.route.param("trained"))
 	}
 }
-ava.TrainIndex.view = function(ctrl) {
+abot.TrainIndex.view = function(ctrl) {
 	var success = null
 	if (ctrl.props.isTrained()) {
 		success = m(".alert.alert-success",
@@ -32,19 +32,17 @@ ava.TrainIndex.view = function(ctrl) {
 	}
 	var convoList = m("h3.empty-state", "No conversations need training")
 	if (!!ctrl.props.convos()) {
-		convoList = m("table.table.table-bordered.table-hover", m("tbody", [
+		convoList = m("table.table", m("tbody", [
 			ctrl.props.convos().map(function(conversation) {
-				return m.component(ava.TrainIndexItem, conversation, ctrl)
+				return m.component(abot.TrainIndexItem, conversation, ctrl)
 			})
 		]))
 	}
-	return m(".body", [
-		m.component(ava.Header),
-		m("#full.container", [
-			m(".row.margin-top-sm", m(".col-md-12", m("h1", "Training"))),
-			m(".row", m(".col-md-12.margin-top-sm", [ success, convoList ]))
-		]),
-		m.component(ava.Footer)
+	return m(".main", [
+		m.component(abot.Header),
+		m("h1", "Training"),
+		success,
+		convoList,
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

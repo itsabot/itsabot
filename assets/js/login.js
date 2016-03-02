@@ -22,8 +22,11 @@ abot.Login.controller = function() {
 				secure = false
 			}
 			cookie.setItem("id", data.ID, exp, null, null, secure)
-			cookie.setItem("trainer", data.Trainer, exp, null, null, secure)
-			cookie.setItem("session_token", data.SessionToken, exp, null, null, secure)
+			cookie.setItem("email", data.Email, exp, null, null, secure)
+			cookie.setItem("issuedAt", data.IssuedAt, exp, null, null, secure)
+			cookie.setItem("authToken", data.AuthToken, exp, null, null, secure)
+			cookie.setItem("csrfToken", data.CSRFToken, exp, null, null, secure)
+			cookie.setItem("scopes", data.Scopes, exp, null, null, secure)
 			if (m.route.param("r") == null) {
 				return m.route("/profile")
 			}

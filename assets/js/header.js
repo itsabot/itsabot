@@ -4,10 +4,20 @@ abot.Header.controller = function() {
 	var ctrl = this
 	ctrl.signout = function(ev) {
 		ev.preventDefault()
-		cookie.removeItem("id")
-		cookie.removeItem("trainer")
-		cookie.removeItem("session_token")
-		m.route("/login")
+		abot.request({
+			url: "/api/logout.json",
+			method: "POST",
+		}).then(function() {
+			cookie.removeItem("id")
+			cookie.removeItem("email")
+			cookie.removeItem("issuedAt")
+			cookie.removeItem("scopes")
+			cookie.removeItem("csrfToken")
+			cookie.removeItem("authToken")
+			m.route("/login")
+		}, function(err) {
+			console.error(err)
+		})
 	}
 }
 abot.Header.view = function(ctrl) {

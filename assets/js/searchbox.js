@@ -1,6 +1,6 @@
 (function(ava) {
-ava.Searchbox = {}
-ava.Searchbox.controller = function(props, pctrl) {
+abot.Searchbox = {}
+abot.Searchbox.controller = function(props, pctrl) {
 	var ctrl = this
 	ctrl.update = function(ev) {
 		var query = ev.target.value
@@ -43,7 +43,7 @@ ava.Searchbox.controller = function(props, pctrl) {
 		Username: m.prop(props.Username()),
 	}
 }
-ava.Searchbox.view = function(ctrl, props, pctrl) {
+abot.Searchbox.view = function(ctrl, props, pctrl) {
 	return m("div", [
 		m("input[type=text][placeholder=To:].form-control.form-white", {
 			disabled: props.UsernameDisabled,

@@ -96,6 +96,9 @@ func main() {
 
 // startServer initializes any clients that are needed and boots packages
 func startServer() error {
+	if len(os.Getenv("ABOT_SECRET")) < 32 || os.Getenv("ABOT_ENV") == "production" {
+		log.Fatal("must set ABOT_SECRET env var in production to >= 32 characters")
+	}
 	var err error
 	db, err = pkg.ConnectDB()
 	if err != nil {

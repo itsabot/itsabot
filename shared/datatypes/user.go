@@ -90,7 +90,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 			return nil, err
 		}
 	}
-	q := `SELECT id, name, email, lastauthenticated, stripecustomerid
+	q := `SELECT id, name, email, lastauthenticated, paymentserviceid
 	      FROM users
 	      WHERE id=$1`
 	u := &User{}

@@ -1,11 +1,11 @@
-(function(ava) {
-ava.TrainIndexItem = {}
-ava.TrainIndexItem.controller = function(props, pctrl) {
+(function(abot) {
+abot.TrainIndexItem = {}
+abot.TrainIndexItem.controller = function(props, pctrl) {
 	var ctrl = this
-	ava.fnCopy(pctrl, ctrl, "route")
+	abot.fnCopy(pctrl, ctrl, "route")
 }
-ava.TrainIndexItem.view = function(ctrl, props) {
-	var t = ava.prettyDate(props.CreatedAt)
+abot.TrainIndexItem.view = function(ctrl, props) {
+	var t = abot.prettyDate(props.CreatedAt)
 	return m("tr", {
 		"data-id": props.ID,
 		"data-user-id": props.UserID,
@@ -13,7 +13,7 @@ ava.TrainIndexItem.view = function(ctrl, props) {
 		onclick: ctrl.route
 	}, [
 		m("td", props.Sentence),
-		m("td", ava.prettyDate(props.CreatedAt))
+		m("td.right", abot.prettyDate(props.CreatedAt))
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);
