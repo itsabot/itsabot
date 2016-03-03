@@ -262,7 +262,7 @@ func installPlugins() error {
 			branch := string(outC)
 			// Sync to get dependencies
 			outC, err = exec.
-				Command("/bin/sh", "-c", "glock sync github.com/itsabot/abot/plugins/"+name+ext).
+				Command("/bin/sh", "-c", "glock sync $(pwd | sed 's/^.*src\\///')").
 				CombinedOutput()
 			if err != nil {
 				l.Debug(string(outC))
