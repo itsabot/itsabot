@@ -94,3 +94,7 @@ MIT, a copy of which you can find in the repo.
 The Abot logo is courtesy of
 [Edward Boatman](https://thenounproject.com/edward/) via TheNounProject and
 licensed via Creative Commons Attribution v3.
+
+The default plugin icon (puzzle piece) is courtesy of
+[Arthur Shlain](https://thenounproject.com/ArtZ91/) via TheNounProject and
+licensed via Creative Commons Attribution v3.

@@ -1,0 +1,13 @@
+.plugin-icon {
+	width: 25%;
+	min-width: 100px;
+	padding: 0.5em;
+}
+.plugin-icon img {
+	width: 50%;
+	display: block;
+	margin: 0 auto;
+}
+.plugin-icon .name {
+	text-align: center;
+}

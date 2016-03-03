@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -58,6 +60,11 @@ func initRoutes(e *echo.Echo) {
 	api := e.Group("/api/user", auth.LoggedIn(), auth.CSRF(db))
 	api.Get("/profile.json", handlerAPIProfile)
 	api.Put("/profile.json", handlerAPIProfileView)
+
+	// API routes (restricted to admins)
+	apiAdmin := e.Group("/api/admin", auth.LoggedIn(), auth.CSRF(db),
+		auth.Admin())
+	apiAdmin.Get("/plugins.json", handlerAPIPlugins)
 
 	// WebSockets
 	e.WebSocket("/ws", handlerWSConversations)
@@ -619,6 +626,34 @@ func handlerWSConversations(c *echo.Context) error {
 		if err = websocket.Message.Receive(ws.Get(uid), &msg); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func handlerAPIPlugins(c *echo.Context) error {
+	// Get all files in the plugins directory
+	fis, err := ioutil.ReadDir("./plugins")
+	if err != nil {
+		return core.JSONError(err)
+	}
+	var pJSON struct {
+		Plugins []json.RawMessage
+	}
+	for _, fi := range fis {
+		// Skip anything that's not a directory
+		if !fi.IsDir() {
+			continue
+		}
+		// Add each plugin.json to array of plugins
+		p := filepath.Join("./plugins", fi.Name(), "plugin.json")
+		byt, err := ioutil.ReadFile(p)
+		if err != nil {
+			return core.JSONError(err)
+		}
+		pJSON.Plugins = append(pJSON.Plugins, byt)
+	}
+	if err = c.JSON(http.StatusOK, pJSON); err != nil {
+		return core.JSONError(err)
 	}
 	return nil
 }

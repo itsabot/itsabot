@@ -42,14 +42,14 @@ abot.isLoggedIn = function() {
 	cookie.setItem("authToken", null)
 	return false
 }
-abot.isTrainer = function() {
+abot.isAdmin = function() {
 	var scopes = cookie.getItem("scopes")
 	if (scopes == null) {
 		return false
 	}
 	scopes = scopes.split(" ")
 	for	(var i = 0; i < scopes.length; ++i) {
-		if (scopes[i] === "trainer") {
+		if (scopes[i] === "admin") {
 			return true
 		}
 	}
@@ -96,6 +96,7 @@ window.addEventListener('load', function() {
 		"/forgot_password": abot.ForgotPassword,
 		"/reset_password": abot.ResetPassword,
 		"/profile": abot.Profile,
+		"/admin": abot.Admin,
 	})
 })
 })(!window.abot ? window.abot={} : window.abot);

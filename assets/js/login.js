@@ -53,70 +53,50 @@ abot.Login.controller = function() {
 abot.Login.view = function(ctrl) {
 	return m(".main", [
 		m.component(abot.Header),
-		m("#full.container", m(".row.margin-top-sm", m(".col-md-push-3.col-md-6.card", [
-			m(".row", [
-				m(".col-md-12.text-center", [
-					m("h2", "Log In")
-				])
+		m("h1", "Log In"),
+		m("form", [
+			m("div", {
+				id: "err",
+				class: "alert alert-danger hidden"
+			}, ctrl.error()),
+			m("div", [
+				m("input", {
+					type: "email",
+					id: "email",
+					placeholder: "Email"
+				}),
 			]),
-			m("form", [
-				m(".row.margin-top-sm", [
-					m(".col-md-12", [
-						m("div", {
-							id: "err",
-							class: "alert alert-danger hidden"
-						}, ctrl.error()),
-						m(".form-group", [
-							m("input", {
-								type: "email",
-								class: "form-control",
-								id: "email",
-								placeholder: "Email"
-							})
-						]),
-						m(".form-group", [
-							m("input", {
-								type: "password",
-								class: "form-control",
-								id: "password",
-								placeholder: "Password"
-							})
-						]),
-						m(".form-group.text-right", [
-							m("a", {
-								href: "/forgot_password",
-								config: m.route
-							}, "Forgot password?")
-						])
-					])
-				]),
-				m(".row", [
-					m(".col-md-12.text-center", [
-						m(".form-group", [
-							m("input", {
-								class: "btn btn-sm",
-								id: "btn",
-								type: "submit",
-								onclick: ctrl.login,
-								onsubmit: ctrl.login,
-								value: "Log In"
-							})
-						])
-					])
-				])
+			m("div", [
+				m("input", {
+					type: "password",
+					id: "password",
+					placeholder: "Password"
+				}),
 			]),
-			m(".row", [
-				m(".col-md-12.text-center", [
-					m(".form-group", [
-						m("span", "No account? "),
-						m("a", {
-							href: "/signup",
-							config: m.route
-						}, "Sign Up")
-					])
-				])
-			])
-		])))
+		]),
+		m("div", [
+			m("a", {
+				href: "/forgot_password",
+				config: m.route
+			}, "Forgot password?")
+		]),
+		m("div", [
+			m("input", {
+				class: "btn btn-sm",
+				id: "btn",
+				type: "submit",
+				onclick: ctrl.login,
+				onsubmit: ctrl.login,
+				value: "Log In"
+			}),
+		]),
+		m("div", [
+			m("span", "No account? "),
+			m("a", {
+				href: "/signup",
+				config: m.route
+			}, "Sign Up"),
+		]),
 	])
 }
 abot.Login.checkAuth = function(callback) {

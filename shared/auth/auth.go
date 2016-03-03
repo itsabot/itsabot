@@ -31,10 +31,6 @@ type Header struct {
 func LoggedIn() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		log.Debug("validating logged in")
-		// Skip WebSocket
-		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
-			return nil
-		}
 		c.Response().Header().Set(echo.WWWAuthenticate, bearerAuthKey+" realm=Restricted")
 		auth := c.Request().Header.Get(echo.Authorization)
 		l := len(bearerAuthKey)
@@ -137,5 +133,25 @@ func CSRF(db *sqlx.DB) echo.HandlerFunc {
 		}
 		log.Debug("validated csrf")
 		return nil
+	}
+}
+
+// Admin ensures that the current user is an admin. We trust the scopes
+// presented by the client because they're validated through HMAC in LoggedIn().
+func Admin() echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		log.Debug("validating admin")
+		tmp, err := util.CookieVal(c, "scopes")
+		if err != nil {
+			return core.JSONError(err)
+		}
+		scopes := strings.Fields(tmp)
+		for _, scope := range scopes {
+			if scope == "admin" {
+				log.Debug("validated admin")
+				return nil
+			}
+		}
+		return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
 	}
 }

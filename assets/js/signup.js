@@ -56,79 +56,59 @@ abot.Signup.view = function(ctrl) {
 	}
 	return m(".main", [
 		m.component(abot.Header),
-		m("#full.container", m(".row.margin-top-sm", [
-			m(".col-md-push-3.col-md-6.card", [
-				m(".row", [
-					m(".col-md-12.text-center", [
-						m("h2", "Sign Up")
-					])
-				]),
-				m("form", { onsubmit: ctrl.signup }, [
-					m(".row.margin-top-sm", [
-						m(".col-md-12", [
-							errMsg,
-							m(".form-group", [
-								m("input", {
-									type: "text",
-									class: "form-control",
-									id: "name",
-									placeholder: "Your name"
-								})
-							]),
-							m(".form-group", [
-								m("input", {
-									type: "tel",
-									class: "form-control",
-									id: "phone",
-									placeholder: "Your phone number",
-									value: ctrl.props.phone(),
-									disabled: ctrl.phoneDisabled()
-								})
-							]),
-							m(".form-group", [
-								m("input", {
-									type: "email",
-									class: "form-control",
-									id: "email",
-									placeholder: "Email"
-								})
-							]),
-							m(".form-group", [
-								m("input", {
-									type: "password",
-									class: "form-control",
-									id: "password",
-									placeholder: "Password"
-								})
-							])
-						])
-					]),
-					m(".row", [
-						m(".col-md-12.text-center", [
-							m(".form-group", [
-								m("input", {
-									class: "btn btn-sm",
-									id: "btn",
-									type: "submit",
-									value: "Sign Up"
-								})
-							])
-						])
-					])
-				]),
-				m(".row", [
-					m(".col-md-12.text-center", [
-						m(".form-group", [
-							m("span", "Have an account? "),
-							m("a", {
-								href: "/login",
-								config: m.route
-							}, "Log In")
-						])
-					])
-				])
+		m("h1", "Sign Up"),
+		m("form", { onsubmit: ctrl.signup }, [
+			errMsg,
+			m("div", [
+				m("input", {
+					type: "text",
+					class: "form-control",
+					id: "name",
+					placeholder: "Your name"
+				})
+			]),
+			m("div", [
+				m("input", {
+					type: "tel",
+					class: "form-control",
+					id: "phone",
+					placeholder: "Your phone number",
+					value: ctrl.props.phone(),
+					disabled: ctrl.phoneDisabled()
+				})
+			]),
+			m("div", [
+				m("input", {
+					type: "email",
+					class: "form-control",
+					id: "email",
+					placeholder: "Email"
+				})
+			]),
+			m("div", [
+				m("input", {
+					type: "password",
+					class: "form-control",
+					id: "password",
+					placeholder: "Password"
+				})
+			]),
+			m("div", [
+				m("input", {
+					class: "btn btn-sm",
+					id: "btn",
+					type: "submit",
+					value: "Sign Up"
+				})
+			]),
+			m("div", [
+				m("span", "Have an account? "),
+				m("a", {
+					href: "/login",
+					config: m.route
+				}, "Log In")
 			])
-		]))
+		])
 	])
 }
 })(!window.abot ? window.abot={} : window.abot);

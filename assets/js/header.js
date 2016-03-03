@@ -22,11 +22,9 @@ abot.Header.view = function() {
 			}, "Sign up"),
 		]
 	}
-	if (cookie.getItem("id") === null || m.route() === "/") {
-		tour = m("a", {
-			href: "/tour",
-			config: m.route
-		}, "Tour")
+	var admin
+	if (abot.isAdmin()) {
+		admin = m("a[href=/admin]", { config: m.route }, "Admin")
 	}
 	return m("header", [
 		m("div", [
@@ -35,6 +33,7 @@ abot.Header.view = function() {
 					href: "/",
 					config: m.route
 				}, "Home"),
+				admin,
 				profileOrLogin
 			]),
 			m(".logo", [
