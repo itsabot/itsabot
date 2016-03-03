@@ -5,7 +5,7 @@ import (
 	"github.com/itsabot/abot/shared/log"
 )
 
-// Vocab maintains sets of Commands and Objects recognized by packages as well
+// Vocab maintains sets of Commands and Objects recognized by plugins as well
 // as the functions to be performed when such Commands or Objects are found.
 type Vocab struct {
 	Commands map[string]struct{}
@@ -13,20 +13,22 @@ type Vocab struct {
 	dict     map[string]VocabFn
 }
 
-// VocabHandler maintains sets of Commands and Objects recognized by packages as well
-// as the functions to be performed when such Commands or Objects are found.
+// VocabHandler maintains sets of Commands and Objects recognized by plugins as
+// well as the functions to be performed when such Commands or Objects are
+// found.
 //
-// TODO use pkg triggers rather than WordTypes, which provides more control over
-// when to run specific functions.
+// TODO use plugin triggers rather than WordTypes, which provides more control
+// over when to run specific functions.
 type VocabHandler struct {
 	Fn       VocabFn
 	WordType string
 	Words    []string
 }
 
-// VocabFn is a function run when the user sends a matched vocab word as defined
-// by a package. For an example, see packages/ava_purchase/ava_purchase.go. The
-// response returned is a user-presentable string from the VocabFn.
+// VocabFn is a function run when the user sends a matched vocab word as
+// defined by a plugin. For an example, see
+// github.com/itsabot/plugin_purchase/plugin_purchase.go. The response returned
+// is a user-presentable string from the VocabFn.
 type VocabFn func(m *Msg, mod int) (response string)
 
 // NewVocab returns Vocab with all Commands and Objects stemmed using the
@@ -53,7 +55,7 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 }
 
 // HandleKeywords is a runs the first matching VocabFn in the sentence. For an
-// example, see packages/ava_purchase/ava_purchase.go.
+// example, see github.com/itsabot/plugin_purchase/plugin_purchase.go.
 func (v *Vocab) HandleKeywords(m *Msg) string {
 	var resp string
 	mod := 1

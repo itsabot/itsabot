@@ -22,7 +22,7 @@ type Msg struct {
 	User            *User
 	StructuredInput *nlp.StructuredInput
 	Stems           []string
-	Package         string
+	Plugin          string
 	State           map[string]interface{}
 	CreatedAt       *time.Time
 	// AbotSent determines if msg is from the user or Ava
@@ -72,9 +72,9 @@ func (m *Msg) Update(db *sqlx.DB /*, mc *MailClient */) error {
 
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, package, route, abotsent, needstraining)
+	      (userid, sentence, plugin, route, abotsent, needstraining)
 	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Package, m.Route,
+	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Plugin, m.Route,
 		m.AbotSent, m.NeedsTraining)
 	if err := row.Scan(&m.ID); err != nil {
 		return err

@@ -16,18 +16,18 @@ import (
 
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/itsabot/abot/shared/pkg"
+	"github.com/itsabot/abot/shared/plugin"
 	"github.com/jmoiron/sqlx"
 )
 
 // Abot is defined to use in RPC communication
 type Abot int
 
-// ErrMissingPackage denotes that Abot could find neither a package with
-// matching triggers for a user's message nor any prior package used. This is
+// ErrMissingPlugin denotes that Abot could find neither a plugin with
+// matching triggers for a user's message nor any prior plugin used. This is
 // most commonly seen on first run if the user's message doesn't initially
-// trigger a package.
-var ErrMissingPackage = errors.New("missing package")
+// trigger a plugin.
+var ErrMissingPlugin = errors.New("missing plugin")
 
 // BootRPCServer starts the rpc for Abot core in a go routine and returns the
 // server address
@@ -54,17 +54,17 @@ func BootRPCServer() (addr string, err error) {
 	return addr, err
 }
 
-// BootDependencies executes all binaries listed in "packages.json". each
+// BootDependencies executes all binaries listed in "plugins.json". each
 // dependencies is passed the rpc address of the ava core. it is expected that
 // each dependency respond with there own rpc address when registering
 // themselves with the ava core.
 func BootDependencies(avaRPCAddr string) error {
 	log.Debug("booting dependencies")
-	content, err := ioutil.ReadFile("packages.json")
+	content, err := ioutil.ReadFile("plugins.json")
 	if err != nil {
 		return err
 	}
-	var conf packagesConf
+	var conf pluginsConf
 	if err := json.Unmarshal(content, &conf); err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func BootDependencies(avaRPCAddr string) error {
 			name += "-" + version
 		}
 		log.Debug("booting", name)
-		// This assumes packages are installed with go install ./...
+		// This assumes plugins are installed with go install ./...
 		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -87,18 +87,18 @@ func BootDependencies(avaRPCAddr string) error {
 	return nil
 }
 
-// GetPkg attempts to find a package and route for the given msg input if none
+// GetPlugin attempts to find a plugin and route for the given msg input if none
 // can be found, it checks the database for the last route used and gets the
-// package for that. If there is no previously used package, we return
-// ErrMissingPackage. The bool value return indicates whether this package is
-// different from the last package used by the user.
-func GetPkg(db *sqlx.DB, m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
+// plugin for that. If there is no previously used plugin, we return
+// ErrMissingPlugin. The bool value return indicates whether this plugin is
+// different from the last plugin used by the user.
+func GetPlugin(db *sqlx.DB, m *dt.Msg) (*plugin.PluginWrapper, string, bool, error) {
 	// First check if the user is missing. AKA, needs to be onboarded
 	if m.User == nil {
-		p := regPkgs.Get("onboard_onboard")
+		p := regPlugins.Get("onboard_onboard")
 		if p == nil {
-			log.Debug("missing required onboard package")
-			return nil, "onboard_onboard", false, ErrMissingPackage
+			log.Debug("missing required onboard plugin")
+			return nil, "onboard_onboard", false, ErrMissingPlugin
 		}
 		return p, "onboard_onboard", true, nil
 	}
@@ -112,40 +112,40 @@ func GetPkg(db *sqlx.DB, m *dt.Msg) (*pkg.PkgWrapper, string, bool, error) {
 	}
 	log.Debugf("found user's last route: %q\n", prevRoute)
 
-	// Iterate over all command/object pairs and see if any package has been
+	// Iterate over all command/object pairs and see if any plugin has been
 	// registered for the resulting route
 	for _, c := range m.StructuredInput.Commands {
 		for _, o := range m.StructuredInput.Objects {
 			route := strings.ToLower(c + "_" + o)
 			log.Debug("searching for route", route)
-			if p := regPkgs.Get(route); p != nil {
+			if p := regPlugins.Get(route); p != nil {
 				// Found route. Return it
 				return p, route, false, nil
 			}
 		}
 	}
 
-	// The user input didnt match any packages. Lets see if the prevRoute
+	// The user input didnt match any plugins. Lets see if the prevRoute
 	// does
 	if prevRoute != "" {
 		log.Debug("checking prevRoute for pkg")
-		if p := regPkgs.Get(prevRoute); p != nil {
+		if p := regPlugins.Get(prevRoute); p != nil {
 			// Prev route matches a pkg! Return it
 			return p, prevRoute, true, nil
 		}
 	}
 
 	// Sadly, if we've reached this point, we are at a loss.
-	log.Debug("could not match user input to any package")
-	return nil, "", false, ErrMissingPackage
+	log.Debug("could not match user input to any plugin")
+	return nil, "", false, ErrMissingPlugin
 }
 
-// CallPkg sends a package the user's preprocessed message. The followup bool
+// CallPlugin sends a plugin the user's preprocessed message. The followup bool
 // dictates whether this is the first consecutive time the user has sent that
-// package a message, or if the user is engaged in a conversation with the pkg.
-// This difference enables packages to respond differently--like reset state--
+// plugin a message, or if the user is engaged in a conversation with the plugin.
+// This difference enables plugins to respond differently--like reset state--
 // when messaged for the first time in each new conversation.
-func CallPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (packageReply string,
+func CallPlugin(pw *plugin.PluginWrapper, m *dt.Msg, followup bool) (pluginReply string,
 	err error) {
 
 	tmp := ""
@@ -167,55 +167,55 @@ func CallPkg(pw *pkg.PkgWrapper, m *dt.Msg, followup bool) (packageReply string,
 }
 
 // pkgMap is a thread-safe atomic map that's used to route user messages to the
-// appropriate packages. The map's key is the route in the form of
-// command_object, e.g. "find_restaurant", and the PkgWrapper contains both the
-// package and the RPC client used to communicate with it.
+// appropriate plugins. The map's key is the route in the form of
+// command_object, e.g. "find_restaurant", and the PluginWrapper contains both the
+// plugin and the RPC client used to communicate with it.
 type pkgMap struct {
-	pkgs  map[string]*pkg.PkgWrapper
+	pkgs  map[string]*plugin.PluginWrapper
 	mutex *sync.Mutex
 }
 
-// packagesConf holds the structure of the packages.json configuration file.
-type packagesConf struct {
+// pluginsConf holds the structure of the plugins.json configuration file.
+type pluginsConf struct {
 	Name         string
 	Version      string
 	Dependencies map[string]string
 }
 
-// regPkgs initializes a pkgMap and holds it in global memory, which works OK
+// regPlugins initializes a pkgMap and holds it in global memory, which works OK
 // given pkgMap is an atomic, thread-safe map.
-var regPkgs = pkgMap{
-	pkgs:  make(map[string]*pkg.PkgWrapper),
+var regPlugins = pkgMap{
+	pkgs:  make(map[string]*plugin.PluginWrapper),
 	mutex: &sync.Mutex{},
 }
 
-// RegisterPackage enables Abot to notify packages when specific StructuredInput
-// is encountered matching triggers set in the packages themselves. Note that
-// packages will only listen when ALL criteria are met and that there's no
+// RegisterPlugin enables Abot to notify plugins when specific StructuredInput
+// is encountered matching triggers set in the plugins themselves. Note that
+// plugins will only listen when ALL criteria are met and that there's no
 // support currently for duplicate routes (e.g. "find_restaurant" leading to
-// either one of two packages).
-func (t *Abot) RegisterPackage(p *pkg.Pkg, reply *string) error {
-	log.Debug("registering", p.Config.Name, "at", p.Config.PkgRPCAddr)
-	client, err := rpc.Dial("tcp", p.Config.PkgRPCAddr)
+// either one of two plugins).
+func (t *Abot) RegisterPlugin(p *plugin.Plugin, reply *string) error {
+	log.Debug("registering", p.Config.Name, "at", p.Config.PluginRPCAddr)
+	client, err := rpc.Dial("tcp", p.Config.PluginRPCAddr)
 	if err != nil {
 		return err
 	}
 	for _, c := range p.Trigger.Commands {
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + "_" + o)
-			if regPkgs.Get(s) != nil {
-				log.Info("found duplicate package or trigger",
+			if regPlugins.Get(s) != nil {
+				log.Info("found duplicate plugin or trigger",
 					p.Config.Name, "on", s)
 			}
-			regPkgs.Set(s, &pkg.PkgWrapper{P: p, RPCClient: client})
+			regPlugins.Set(s, &plugin.PluginWrapper{P: p, RPCClient: client})
 		}
 	}
 	return nil
 }
 
 // Get is a thread-safe, locking way to access the values of a pkgMap.
-func (pm pkgMap) Get(k string) *pkg.PkgWrapper {
-	var pw *pkg.PkgWrapper
+func (pm pkgMap) Get(k string) *plugin.PluginWrapper {
+	var pw *plugin.PluginWrapper
 	pm.mutex.Lock()
 	pw = pm.pkgs[k]
 	pm.mutex.Unlock()
@@ -224,7 +224,7 @@ func (pm pkgMap) Get(k string) *pkg.PkgWrapper {
 }
 
 // Set is a thread-safe, locking way to set the values of a pkgMap.
-func (pm pkgMap) Set(k string, v *pkg.PkgWrapper) {
+func (pm pkgMap) Set(k string, v *plugin.PluginWrapper) {
 	pm.mutex.Lock()
 	pm.pkgs[k] = v
 	pm.mutex.Unlock()

@@ -20,7 +20,7 @@ abot.Index.view = function() {
 				config: m.route,
 			}, "Creating an Account.")),
 			m("li", m("a[href=https://github.com/itsabot/abot/wiki/Adding-SMS-Messaging-to-Abot]", "Adding SMS Messaging to Abot.")),
-			m("li", m("a[href=#/]", "Building a package.")),
+			m("li", m("a[href=#/]", "Building a plugin.")),
 			m("li", [
 				"Learning the ",
 				m("a[href=https://github.com/itsabot/abot/wiki/Learning-the-Human-Aided-Training-Interface]", "Human-Aided Training Interface.")

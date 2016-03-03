@@ -1,4 +1,4 @@
-package pkg
+package plugin
 
 import (
 	"errors"
@@ -13,65 +13,64 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type PkgWrapper struct {
-	P         *Pkg
+type PluginWrapper struct {
+	P         *Plugin
 	RPCClient *rpc.Client
 }
 
-// Pkg holds config options for any Ava package. Name must be globally unique.
+// Plugin holds config options for any Abot plugin. Name must be globally unique.
 // Port takes the format of ":1234". Note that the colon is significant.
 // ServerAddress will default to localhost if left blank.
-type Pkg struct {
-	Config  PkgConfig
+type Plugin struct {
+	Config  PluginConfig
 	Vocab   *dt.Vocab
 	Trigger *nlp.StructuredInput
 }
 
-type PkgConfig struct {
-	Name        string
-	Route       string
-	CoreRPCAddr string
-	PkgRPCAddr  string
+type PluginConfig struct {
+	Name          string
+	Route         string
+	CoreRPCAddr   string
+	PluginRPCAddr string
 }
 
-type Ava int
+type Abot int
 
 var client *rpc.Client
 var db *sqlx.DB
 var (
-	ErrMissingPackageName = errors.New("missing package name")
-	ErrMissingPort        = errors.New("missing package port")
-	ErrMissingTrigger     = errors.New("missing package trigger")
+	ErrMissingPluginName = errors.New("missing plugin name")
+	ErrMissingPort       = errors.New("missing plugin port")
+	ErrMissingTrigger    = errors.New("missing plugin trigger")
 )
 
-func NewPackage(name, coreRPCAddr string,
-	trigger *nlp.StructuredInput) (*Pkg, error) {
+func NewPlugin(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin, error) {
 
 	if len(name) == 0 {
-		return &Pkg{}, ErrMissingPackageName
+		return &Plugin{}, ErrMissingPluginName
 	}
 	if trigger == nil {
-		return &Pkg{}, ErrMissingTrigger
+		return &Plugin{}, ErrMissingTrigger
 	}
 
-	c := PkgConfig{
+	c := PluginConfig{
 		Name:        name,
 		CoreRPCAddr: coreRPCAddr,
 	}
-	return &Pkg{Config: c, Trigger: trigger}, nil
+	return &Plugin{Config: c, Trigger: trigger}, nil
 }
 
-// Register with Ava to begin communicating over RPC.
-func (p *Pkg) Register(pkgT interface{}) error {
+// Register with Abot to begin communicating over RPC.
+func (p *Plugin) Register(pluginT interface{}) error {
 	log.Debug("connecting to", p.Config.Name)
 
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}
-	p.Config.PkgRPCAddr = ln.Addr().String()
+	p.Config.PluginRPCAddr = ln.Addr().String()
 
-	if err := rpc.Register(pkgT); err != nil {
+	if err := rpc.Register(pluginT); err != nil {
 		return err
 	}
 
@@ -80,7 +79,7 @@ func (p *Pkg) Register(pkgT interface{}) error {
 		return err
 	}
 
-	if err := client.Call("Abot.RegisterPackage", p, nil); err != nil {
+	if err := client.Call("Abot.RegisterPlugin", p, nil); err != nil {
 		return err
 	}
 

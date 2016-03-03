@@ -72,8 +72,8 @@ func Fatalf(format string, v ...interface{}) {
 	log.Fatalf(format, v...)
 }
 
-// Logger is defined for packages to use in place of the stdlib log. It sets a
-// prefix of the package name with each log and follows the convention of.
+// Logger is defined for plugins to use in place of the stdlib log. It sets a
+// prefix of the plugin name with each log and follows the convention of.
 type Logger struct {
 	prefix string
 	logger *log.Logger

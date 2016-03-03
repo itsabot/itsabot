@@ -178,20 +178,20 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	if err != nil {
 		return core.JSONError(err)
 	}
-	pkg, route, _, err := core.GetPkg(db, msg)
+	pkg, route, _, err := core.GetPlugin(db, msg)
 	if err != nil {
-		log.Debug("could not get core package", err)
+		log.Debug("could not get core plugin", err)
 		return core.JSONError(err)
 	}
 	msg.Route = route
 	if pkg == nil {
-		msg.Package = ""
+		msg.Plugin = ""
 	} else {
-		msg.Package = pkg.P.Config.Name
+		msg.Plugin = pkg.P.Config.Name
 	}
-	ret, err := core.CallPkg(pkg, msg, false)
+	ret, err := core.CallPlugin(pkg, msg, false)
 	if err != nil {
-		log.Debug("could not call package", err)
+		log.Debug("could not call plugin", err)
 		return core.JSONError(err)
 	}
 	if len(ret) == 0 {
@@ -204,7 +204,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 	m.User = msg.User
 	m.Sentence = ret
 	if pkg != nil {
-		m.Package = pkg.P.Config.Name
+		m.Plugin = pkg.P.Config.Name
 	}
 	if err = m.Save(db); err != nil {
 		log.Debug("could not save Abot response message", err)
@@ -485,10 +485,10 @@ func handlerAPIProfile(c *echo.Context) error {
 }
 
 // handlerAPIProfileView is used to validate a purchase or disclosure of
-// sensitive information by a package. This method of validation has the user
+// sensitive information by a plugin. This method of validation has the user
 // view their profile page, meaning that they have to be logged in on their
 // device, ensuring that they either have a valid email/password or a valid
-// session token in their cookies before the package will continue. This is a
+// session token in their cookies before the plugin will continue. This is a
 // useful security measure because SMS is not a secure means of communication;
 // SMS messages can easily be hijacked or spoofed. Taking the user to an HTTPS
 // site offers the developer a better guarantee that information entered is

@@ -31,7 +31,7 @@ func Preprocess(db *sqlx.DB, ner Classifier, c *echo.Context) (*dt.Msg, error) {
 }
 
 // ProcessText is Abot's core logic. This function processes a user's message,
-// routes it to the correct package, and handles edge cases like offensive
+// routes it to the correct plugin, and handles edge cases like offensive
 // language before returning a response to the user. Any user-presentable error
 // is returned in the string. Errors returned from this function are not for the
 // user, so they are handled by Abot explicitly on this function's return
@@ -47,15 +47,15 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
 	log.Debug("  people:", msg.StructuredInput.People)
-	pkg, route, followup, err := GetPkg(db, msg)
+	plugin, route, followup, err := GetPlugin(db, msg)
 	if err != nil {
 		return "", msg.User.ID, err
 	}
 	msg.Route = route
-	if pkg == nil {
-		msg.Package = ""
+	if plugin == nil {
+		msg.Plugin = ""
 	} else {
-		msg.Package = pkg.P.Config.Name
+		msg.Plugin = plugin.P.Config.Name
 	}
 	if err = msg.Save(db); err != nil {
 		return "", msg.User.ID, err
@@ -65,7 +65,7 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 		if followup {
 			log.Debug("message is a followup")
 		}
-		ret, err = CallPkg(pkg, msg, followup)
+		ret, err = CallPlugin(plugin, msg, followup)
 		if err != nil {
 			return "", msg.User.ID, err
 		}
@@ -90,8 +90,8 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	} else {
 		m.Sentence = ret
 	}
-	if pkg != nil {
-		m.Package = pkg.P.Config.Name
+	if plugin != nil {
+		m.Plugin = plugin.P.Config.Name
 	}
 	if err = m.Save(db); err != nil {
 		return "", m.User.ID, err

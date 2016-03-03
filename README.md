@@ -35,33 +35,33 @@ Then visit Abot at `localhost:4200`.
 
 ## Usage
 
-First configure the packages you want to import, such as `restaurants` or
-`mechanic`. Add them to your package.json like so:
+First configure the plugins you want to import, such as `restaurants` or
+`mechanic`. Add them to your plugin.json like so:
 
 ```
 {
 	"Name": "abot",
 	"Version": "0.0.1",
 	"Dependencies": {
-		"github.com/itsabot/pkg_onboard": "*",
-		"github.com/itsabot/pkg_restaurants": "*",
-		"github.com/itsabot/pkg_mechanic": "*"
+		"github.com/itsabot/plugin_onboard": "*",
+		"github.com/itsabot/plugin_restaurants": "*",
+		"github.com/itsabot/plugin_mechanic": "*"
 	}
 }
 ```
 
-Then run the following in your terminal to download the packages:
+Then run the following in your terminal to download the plugins:
 
 ```
 $ abotp
-Fetching 3 packages...
+Fetching 3 plugins...
 Success!
 ```
 
-That will download the packages to the `/packages` directory. Be sure to follow
-the integration instructions in the README of each package you add (found in
-`/packages/pkgname/README.md`), as adding a package may require you to make some
-minor code changes in Abot. Once you've integrated the packages, recompile and
+That will download the plugins to the `/plugins` directory. Be sure to follow
+the integration instructions in the README of each plugin you add (found in
+`/plugins/pluginname/README.md`), as adding a plugin may require you to make some
+minor code changes in Abot. Once you've integrated the plugins, recompile and
 run Abot again: `go install ./... && abot -s`. You can use the included Abot
 console to communicate with Abot locally:
 
@@ -80,7 +80,7 @@ Abot aspires to:
 
 1. Be accessible from every major communication method (SMS, email, web, as well
 as native iOS and Android apps).
-1. Open-source fully automated packages covering common use-cases, like checking
+1. Open-source fully automated plugins covering common use-cases, like checking
 the weather, stocks, restaurant recommendations, and more.
 1. Distribute and share training efforts of the Abot community with opt-in
 centralized training.

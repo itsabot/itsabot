@@ -10,8 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// stateKey is a reserved key in the state of a package that tracks which state
-// the package is currently in for each user.
+// stateKey is a reserved key in the state of a plugin that tracks which state
+// the plugin is currently in for each user.
 const stateKey string = "__state"
 
 // stateKeyEntered keeps track of whether the current state has already been
@@ -19,7 +19,7 @@ const stateKey string = "__state"
 // As mentioned elsewhere, the OnEntry function is only ever run once.
 const stateEnteredKey string = "__state_entered"
 
-// stateMachine enables package developers to easily build complex state
+// stateMachine enables plugin developers to easily build complex state
 // machines given the constraints and use-cases of an A.I. bot. It primarily
 // holds a slice of function Handlers, which is all possible states for a given
 // stateMachine. The unexported variables are useful internally in keeping track
@@ -31,7 +31,7 @@ type StateMachine struct {
 	stateEntered bool
 	states       map[string]int
 	keys         []string
-	pkgName      string
+	pluginName   string
 	logger       *log.Logger
 	db           *sqlx.DB
 	resetFn      func(*Msg)
@@ -87,18 +87,18 @@ type State struct {
 type EventRequest int
 
 // NewStateMachine initializes a stateMachine to its starting state.
-func NewStateMachine(pkgName string) *StateMachine {
-	sm := StateMachine{state: 0, pkgName: pkgName}
+func NewStateMachine(pluginName string) *StateMachine {
+	sm := StateMachine{state: 0, pluginName: pluginName}
 	sm.states = map[string]int{}
 	sm.resetFn = func(*Msg) {}
-	sm.logger = log.New(pkgName)
+	sm.logger = log.New(pluginName)
 	return &sm
 }
 
 // SetStates takes [][]State as an argument. Note that it's a slice of a slice,
 // which is used to enable tasks like requesting a user's shipping address,
 // which themselves are []Slice, to be included inline when defining the states
-// of a stateMachine. See packages/ava_purchase/ava_purchase.go as an example.
+// of a stateMachine. See plugins/ava_purchase/ava_purchase.go as an example.
 func (sm *StateMachine) SetStates(sss ...[]State) {
 	for i, ss := range sss {
 		for j, s := range ss {
@@ -110,14 +110,14 @@ func (sm *StateMachine) SetStates(sss ...[]State) {
 	}
 }
 
-// SetLogger enables the logger with any package-defined settings to be used
+// SetLogger enables the logger with any plugin-defined settings to be used
 // internally by the stateMachine. This ensures consistency in the logs of a
-// package.
+// plugin.
 func (sm *StateMachine) SetLogger(l *log.Logger) {
 	sm.logger = l
 }
 
-// SetDBConn gives a stateMachine itsabot.org/abot/shared access to a package's database
+// SetDBConn gives a stateMachine itsabot.org/abot/shared access to a plugin's database
 // connection. This is required even if no states require database access, since
 // the stateMachine's current state (among other things) are peristed to the
 // database between user requests.
@@ -126,22 +126,22 @@ func (sm *StateMachine) SetDBConn(s *sqlx.DB) {
 }
 
 // SetOnReset sets the OnReset function for the stateMachine, which should be
-// called from a package's Run() function. See
-// packages/ava_purchase/ava_purchase.go for an example.
+// called from a plugin's Run() function. See
+// plugins/ava_purchase/ava_purchase.go for an example.
 func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
 	sm.resetFn = reset
 }
 
 // LoadState upserts state into the database. If there is an existing state for
-// a given user and package, the stateMachine will load it. If not, the
+// a given user and plugin, the stateMachine will load it. If not, the
 // stateMachine will insert a starting state into the database.
 func (sm *StateMachine) LoadState(in *Msg) {
 	q := `INSERT INTO states
-	      (key, userid, value, pkgname) VALUES ($1, $2, $3, $4)
-	      ON CONFLICT (userid, key, pkgname) DO UPDATE SET value=$5
+	      (key, userid, value, pluginname) VALUES ($1, $2, $3, $4)
+	      ON CONFLICT (userid, key, pluginname) DO UPDATE SET value=$5
 	      RETURNING value`
 	var val []byte
-	err := sm.db.QueryRowx(q, stateKey, in.User.ID, 0, sm.pkgName,
+	err := sm.db.QueryRowx(q, stateKey, in.User.ID, 0, sm.pluginName,
 		sm.state).Scan(&val)
 	if err != nil && err != sql.ErrNoRows {
 		sm.logger.Debug("could not fetch value from states", err)
@@ -251,13 +251,13 @@ func (sm *StateMachine) OnInput(in *Msg) {
 }
 
 // SetMemory saves to some key to some value in Ava's memory, which can be
-// accessed by any state or package. Memories are stored in a key-value format,
+// accessed by any state or plugin. Memories are stored in a key-value format,
 // and any marshalable/unmarshalable datatype can be stored and retrieved.
-// Note that Ava's memory is global, peristed across packages. This enables
-// packages that subscribe to an agreed-upon memory API to communicate between
-// themselves. Thus, if it's absolutely necessary that no some other packages
+// Note that Ava's memory is global, peristed across plugins. This enables
+// plugins that subscribe to an agreed-upon memory API to communicate between
+// themselves. Thus, if it's absolutely necessary that no some other plugins
 // modify or access a memory, use a long key unlikely to collide with any other
-// package's.
+// plugin's.
 func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -265,10 +265,10 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 			k, ":", err)
 		return
 	}
-	q := `INSERT INTO states (key, value, pkgname, userid)
+	q := `INSERT INTO states (key, value, pluginname, userid)
 	      VALUES ($1, $2, $3, $4)
-	      ON CONFLICT (userid, pkgname, key) DO UPDATE SET value=$2`
-	_, err = sm.db.Exec(q, k, b, sm.pkgName, in.User.ID)
+	      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2`
+	_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID)
 	if err != nil {
 		sm.logger.Debug("could not set memory at", k, "to", v, ":", err)
 		return
@@ -278,9 +278,9 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 // GetMemory retrieves a memory for a given key. Accessing that Memory's value
 // is described in itsabot.org/abot/shared/datatypes/memory.go.
 func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
-	q := `SELECT value FROM states WHERE userid=$1 AND pkgname=$2 AND key=$3`
+	q := `SELECT value FROM states WHERE userid=$1 AND pluginname=$2 AND key=$3`
 	var buf []byte
-	err := sm.db.Get(&buf, q, in.User.ID, sm.pkgName, k)
+	err := sm.db.Get(&buf, q, in.User.ID, sm.pluginName, k)
 	if err == sql.ErrNoRows {
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
@@ -299,9 +299,9 @@ func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
 
 // Reset the stateMachine both in memory and in the database. This also runs the
 // programmer-defined reset function (SetOnReset) to reset memories to some
-// starting state for running the same package multiple times. This is usually
-// called from a package's Run() function. See
-// packages/ava_purchase/ava_purchase.go for an example.
+// starting state for running the same plugin multiple times. This is usually
+// called from a plugin's Run() function. See
+// plugins/ava_purchase/ava_purchase.go for an example.
 func (sm *StateMachine) Reset(in *Msg) {
 	sm.state = 0
 	sm.stateEntered = false

@@ -6,11 +6,11 @@ import (
 	"github.com/itsabot/abot/shared/log"
 )
 
-// Memory holds a generic "memory" of Ava's usually set by a package, such as
-// the current state of a package, selected products, results of a search,
+// Memory holds a generic "memory" of Ava's usually set by a plugin, such as
+// the current state of a plugin, selected products, results of a search,
 // current offset in those search results, etc. Since the value is returned as a
 // a []byte (and stored in the database in the same way), it can represent any
-// datatype, and it's up to the package developer to recall which memories
+// datatype, and it's up to the plugin developer to recall which memories
 // correspond to which datatypes.
 type Memory struct {
 	Key    string

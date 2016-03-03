@@ -1,13 +1,13 @@
 // Package language does the following four things:
 //
-// 1. Provides easy-to-use helpers for returning commonly used, randomized text
-// such as greetings.
-// 2. Normalizes varied user responses like "yup" or "nah" into something to be
-// more easily used by packages.
-// 3. Consolidates triggers by categories (e.g. automotive brands) if commonly
-// used across packages.
-// 4. Summarizes text using the custom rule-based algorithm found in
-// summarize.go.
+//	1. Provides easy-to-use helpers for returning commonly used, randomized
+//	text such as greetings.
+//	2. Normalizes varied user responses like "yup" or "nah" into something
+//	to be more easily used by plugins.
+//	3. Consolidates triggers by categories (e.g. automotive brands) if
+//	commonly used across plugins.
+//	4. Summarizes text using the custom rule-based algorithm found in
+//	summarize.go.
 package language
 
 import (

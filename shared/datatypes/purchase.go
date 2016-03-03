@@ -38,7 +38,7 @@ type Purchase struct {
 	db                 *sqlx.DB
 }
 
-// PurchaseConfig is a smaller set of purchase information that packages can use
+// PurchaseConfig is a smaller set of purchase information that plugins can use
 // to more easily build a full Purchase.
 type PurchaseConfig struct {
 	*User

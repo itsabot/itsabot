@@ -24,7 +24,7 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/itsabot/abot/shared/pkg"
+	"github.com/itsabot/abot/shared/plugin"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
@@ -59,9 +59,9 @@ func main() {
 			},
 		},
 		{
-			Name:    "package",
+			Name:    "plugin",
 			Aliases: []string{"p"},
-			Usage:   "manage and install packages from packages.json",
+			Usage:   "manage and install plugins from plugins.json",
 			Subcommands: []cli.Command{
 				{
 					Name:  "install",
@@ -101,7 +101,7 @@ func startServer() error {
 		log.Fatal("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	var err error
-	db, err = pkg.ConnectDB()
+	db, err = plugin.ConnectDB()
 	if err != nil {
 		log.Fatal("could not connect to database", err)
 	}
