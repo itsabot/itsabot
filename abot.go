@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -64,9 +65,9 @@ func main() {
 			Subcommands: []cli.Command{
 				{
 					Name:  "install",
-					Usage: "download and install packages listed in packages.json",
+					Usage: "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
-						if err := installPackages(); err != nil {
+						if err := installPlugins(); err != nil {
 							l := log.New("")
 							l.SetFlags(0)
 							l.Fatalf("could not start server\n%s", err)
@@ -94,7 +95,7 @@ func main() {
 	app.Run(os.Args)
 }
 
-// startServer initializes any clients that are needed and boots packages
+// startServer initializes any clients that are needed and boots plugins
 func startServer() error {
 	if len(os.Getenv("ABOT_SECRET")) < 32 || os.Getenv("ABOT_ENV") == "production" {
 		log.Fatal("must set ABOT_SECRET env var in production to >= 32 characters")
@@ -180,37 +181,37 @@ func startConsole(c *cli.Context) error {
 	return nil
 }
 
-func installPackages() error {
+func installPlugins() error {
 	l := log.New("")
 	l.SetFlags(0)
-	// Delete all packages in the /packages dir, packages.lock
-	if err := os.RemoveAll("./packages"); err != nil {
+	// Delete all plugins in the /plugins dir, plugins.lock
+	if err := os.RemoveAll("./plugins"); err != nil {
 		l.Fatal(err)
 	}
-	err := os.Remove("./packages.lock")
+	err := os.Remove("./plugins.lock")
 	if err != nil && err.Error() !=
-		"remove ./packages.lock: no such file or directory" {
+		"remove ./plugins.lock: no such file or directory" {
 		l.Fatal(err)
 	}
-	// Read packages.json, unmarshal into struct
-	contents, err := ioutil.ReadFile("./packages.json")
+	// Read plugins.json, unmarshal into struct
+	contents, err := ioutil.ReadFile("./plugins.json")
 	if err != nil {
 		l.Fatal(err)
 	}
-	var packages packageJSON
-	if err = json.Unmarshal(contents, &packages); err != nil {
+	var plugins pluginJSON
+	if err = json.Unmarshal(contents, &plugins); err != nil {
 		l.Fatal(err)
 	}
-	// Remake the /packages dir
-	if err = os.Mkdir("./packages", 0775); err != nil {
+	// Remake the /plugins dir
+	if err = os.Mkdir("./plugins", 0775); err != nil {
 		l.Fatal(err)
 	}
-	// Fetch packages
-	l.Info("Fetching", len(packages.Dependencies), "packages...")
+	// Fetch plugins
+	l.Info("Fetching", len(plugins.Dependencies), "plugins...")
 	var wg sync.WaitGroup
-	wg.Add(len(packages.Dependencies))
+	wg.Add(len(plugins.Dependencies))
 	rand.Seed(time.Now().UTC().UnixNano())
-	for url, _ := range packages.Dependencies {
+	for url, version := range plugins.Dependencies {
 		go func(url string) {
 			// Download source as a zip
 			resp, err := http.Get("https://" + url + "/archive/master.zip")
@@ -219,12 +220,12 @@ func installPackages() error {
 			}
 			defer resp.Body.Close()
 			if resp.StatusCode != 200 {
-				e := fmt.Sprintf("err fetching package %s: %d", url,
+				e := fmt.Sprintf("err fetching plugin %s: %d", url,
 					resp.StatusCode)
 				l.Fatal(errors.New(e))
 			}
 			fiName := "tmp_" + randSeq(8) + ".zip"
-			fpZip := filepath.Join("./packages", fiName)
+			fpZip := filepath.Join("./plugins", fiName)
 			out, err := os.Create(fpZip)
 			if err != nil {
 				l.Fatal(err)
@@ -235,7 +236,7 @@ func installPackages() error {
 				l.Fatal(err)
 			}
 			// Unzip source to directory
-			if err = unzip(fpZip, "./packages"); err != nil {
+			if err = unzip(fpZip, "./plugins"); err != nil {
 				_ = out.Close()
 				l.Fatal(err)
 			}
@@ -247,8 +248,38 @@ func installPackages() error {
 			if err = os.Remove(fpZip); err != nil {
 				l.Fatal(err)
 			}
+			ext := "-master"
+			if version != "*" {
+				ext = version
+			}
+			name := filepath.Base(url)
+			outC, err := exec.
+				Command("/bin/sh", "-c", "git rev-parse --abbrev-ref HEAD").
+				CombinedOutput()
+			if err != nil {
+				l.Fatal(err)
+			}
+			branch := string(outC)
+			// Sync to get dependencies
+			outC, err = exec.
+				Command("/bin/sh", "-c", "glock sync github.com/itsabot/abot/plugins/"+name+ext).
+				CombinedOutput()
+			if err != nil {
+				l.Debug(string(outC))
+				l.Debug(name, ext)
+				l.Fatal(err)
+			}
+			// For some reason glock leaves us detached from HEAD,
+			// but this fixes it. FIXME
+			outC, err = exec.
+				Command("/bin/sh", "-c", "git checkout "+branch).
+				CombinedOutput()
+			if err != nil {
+				l.Debug(string(outC))
+				l.Fatal(err)
+			}
 
-			// Anonymously increment the package's download count
+			// Anonymously increment the plugin's download count
 			// at itsabot.org
 			p := struct {
 				Path string
@@ -261,9 +292,9 @@ func installPackages() error {
 			}
 			var u string
 			if len(os.Getenv("ITSABOT_URL")) > 0 {
-				u = os.Getenv("ITSABOT_URL") + "/api/packages.json"
+				u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
 			} else {
-				u = "https://www.itsabot.org/api/packages.json"
+				u = "https://www.itsabot.org/api/plugins.json"
 			}
 			resp, err = http.Post(u, "application/json",
 				bytes.NewBuffer(byt))
@@ -305,7 +336,7 @@ func checkRequiredEnvVars() error {
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-type packageJSON struct {
+type pluginJSON struct {
 	Dependencies map[string]string
 }
 
