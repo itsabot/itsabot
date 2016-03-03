@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -18,26 +17,19 @@ import (
 	"time"
 
 	"github.com/itsabot/abot/core"
+	"github.com/itsabot/abot/shared/auth"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/shared/util"
 	"github.com/labstack/echo"
 	mw "github.com/labstack/echo/middleware"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/websocket"
 )
 
-const bearerAuthKey = "Bearer"
-
-type authHeader struct {
-	ID       uint64
-	Email    string
-	Scopes   []string
-	IssuedAt int64
-}
-
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
-	//e.SetHTTPErrorHandler(handlerError)
+	e.SetHTTPErrorHandler(handlerError)
 	e.SetDebug(true)
 
 	e.Static("/public/css", "public/css")
@@ -61,21 +53,9 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 
 	// API routes (restricted by login)
-	api := e.Group("/api/user", authLoggedIn(), validateCSRF())
+	api := e.Group("/api/user", auth.LoggedIn(), auth.CSRF(db))
 	api.Get("/profile.json", handlerAPIProfile)
 	api.Put("/profile.json", handlerAPIProfileView)
-
-	// API routes (restricted to trainers)
-	apiTrainer := e.Group("/api/trainer", authLoggedIn(), authTrainer(),
-		validateCSRF())
-	apiTrainer.Get("/message.json", handlerAPIConversationsShow)
-	apiTrainer.Get("/messages.json", handlerAPIMessages)
-	apiTrainer.Get("/contacts/search.json", handlerAPIContactsSearch)
-	apiTrainer.Post("/trigger.json", handlerAPITriggerPkg)
-	apiTrainer.Post("/messages.json", handlerAPIMessagesCreate)
-	apiTrainer.Patch("/conversation.json", handlerAPIConversationsComplete)
-	apiTrainer.Post("/contacts/conversations.json",
-		handlerAPIContactsConversationsCreate)
 
 	// WebSockets
 	e.WebSocket("/ws", handlerWSConversations)
@@ -240,7 +220,7 @@ func handlerAPITriggerPkg(c *echo.Context) error {
 // handlerAPILogoutSubmit processes a logout request deleting the session from
 // the server.
 func handlerAPILogoutSubmit(c *echo.Context) error {
-	uid, err := cookieVal(c, "id")
+	uid, err := util.CookieVal(c, "id")
 	if err != nil {
 		return core.JSONError(err)
 	}
@@ -422,7 +402,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 // handlerAPIProfile shows a user profile with the user's current addresses,
 // credit cards, and contact information.
 func handlerAPIProfile(c *echo.Context) error {
-	uid, err := cookieVal(c, "id")
+	uid, err := util.CookieVal(c, "id")
 	if err != nil {
 		return core.JSONError(err)
 	}
@@ -493,7 +473,7 @@ func handlerAPIProfile(c *echo.Context) error {
 // site offers the developer a better guarantee that information entered is
 // coming from the correct person.
 func handlerAPIProfileView(c *echo.Context) error {
-	uid, err := cookieVal(c, "id")
+	uid, err := util.CookieVal(c, "id")
 	if err != nil {
 		return core.JSONError(err)
 	}
@@ -604,242 +584,6 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	return nil
 }
 
-// handlerAPIMessages loads up conversations that need training for the
-// Training Index endpoint. A max of 1 message per user will be loaded, since
-// any user that needs help will receive help for their most recent request
-// via their most recent message.
-func handlerAPIMessages(c *echo.Context) error {
-	var msgs []struct {
-		ID        uint64
-		Sentence  string
-		UserID    uint64
-		CreatedAt *time.Time
-	}
-	q := `SELECT DISTINCT ON (userid)
-	          id, sentence, createdat, userid
-	      FROM messages
-	      WHERE needstraining IS TRUE
-	      ORDER BY userid, createdat DESC
-	      LIMIT 25`
-	err := db.Select(&msgs, q)
-	if err != nil && err != sql.ErrNoRows {
-		return core.JSONError(err)
-	}
-	if err = c.JSON(http.StatusOK, msgs); err != nil {
-		return core.JSONError(err)
-	}
-	return nil
-}
-
-// handlerAPIConversationsComplete marks a conversation as complete, so it's no
-// longer presented in the Training Index.
-func handlerAPIConversationsComplete(c *echo.Context) error {
-	uid, err := strconv.Atoi(c.Query("uid"))
-	if err != nil {
-		return core.JSONError(err)
-	}
-	q := `UPDATE messages SET needstraining=FALSE WHERE userid=$1`
-	_, err = db.Exec(q, uid)
-	return err
-}
-
-// handlerAPIMessagesShow returns all relevant messages and information in a
-// single conversation to enable trainers to get a sense of what happened in the
-// messages leading up to this problem and provide a better and faster solution.
-func handlerAPIConversationsShow(c *echo.Context) error {
-	uid, err := cookieVal(c, "id")
-	if err != nil {
-		return core.JSONError(err)
-	}
-	var ret []struct {
-		Sentence  string
-		AbotSent  bool
-		CreatedAt time.Time
-	}
-	q := `SELECT sentence, abotsent, createdat
-	      FROM messages
-	      WHERE userid=$1
-	      ORDER BY createdat DESC
-	      LIMIT 10`
-	if err := db.Select(&ret, q, uid); err != nil {
-		return core.JSONError(err)
-	}
-	var username string
-	q = `SELECT name FROM users WHERE id=$1`
-	if err := db.Get(&username, q, uid); err != nil {
-		return core.JSONError(err)
-	}
-	// reverse order of messages for display
-	for i, j := 0, len(ret)-1; i < j; i, j = i+1, j-1 {
-		ret[i], ret[j] = ret[j], ret[i]
-	}
-	q = `SELECT DISTINCT ON (key) key, value
-	     FROM preferences
-	     WHERE userid=$1
-	     ORDER BY key, createdat DESC
-	     LIMIT 25`
-	var prefsTmp []struct {
-		Key   string
-		Value string
-	}
-	err = db.Select(&prefsTmp, q, uid)
-	if err != nil && err != sql.ErrNoRows {
-		return core.JSONError(err)
-	}
-	var prefs []string
-	for _, p := range prefsTmp {
-		prefs = append(prefs, p.Key+": "+
-			strings.ToUpper(p.Value[:1])+p.Value[1:])
-	}
-	var tmp []string
-	q = `SELECT label FROM sessions
-	     WHERE label='gcal_token' AND userid=$1 AND token IS NOT NULL`
-	err = db.Select(&tmp, q, uid)
-	if err != nil && err != sql.ErrNoRows {
-		return core.JSONError(err)
-	}
-	cals := []string{}
-	if len(tmp) > 0 {
-		cals = append(cals, "Google")
-	}
-	var addrsTmp []struct {
-		Name  string
-		Line1 string
-	}
-	q = `SELECT name, line1 FROM addresses WHERE userid=$1`
-	err = db.Select(&addrsTmp, q, uid)
-	if err != nil && err != sql.ErrNoRows {
-		return core.JSONError(err)
-	}
-	var addrs []string
-	for _, addr := range addrsTmp {
-		if len(addr.Name) > 0 {
-			s := fmt.Sprintf("%s (%s)", addr.Name, addr.Line1)
-			addrs = append(addrs, s)
-		} else {
-			addrs = append(addrs, addr.Line1)
-		}
-	}
-	var cardsTmp []struct {
-		Last4 string
-		Brand string
-	}
-	q = `SELECT brand, last4 FROM cards WHERE userid=$1`
-	err = db.Select(&cardsTmp, q, uid)
-	if err != nil && err != sql.ErrNoRows {
-		return core.JSONError(err)
-	}
-	var cards []string
-	for _, card := range cardsTmp {
-		s := fmt.Sprintf("%s (%s)", card.Brand, card.Last4)
-		cards = append(cards, s)
-	}
-	resp := struct {
-		Username string
-		Chats    []struct {
-			Sentence  string
-			AbotSent  bool
-			CreatedAt time.Time
-		}
-		Preferences []string
-		Calendars   []string
-		Addresses   []string
-		Cards       []string
-	}{
-		Username:    username,
-		Chats:       ret,
-		Preferences: prefs,
-		Calendars:   cals,
-		Addresses:   addrs,
-		Cards:       cards,
-	}
-	if err := c.JSON(http.StatusOK, resp); err != nil {
-		return core.JSONError(err)
-	}
-	return nil
-}
-
-// handlerAPIMessagesCreate sends a message to a user on behalf of Ava and is
-// called via the training interface.
-func handlerAPIMessagesCreate(c *echo.Context) error {
-	var req struct {
-		Sentence string
-		UserID   uint64
-	}
-	if err := c.Bind(&req); err != nil {
-		return core.JSONError(err)
-	}
-	// TODO record the last flextype used and send the user a response via
-	// that. e.g. if message was received from a secondary phone number,
-	// respond to the user via that secondary phone number. For now, simply
-	// get the first flexid available
-	var fid string
-	q := `SELECT flexid FROM userflexids WHERE flexidtype=2 AND userid=$1`
-	if err := db.Get(&fid, q, req.UserID); err != nil {
-		return core.JSONError(err)
-	}
-	var id uint64
-	q = `INSERT INTO messages
-	     (userid, sentence, abotsent) VALUES ($1, $2, TRUE) RETURNING id`
-	err := db.QueryRowx(q, req.UserID, req.Sentence).Scan(&id)
-	if err != nil {
-		return core.JSONError(err)
-	}
-	/*
-		if err = sms.SendMessage(tc, fid, req.Sentence); err != nil {
-			q = `DELETE FROM messages WHERE id=$1`
-			if _, err = db.Exec(q, id); err != nil {
-				return core.JSONError(err)
-			}
-			return core.JSONError(err)
-		}
-	*/
-	if err := c.JSON(http.StatusOK, nil); err != nil {
-		return core.JSONError(err)
-	}
-	return nil
-}
-
-// TODO
-// handlerAPIContactsConversationsCreate is not yet implemented. At this point
-// we're finalizing the Contact API before continuing.
-func handlerAPIContactsConversationsCreate(c *echo.Context) error {
-	var req struct {
-		Sentence      string
-		Contact       string
-		ContactMethod string
-	}
-	if err := c.Bind(&req); err != nil {
-		return core.JSONError(err)
-	}
-	// TODO insert into contact's messages, send message
-	return core.JSONError(errors.New("ContactsConversationsCreate not implemented"))
-}
-
-// handlerAPIContactsSearch provides a way to query for contacts using full-text
-// search on their name, email and phone number.
-//
-// TODO this will be implemented when the Contact API has been decided.
-func handlerAPIContactsSearch(c *echo.Context) error {
-	/*
-		uid, err := strconv.Atoi(c.Query("UserID"))
-		if err != nil {
-			return core.JSONError(err)
-		}
-		var results []dt.Contact
-		q := `SELECT name, email, phone FROM contacts
-		      WHERE userid=$1 AND name ILIKE $2`
-		term := "%" + c.Query("Query") + "%"
-		if err := db.Select(&results, q, uid, term); err != nil {
-			return core.JSONError(err)
-		}
-		if err := c.JSON(http.StatusOK, results); err != nil {
-			return core.JSONError(err)
-		}
-	*/
-	return core.JSONError(errors.New("not implemented"))
-}
-
 // handlerWSConversations establishes a socket connection for the training
 // interface to reload as new user messages arrive.
 func handlerWSConversations(c *echo.Context) error {
@@ -864,6 +608,7 @@ func handlerWSConversations(c *echo.Context) error {
 
 func handlerError(err error, c *echo.Context) {
 	log.Debug("failed handling", err)
+	c.Error(err)
 	// TODO implement mail interface
 	// mc.SendBug(err)
 }
@@ -882,14 +627,14 @@ func createCSRFToken(u *dt.User) (token string, err error) {
 
 // getAuthToken returns a token used for future client authorization with a CSRF
 // token.
-func getAuthToken(u *dt.User) (header *authHeader, authToken string,
+func getAuthToken(u *dt.User) (header *auth.Header, authToken string,
 	err error) {
 
 	scopes := []string{}
 	if u.Trainer {
 		scopes = append(scopes, "trainer")
 	}
-	header = &authHeader{
+	header = &auth.Header{
 		ID:       u.ID,
 		Email:    u.Email,
 		Scopes:   scopes,
@@ -906,149 +651,4 @@ func getAuthToken(u *dt.User) (header *authHeader, authToken string,
 	}
 	authToken = base64.StdEncoding.EncodeToString(hash.Sum(nil))
 	return header, authToken, nil
-}
-
-func authLoggedIn() echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		log.Debug("validating logged in")
-		// Skip WebSocket
-		if (c.Request().Header.Get(echo.Upgrade)) == echo.WebSocket {
-			return nil
-		}
-		c.Response().Header().Set(echo.WWWAuthenticate, bearerAuthKey+" realm=Restricted")
-		auth := c.Request().Header.Get(echo.Authorization)
-		l := len(bearerAuthKey)
-		// Ensure client sent the token
-		if len(auth) <= l+1 || auth[:l] != bearerAuthKey {
-			log.Debug("client did not send token")
-			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
-		}
-		// Ensure the token is still valid
-		tmp, err := cookieVal(c, "issuedAt")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		issuedAt, err := strconv.ParseInt(tmp, 10, 64)
-		if err != nil {
-			return core.JSONError(err)
-		}
-		t := time.Unix(issuedAt, 0)
-		if t.Add(72 * time.Hour).Before(time.Now()) {
-			log.Debug("token expired")
-			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
-		}
-		// Ensure the token has not been tampered with
-		b, err := base64.StdEncoding.DecodeString(auth[l+1:])
-		if err != nil {
-			return core.JSONError(err)
-		}
-		tmp, err = cookieVal(c, "scopes")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		scopes := strings.Fields(tmp)
-		tmp, err = cookieVal(c, "id")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		userID, err := strconv.ParseUint(tmp, 10, 64)
-		if err != nil {
-			return core.JSONError(err)
-		}
-		email, err := cookieVal(c, "email")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		a := authHeader{
-			ID:       userID,
-			Email:    email,
-			Scopes:   scopes,
-			IssuedAt: issuedAt,
-		}
-		byt, err := json.Marshal(a)
-		if err != nil {
-			return core.JSONError(err)
-		}
-		known := hmac.New(sha512.New, []byte(os.Getenv("ABOT_SECRET")))
-		_, err = known.Write(byt)
-		if err != nil {
-			return core.JSONError(err)
-		}
-		ok := hmac.Equal(known.Sum(nil), b)
-		if !ok {
-			log.Debug("token tampered")
-			return core.JSONError(echo.NewHTTPError(http.StatusUnauthorized))
-		}
-		log.Debug("validated logged in")
-		return nil
-	}
-}
-
-func authTrainer() echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		// Since the headers are validated in authLoggedIn, we can trust
-		// these scopes and can avoid a DB request
-		log.Debug("validating trainer")
-		tmp, err := cookieVal(c, "scopes")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		scopes := strings.Fields(tmp)
-		for _, scope := range scopes {
-			if scope == "trainer" {
-				log.Debug("validated trainer")
-				return nil
-			}
-		}
-		return echo.NewHTTPError(http.StatusUnauthorized)
-	}
-}
-
-// validateCSRF ensures that any forms posted to Abot are protected against
-// Cross-Site Request Forgery. Without this function, Abot would be vulnerable
-// to the attack because tokens are stored client-side in cookies.
-func validateCSRF() echo.HandlerFunc {
-	return func(c *echo.Context) error {
-		// TODO look into other session-based temporary storage systems
-		// for these csrf tokens to prevent hitting the database.
-		// Whatever is selected must *not* introduce a dependency
-		// (memcached/Redis). Bolt might be an option.
-		if c.Request().Method == "GET" {
-			return nil
-		}
-		log.Debug("validating csrf")
-		var label string
-		q := `SELECT label FROM sessions
-		      WHERE userid=$1 AND label='csrfToken' AND token=$2`
-		uid, err := cookieVal(c, "id")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		token, err := cookieVal(c, "csrfToken")
-		if err != nil {
-			return core.JSONError(err)
-		}
-		err = db.Get(&label, q, uid, token)
-		if err == sql.ErrNoRows {
-			return echo.NewHTTPError(http.StatusUnauthorized)
-		}
-		if err != nil {
-			return core.JSONError(err)
-		}
-		log.Debug("validated csrf")
-		return nil
-	}
-}
-
-// cookieVal retrieves a cookie
-func cookieVal(c *echo.Context, name string) (value string, err error) {
-	ck, err := c.Request().Cookie(name)
-	if err != nil {
-		return "", fmt.Errorf("%s: %s", err, name)
-	}
-	val, err := url.QueryUnescape(ck.Value)
-	if err != nil {
-		return "", err
-	}
-	return val, nil
 }

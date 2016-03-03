@@ -79,7 +79,7 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	}
 	log.Debug("message response:", ret)
 	m := &dt.Msg{}
-	m.AvaSent = true
+	m.AbotSent = true
 	m.User = msg.User
 	if len(ret) == 0 {
 		m.Sentence = language.Confused()
