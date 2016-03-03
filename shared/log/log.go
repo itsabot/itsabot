@@ -39,28 +39,28 @@ func Infof(format string, v ...interface{}) {
 // Warn is not used, but it's included to satisfy the Echo router's Logger
 // interface. The rationale on why Warn and Error have been excluded can be
 // found here: http://dave.cheney.net/2015/11/05/lets-talk-about-logging
-func Warn(v ...interface{}) {
+func (l *Logger) Warn(v ...interface{}) {
 	Debug(v...)
 }
 
 // Warnf is not used, but it's included to satisfy the Echo router's Logger
 // interface. The rationale on why Warn and Error have been excluded can be
 // found here: http://dave.cheney.net/2015/11/05/lets-talk-about-logging
-func Warnf(format string, v ...interface{}) {
+func (l *Logger) Warnf(format string, v ...interface{}) {
 	Debugf(format, v...)
 }
 
 // Error is not used, but it's included to satisfy the Echo router's Logger
 // interface. The rationale on why Warn and Error have been excluded can be
 // found here: http://dave.cheney.net/2015/11/05/lets-talk-about-logging
-func Error(v ...interface{}) {
+func (l *Logger) Error(v ...interface{}) {
 	Debug(v...)
 }
 
 // Errorf is not used, but it's included to satisfy the Echo router's Logger
 // interface. The rationale on why Warn and Error have been excluded can be
 // found here: http://dave.cheney.net/2015/11/05/lets-talk-about-logging
-func Errorf(format string, v ...interface{}) {
+func (l *Logger) Errorf(format string, v ...interface{}) {
 	Debugf(format, v...)
 }
 

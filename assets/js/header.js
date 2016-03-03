@@ -1,26 +1,6 @@
 (function(abot) {
 abot.Header = {}
-abot.Header.controller = function() {
-	var ctrl = this
-	ctrl.signout = function(ev) {
-		ev.preventDefault()
-		abot.request({
-			url: "/api/logout.json",
-			method: "POST",
-		}).then(function() {
-			cookie.removeItem("id")
-			cookie.removeItem("email")
-			cookie.removeItem("issuedAt")
-			cookie.removeItem("scopes")
-			cookie.removeItem("csrfToken")
-			cookie.removeItem("authToken")
-			m.route("/login")
-		}, function(err) {
-			console.error(err)
-		})
-	}
-}
-abot.Header.view = function(ctrl) {
+abot.Header.view = function() {
 	var tour = null
 	var profileOrLogin
 	if (cookie.getItem("id") !== null) {
@@ -29,7 +9,7 @@ abot.Header.view = function(ctrl) {
 				config: m.route
 			}, "Profile"),
 			m("a[href=#/]", {
-				onclick: ctrl.signout,
+				onclick: abot.signout,
 			}, "Sign out"),
 		]
 	} else {

@@ -10,6 +10,23 @@ abot.fnCopy = function(from, to) {
 		}
 	}
 }
+abot.signout = function(ev) {
+	ev.preventDefault()
+	abot.request({
+		url: "/api/logout.json",
+		method: "POST",
+	}).then(function() {
+		cookie.removeItem("id")
+		cookie.removeItem("email")
+		cookie.removeItem("issuedAt")
+		cookie.removeItem("scopes")
+		cookie.removeItem("csrfToken")
+		cookie.removeItem("authToken")
+		m.route("/login")
+	}, function(err) {
+		console.error(err)
+	})
+}
 abot.isLoggedIn = function() {
 	if (cookie.getItem("id") != null &&
 		cookie.getItem("email") != null &&
@@ -74,8 +91,6 @@ window.addEventListener('load', function() {
 	m.route.mode = "pathname"
 	m.route(document.body, "/", {
 		"/": abot.Index,
-		"/train": abot.TrainIndex,
-		"/train/:id": abot.TrainShow,
 		"/signup": abot.Signup,
 		"/login": abot.Login,
 		"/forgot_password": abot.ForgotPassword,

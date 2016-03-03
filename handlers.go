@@ -19,6 +19,7 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/auth"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/interface/emailsender"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/util"
 	"github.com/labstack/echo"
@@ -29,8 +30,9 @@ import (
 
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
-	e.SetHTTPErrorHandler(handlerError)
 	e.SetDebug(true)
+	logger := log.New("")
+	e.SetLogger(logger)
 
 	e.Static("/public/css", "public/css")
 	e.Static("/public/js", "public/js")
@@ -152,16 +154,16 @@ func handlerMain(c *echo.Context) error {
 	if err != nil {
 		ret = errMsg
 		errSent = true
-		handlerError(err, c)
+		log.Debug(err)
 	}
 	if err = ws.NotifySockets(c, uid, c.Form("cmd"), ret); err != nil {
 		if !errSent {
-			handlerError(err, c)
+			log.Debug(err)
 		}
 	}
 	if err = c.HTML(http.StatusOK, ret); err != nil {
 		if !errSent {
-			handlerError(err, c)
+			log.Debug(err)
 		}
 	}
 	return nil
@@ -372,14 +374,33 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		return core.JSONError(errors.New(
 			"Something went wrong. Please try again."))
 	}
-	// TODO createCSRFToken
-	var resp struct {
+	user := &dt.User{
+		ID:      uid,
+		Email:   req.Email,
+		Trainer: false,
+	}
+	csrfToken, err := createCSRFToken(user)
+	if err != nil {
+		return core.JSONError(err)
+	}
+	header, token, err := getAuthToken(user)
+	if err != nil {
+		return core.JSONError(err)
+	}
+	resp := struct {
 		ID        uint64
 		Email     string
 		Scopes    []string
 		AuthToken string
-		IssuedAt  uint64
+		IssuedAt  int64
 		CSRFToken string
+	}{
+		ID:        user.ID,
+		Email:     user.Email,
+		Scopes:    header.Scopes,
+		AuthToken: token,
+		IssuedAt:  header.IssuedAt,
+		CSRFToken: csrfToken,
 	}
 	resp.ID = uid
 	if os.Getenv("ABOT_ENV") == "production" {
@@ -520,13 +541,9 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	if _, err := db.Exec(q, user.ID, secret); err != nil {
 		return core.JSONError(err)
 	}
-	// TODO implement mail interface
-	/*
-		h := template.ForgotPasswordEmail(user.Name, secret)
-		if err := mc.Send("Password reset", h, &user); err != nil {
-			return core.JSONError(err)
-		}
-	*/
+	if len(emailsender.Drivers()) == 0 {
+		return core.JSONError(errors.New("Sorry, this feature is not enabled. To be enabled, an email driver must be imported."))
+	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
 		return core.JSONError(err)
 	}
@@ -604,13 +621,6 @@ func handlerWSConversations(c *echo.Context) error {
 		}
 	}
 	return nil
-}
-
-func handlerError(err error, c *echo.Context) {
-	log.Debug("failed handling", err)
-	c.Error(err)
-	// TODO implement mail interface
-	// mc.SendBug(err)
 }
 
 // createCSRFToken creates a new token, invalidating any existing token.

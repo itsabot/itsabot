@@ -1,20 +1,20 @@
-(function(ava) {
-ava.ForgotPassword = {}
-ava.ForgotPassword.controller = function() {
+(function(abot) {
+abot.ForgotPassword = {}
+abot.ForgotPassword.controller = function() {
 	var ctrl = this
 	ctrl.submit = function(ev) {
 		ev.preventDefault()
+		console.log("preventing default")
 		ctrl.hideError()
 		var email = document.getElementById("email").value
-		return m.request({
+		return abot.request({
 			method: "POST",
-			data: {
-				Email: email
-			},
+			data: { Email: email },
 			url: "/api/forgot_password.json"
 		}).then(function(data) {
 			ctrl.showSuccess()
 		}, function(err) {
+			console.log("Error!")
 			ctrl.showError(err.Msg)
 		})
 	},
@@ -45,16 +45,13 @@ ava.ForgotPassword.controller = function() {
 		document.getElementById("btn").classList.add("hidden")
 	}
 }
-
-ava.ForgotPassword.view = function(ctrl) {
-	return m(".body", [
-		m.component(ava.Header),
-		ava.ForgotPassword.viewFull(ctrl),
-		m.component(ava.Footer)
+abot.ForgotPassword.view = function(ctrl) {
+	return m(".main", [
+		m.component(abot.Header),
+		abot.ForgotPassword.viewFull(ctrl),
 	])
 }
-
-ava.ForgotPassword.viewFull = function(ctrl) {
+abot.ForgotPassword.viewFull = function(ctrl) {
 	return m("#full.container", [
 		m(".row.margin-top-sm", [
 			m(".col-md-push-3.col-md-6.card", [
@@ -95,7 +92,6 @@ ava.ForgotPassword.viewFull = function(ctrl) {
 									id: "btn",
 									type: "submit",
 									onclick: ctrl.submit,
-									onsubmit: ctrl.submit,
 									value: "Submit"
 								})
 							])
@@ -117,4 +113,4 @@ ava.ForgotPassword.viewFull = function(ctrl) {
 		])
 	])
 }
-})(!window.ava ? window.ava={} : window.ava);
+})(!window.abot ? window.abot={} : window.abot);

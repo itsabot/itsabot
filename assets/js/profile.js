@@ -3,9 +3,6 @@ abot.Profile = {}
 abot.Profile.controller = function() {
 	var userId = cookie.getItem("id")
 	if (!userId || userId <= 0) {
-		cookie.removeItem("id")
-		cookie.removeItem("trainer")
-		cookie.removeItem("session_token")
 		return m.route("/login")
 	}
 	var redirect = m.route.param("r")

@@ -30,8 +30,16 @@ abot.Signup.controller = function() {
 		}).then(function(data) {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
-			cookie.setItem("id", data.ID, exp, null, null, false)
-			cookie.setItem("session_token", data.SessionToken, exp, null, null, false)
+			var secure = true
+			if (window.location.hostname === "localhost") {
+				secure = false
+			}
+			cookie.setItem("id", data.ID, exp, null, null, secure)
+			cookie.setItem("email", data.Email, exp, null, null, secure)
+			cookie.setItem("issuedAt", data.IssuedAt, exp, null, null, secure)
+			cookie.setItem("authToken", data.AuthToken, exp, null, null, secure)
+			cookie.setItem("csrfToken", data.CSRFToken, exp, null, null, secure)
+			cookie.setItem("scopes", data.Scopes, exp, null, null, secure)
 			m.route("/profile")
 		}, function(err) {
 			ctrl.props.error(err.Msg)
