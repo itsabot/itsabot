@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "Verifying PostgreSQL is running... "
+if ! ps ax | grep 'postgres' > /dev/null
+then
+	echo "PostgreSQL not running. Please start Postgres to continue."
+	exit 1
+fi
+
+echo "Confirming postgres user exists..."
+if ! psql -U postgres postgres -tAc "SELECT '' FROM pg_roles WHERE rolname='postgres'" > /dev/null
+then
+	echo "Please create a PostgreSQL user named postgres to continue. Google \"createuser postgres\""
+fi
+
+echo "Creating abot database..."
+if ! createdb -U postgres abot -O postgres &> /dev/null
+then
+	echo "WARN: could not create abot database. If you already created one, you can ignore this message."
+fi
+
+echo "Migrating database..."
+if ! cmd/migrateup.sh &> /dev/null
+then
+	echo "Failed migrating db"
+fi
+
+echo "Creating local admin account..."
+echo -n "Email: "
+read username;
+echo -n "Password: "
+read -s pw;
+if psql -U postgres -d abot -c "
+	INSERT INTO users (name, email, password, admin, locationid)
+	VALUES ('admin', '$username', '$pw', TRUE, 0)
+	" > /dev/null
+then
+	echo "Created admin account."
+else
+	echo "Could not create admin account. Continuing..."
+fi
+
+echo "Updating environment variables"
+if [ -f ~/.bash_profile ];
+then
+	FILE=$HOME/.bash_profile
+else
+	FILE=$HOME/.bashrc
+fi
+
+# Delete old lines
+sed -i -n '/\n# Added by Abot via /!p' $FILE
+sed -i -n '/# Added by Abot via /!p' $FILE
+sed -i -n '/export PORT=/!p' $FILE
+sed -i -n '/export ABOT_URL=/!p' $FILE
+sed -i -n '/export ABOT_ENV=/!p' $FILE
+sed -i -n '/export ABOT_SECRET=/!p' $FILE
+
+# Generate ABOT_SECRET used for validating cookie values
+SECRET=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-64};echo;)
+
+# Append environment variables
+cat <<EOT >> $FILE
+
+# Added by Abot via setup.sh 
+export PORT="4200"
+export ABOT_ENV="development"
+export ABOT_URL="http://localhost:4200"
+export ABOT_SECRET="$SECRET"
+EOT
+
+echo "Installing Abot..."
+go install
+
+abot plugin install
+
+echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200"

@@ -9,13 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"text/template"
 	"time"
 
 	"github.com/itsabot/abot/core"
@@ -129,10 +129,15 @@ func initCMDGroup(g *echo.Group) {
 // handlerIndex presents the homepage to the user and populates the HTML with
 // server-side variables.
 func handlerIndex(c *echo.Context) error {
-	// TODO split out to main unless in development
-	tmplLayout, err := template.ParseFiles("assets/html/layout.html")
-	if err != nil {
-		log.Fatal(err)
+	if os.Getenv("ABOT_ENV") == "development" {
+		var err error
+		tmplLayout, err = template.ParseFiles("assets/html/layout.html")
+		if err != nil {
+			return err
+		}
+		if err = compileAssets(); err != nil {
+			return err
+		}
 	}
 	var s []byte
 	b := bytes.NewBuffer(s)
@@ -142,7 +147,7 @@ func handlerIndex(c *echo.Context) error {
 	if err := tmplLayout.Execute(b, data); err != nil {
 		return err
 	}
-	if err = c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
+	if err := c.HTML(http.StatusOK, string(b.Bytes())); err != nil {
 		return err
 	}
 	return nil

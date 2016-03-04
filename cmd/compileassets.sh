@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
-set -e
+rm -rf public/*
+mkdir -p public/{css,js,images}
 
-mkdir -p public/js public/css
+# Concatenate files
 cat {plugins/*/,}assets/{vendor/,}js/*.js > public/js/main.js 2>/dev/null
 cat {plugins/*/,}assets/{vendor/,}css/*.css > public/css/main.css 2>/dev/null
-cp -r plugins/*/public/images/. public/images
-cp -r assets/images/. public/images
+
+# Create symbolic links to images
+ln -s plugins/*/public/images/* public/images
+ln -s assets/images/* public/images

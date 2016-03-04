@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -32,6 +33,7 @@ import (
 
 var db *sqlx.DB
 var ner core.Classifier
+var tmplLayout *template.Template
 var ws = websocket.NewAtomicWebSocketSet()
 var offensive map[string]struct{}
 var (
@@ -106,6 +108,10 @@ func startServer() error {
 		log.Fatal("could not connect to database", err)
 	}
 	if err = checkRequiredEnvVars(); err != nil {
+		return err
+	}
+	tmplLayout, err = template.ParseFiles("assets/html/layout.html")
+	if err != nil {
 		return err
 	}
 	if err = compileAssets(); err != nil {
@@ -328,6 +334,14 @@ func installPlugins() error {
 		}(url)
 	}
 	wg.Wait()
+	l.Info("Installing plugins...")
+	outC, err := exec.
+		Command("/bin/sh", "-c", "go install ./...").
+		CombinedOutput()
+	if err != nil {
+		l.Debug(string(outC))
+		l.Fatal(err)
+	}
 	l.Info("Success!")
 	return nil
 }
@@ -422,6 +436,12 @@ func randSeq(n int) string {
 // boot. In development, this step is repeated on each server HTTP request prior
 // to serving any assets.
 func compileAssets() error {
-	log.Debug("compileAssets not implemented")
+	outC, err := exec.
+		Command("/bin/sh", "-c", "cmd/compileassets.sh").
+		CombinedOutput()
+	if err != nil {
+		log.Debug(string(outC))
+		log.Fatal(err)
+	}
 	return nil
 }

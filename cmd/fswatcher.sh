@@ -4,14 +4,7 @@ set -e
 
 
 ava_reload() {
-	rm -rf public/*
-	mkdir -p public/{css,js}
-
 	echo reloading...
-	jsfiles=$(find assets/{vendor/,}/js -type f -name "*.js")
-	cssfiles=$(find assets/{vendor/,}css -type f -name "*.css")
-	cat $jsfiles > public/js/main.js
-	cat $cssfiles > public/css/main.css
 	curl localhost:4200/_/cmd/reload
 }
 
