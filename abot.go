@@ -108,6 +108,9 @@ func startServer() error {
 	if err = checkRequiredEnvVars(); err != nil {
 		return err
 	}
+	if err = compileAssets(); err != nil {
+		return err
+	}
 	addr, err := core.BootRPCServer()
 	if err != nil {
 		return err
@@ -184,13 +187,15 @@ func startConsole(c *cli.Context) error {
 func installPlugins() error {
 	l := log.New("")
 	l.SetFlags(0)
-	// Delete all plugins in the /plugins dir, plugins.lock
-	if err := os.RemoveAll("./plugins"); err != nil {
+	// Delete all plugins in the /plugins and /public directories
+	err := os.RemoveAll("./plugins")
+	if err != nil && err.Error() !=
+		"remove ./plugins: no such file or directory" {
 		l.Fatal(err)
 	}
-	err := os.Remove("./plugins.lock")
+	err = os.RemoveAll("./public")
 	if err != nil && err.Error() !=
-		"remove ./plugins.lock: no such file or directory" {
+		"remove ./public: no such file or directory" {
 		l.Fatal(err)
 	}
 	// Read plugins.json, unmarshal into struct
@@ -202,8 +207,12 @@ func installPlugins() error {
 	if err = json.Unmarshal(contents, &plugins); err != nil {
 		l.Fatal(err)
 	}
-	// Remake the /plugins dir
+	// Remake the /plugins dir for plugin Go code
 	if err = os.Mkdir("./plugins", 0775); err != nil {
+		l.Fatal(err)
+	}
+	// Remake the /public dir for assets
+	if err = os.Mkdir("./public", 0775); err != nil {
 		l.Fatal(err)
 	}
 	// Fetch plugins
@@ -279,7 +288,8 @@ func installPlugins() error {
 			// For some reason glock leaves us detached from HEAD,
 			// but this fixes it. FIXME
 			outC, err = exec.
-				Command("/bin/sh", "-c", "git checkout "+branch).
+				os.Mov
+			Command("/bin/sh", "-c", "git checkout "+branch).
 				CombinedOutput()
 			if err != nil {
 				l.Debug(string(outC))
@@ -407,4 +417,11 @@ func randSeq(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+// compileAssets compresses and merges assets from Abot core and all plugins on
+// boot. In development, this step is repeated on each server HTTP request prior
+// to serving any assets.
+func compileAssets() error {
+
 }
