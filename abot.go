@@ -94,7 +94,9 @@ func main() {
 	app.Action = func(c *cli.Context) {
 		cli.ShowAppHelp(c)
 	}
-	app.Run(os.Args)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
 
 // startServer initializes any clients that are needed and boots plugins
@@ -122,7 +124,7 @@ func startServer() error {
 		return err
 	}
 	go func() {
-		if err := core.BootDependencies(addr); err != nil {
+		if err = core.BootDependencies(addr); err != nil {
 			log.Debug("could not boot dependency", err)
 		}
 	}()
@@ -180,7 +182,9 @@ func startConsole(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		resp.Body.Close()
+		if err = resp.Body.Close(); err != nil {
+			return err
+		}
 		fmt.Println(string(body))
 		fmt.Print("> ")
 	}
@@ -227,13 +231,18 @@ func installPlugins() error {
 	wg.Add(len(plugins.Dependencies))
 	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
-		go func(url string) {
+		go func(url, version string) {
 			// Download source as a zip
-			resp, err := http.Get("https://" + url + "/archive/master.zip")
+			var resp *http.Response
+			resp, err = http.Get("https://" + url + "/archive/master.zip")
 			if err != nil {
 				l.Fatal(err)
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err = resp.Body.Close(); err != nil {
+					l.Fatal(err)
+				}
+			}()
 			if resp.StatusCode != 200 {
 				e := fmt.Sprintf("err fetching plugin %s: %d", url,
 					resp.StatusCode)
@@ -241,7 +250,8 @@ func installPlugins() error {
 			}
 			fiName := "tmp_" + randSeq(8) + ".zip"
 			fpZip := filepath.Join("./plugins", fiName)
-			out, err := os.Create(fpZip)
+			var out *os.File
+			out, err = os.Create(fpZip)
 			if err != nil {
 				l.Fatal(err)
 			}
@@ -273,7 +283,8 @@ func installPlugins() error {
 				ext = version
 			}
 			name := filepath.Base(url)
-			outC, err := exec.
+			var outC []byte
+			outC, err = exec.
 				Command("/bin/sh", "-c", "git rev-parse --abbrev-ref HEAD").
 				CombinedOutput()
 			if err != nil {
@@ -306,7 +317,7 @@ func installPlugins() error {
 			p := struct {
 				Path string
 			}{Path: url}
-			byt, err := json.Marshal(p)
+			outC, err = json.Marshal(p)
 			if err != nil {
 				l.Info("failed to build itsabot.org JSON.", err)
 				wg.Done()
@@ -319,19 +330,23 @@ func installPlugins() error {
 				u = "https://www.itsabot.org/api/plugins.json"
 			}
 			resp, err = http.Post(u, "application/json",
-				bytes.NewBuffer(byt))
+				bytes.NewBuffer(outC))
 			if err != nil {
 				l.Info("failed to update itsabot.org.", err)
 				wg.Done()
 				return
 			}
-			defer resp.Body.Close()
+			defer func() {
+				if err = resp.Body.Close(); err != nil {
+					l.Fatal(err)
+				}
+			}()
 			if resp.StatusCode != 200 {
 				l.Info("WARN: %d - %s\n", resp.StatusCode,
 					resp.Status)
 			}
 			wg.Done()
-		}(url)
+		}(url, version)
 	}
 	wg.Wait()
 	l.Info("Installing plugins...")
@@ -377,11 +392,13 @@ func unzip(src, dest string) error {
 		return err
 	}
 	defer func() {
-		if err := r.Close(); err != nil {
+		if err = r.Close(); err != nil {
 			panic(err)
 		}
 	}()
-	os.MkdirAll(dest, 0755)
+	if err = os.MkdirAll(dest, 0755); err != nil {
+		return err
+	}
 	for _, f := range r.File {
 		err = extractAndWriteFile(dest, f)
 		if err != nil {
@@ -398,20 +415,22 @@ func extractAndWriteFile(dest string, f *zip.File) error {
 		return err
 	}
 	defer func() {
-		if err := rc.Close(); err != nil {
+		if err = rc.Close(); err != nil {
 			panic(err)
 		}
 	}()
 	path := filepath.Join(dest, f.Name)
 	if f.FileInfo().IsDir() {
-		os.MkdirAll(path, f.Mode())
+		if err = os.MkdirAll(path, f.Mode()); err != nil {
+			return err
+		}
 	} else {
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 		if err != nil {
 			return err
 		}
 		defer func() {
-			if err := f.Close(); err != nil {
+			if err = f.Close(); err != nil {
 				panic(err)
 			}
 		}()

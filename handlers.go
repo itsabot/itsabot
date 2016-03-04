@@ -181,56 +181,6 @@ func handlerMain(c *echo.Context) error {
 	return nil
 }
 
-// handlerAPITriggerPkg enables easier communication via JSON with the training
-// interface when trainers want to "trigger" an action on behalf of a user.
-func handlerAPITriggerPkg(c *echo.Context) error {
-	c.Set("cmd", c.Form("cmd"))
-	c.Set("uid", c.Form("uid"))
-	msg, err := core.Preprocess(db, ner, c)
-	if err != nil {
-		return core.JSONError(err)
-	}
-	pkg, route, _, err := core.GetPlugin(db, msg)
-	if err != nil {
-		log.Debug("could not get core plugin", err)
-		return core.JSONError(err)
-	}
-	msg.Route = route
-	if pkg == nil {
-		msg.Plugin = ""
-	} else {
-		msg.Plugin = pkg.P.Config.Name
-	}
-	ret, err := core.CallPlugin(pkg, msg, false)
-	if err != nil {
-		log.Debug("could not call plugin", err)
-		return core.JSONError(err)
-	}
-	if len(ret) == 0 {
-		tmp := fmt.Sprintf("%s %s", "missing trigger/pkg for cmd",
-			c.Get("cmd"))
-		return core.JSONError(errors.New(tmp))
-	}
-	m := &dt.Msg{}
-	m.AbotSent = true
-	m.User = msg.User
-	m.Sentence = ret
-	if pkg != nil {
-		m.Plugin = pkg.P.Config.Name
-	}
-	if err = m.Save(db); err != nil {
-		log.Debug("could not save Abot response message", err)
-		return core.JSONError(err)
-	}
-	resp := struct {
-		Msg string
-	}{Msg: ret}
-	if err = c.JSON(http.StatusOK, resp); err != nil {
-		return core.JSONError(err)
-	}
-	return nil
-}
-
 // handlerAPILogoutSubmit processes a logout request deleting the session from
 // the server.
 func handlerAPILogoutSubmit(c *echo.Context) error {
@@ -418,17 +368,6 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		CSRFToken: csrfToken,
 	}
 	resp.ID = uid
-	if os.Getenv("ABOT_ENV") == "production" {
-		fName := strings.Fields(req.Name)[0]
-		msg := fmt.Sprintf("Nice to meet you, %s. ", fName)
-		msg += "How can I help? Try asking me to help you find a nice bottle of wine."
-		// TODO move to the new SMS interface
-		/*
-			if err = sms.SendMessage(tc, req.FID, msg); err != nil {
-				return core.JSONError(err)
-			}
-		*/
-	}
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return core.JSONError(err)
 	}
@@ -553,7 +492,7 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	}
 	secret := randSeq(40)
 	q = `INSERT INTO passwordresets (userid, secret) VALUES ($1, $2)`
-	if _, err := db.Exec(q, user.ID, secret); err != nil {
+	if _, err = db.Exec(q, user.ID, secret); err != nil {
 		return core.JSONError(err)
 	}
 	if len(emailsender.Drivers()) == 0 {
@@ -635,7 +574,6 @@ func handlerWSConversations(c *echo.Context) error {
 			return err
 		}
 	}
-	return nil
 }
 
 func handlerAPIPlugins(c *echo.Context) error {
@@ -654,7 +592,8 @@ func handlerAPIPlugins(c *echo.Context) error {
 		}
 		// Add each plugin.json to array of plugins
 		p := filepath.Join("./plugins", fi.Name(), "plugin.json")
-		byt, err := ioutil.ReadFile(p)
+		var byt []byte
+		byt, err = ioutil.ReadFile(p)
 		if err != nil {
 			return core.JSONError(err)
 		}
