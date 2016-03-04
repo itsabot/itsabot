@@ -235,19 +235,24 @@ func installPlugins() error {
 				_ = out.Close()
 				l.Fatal(err)
 			}
+
 			// Unzip source to directory
 			if err = unzip(fpZip, "./plugins"); err != nil {
 				_ = out.Close()
 				l.Fatal(err)
 			}
+
 			// Close zip file
 			if err = out.Close(); err != nil {
 				l.Fatal(err)
 			}
+
 			// Delete zip file
 			if err = os.Remove(fpZip); err != nil {
 				l.Fatal(err)
 			}
+
+			// Get tag, branch information
 			ext := "-master"
 			if version != "*" {
 				ext = version
@@ -260,6 +265,7 @@ func installPlugins() error {
 				l.Fatal(err)
 			}
 			branch := string(outC)
+
 			// Sync to get dependencies
 			outC, err = exec.
 				Command("/bin/sh", "-c", "glock sync $(pwd | sed 's/^.*src\\///')").
@@ -269,6 +275,7 @@ func installPlugins() error {
 				l.Debug(name, ext)
 				l.Fatal(err)
 			}
+
 			// For some reason glock leaves us detached from HEAD,
 			// but this fixes it. FIXME
 			outC, err = exec.
@@ -286,7 +293,7 @@ func installPlugins() error {
 			}{Path: url}
 			byt, err := json.Marshal(p)
 			if err != nil {
-				l.Info("WARN:", err)
+				l.Info("failed to build itsabot.org JSON.", err)
 				wg.Done()
 				return
 			}
@@ -299,7 +306,7 @@ func installPlugins() error {
 			resp, err = http.Post(u, "application/json",
 				bytes.NewBuffer(byt))
 			if err != nil {
-				l.Info("WARN:", err)
+				l.Info("failed to update itsabot.org.", err)
 				wg.Done()
 				return
 			}

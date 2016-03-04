@@ -11,9 +11,9 @@ abot.Login.controller = function() {
 			method: "POST",
 			data: {
 				email: email,
-				password: pass
+				password: pass,
 			},
-			url: "/api/login.json"
+			url: "/api/login.json",
 		}).then(function(data) {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
@@ -21,6 +21,7 @@ abot.Login.controller = function() {
 			if (window.location.hostname === "localhost") {
 				secure = false
 			}
+			console.log(data)
 			cookie.setItem("id", data.ID, exp, null, null, secure)
 			cookie.setItem("email", data.Email, exp, null, null, secure)
 			cookie.setItem("issuedAt", data.IssuedAt, exp, null, null, secure)

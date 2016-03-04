@@ -1,5 +1,5 @@
 {
 	"Dependencies": {
-		"github.com/itsabot/pkg_onboard": "*"
+		"github.com/itsabot/plugin_onboard": "*"
 	}
 }

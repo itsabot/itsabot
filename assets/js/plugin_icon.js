@@ -10,7 +10,7 @@ abot.PluginIcon.view = function(ctrl, attrs) {
 	return m(".plugin-icon", [
 		m("img", {
 			alt: attrs.Name + " icon",
-			src: attrs.Icon
+			src: "/public/images/" + attrs.AdminPanel.Icon,
 		}),
 		m(".name", attrs.Name),
 	])

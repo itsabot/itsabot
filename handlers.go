@@ -260,8 +260,9 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		ID       uint64
 		Password []byte
 		Trainer  bool
+		Admin    bool
 	}
-	q := `SELECT id, password, trainer FROM users WHERE email=$1`
+	q := `SELECT id, password, trainer, admin FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		return core.JSONError(errInvalidUserPass)
@@ -281,6 +282,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		ID:      u.ID,
 		Email:   req.Email,
 		Trainer: u.Trainer,
+		Admin:   u.Admin,
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
@@ -385,6 +387,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		ID:      uid,
 		Email:   req.Email,
 		Trainer: false,
+		Admin:   false,
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
@@ -404,7 +407,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 	}{
 		ID:        user.ID,
 		Email:     user.Email,
-		Scopes:    header.Scopes,
+		Scopes:    []string{},
 		AuthToken: token,
 		IssuedAt:  header.IssuedAt,
 		CSRFToken: csrfToken,
@@ -676,6 +679,9 @@ func getAuthToken(u *dt.User) (header *auth.Header, authToken string,
 	err error) {
 
 	scopes := []string{}
+	if u.Admin {
+		scopes = append(scopes, "admin")
+	}
 	if u.Trainer {
 		scopes = append(scopes, "trainer")
 	}

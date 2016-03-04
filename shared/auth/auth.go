@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/itsabot/abot/core"
+	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/util"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
-	"github.com/labstack/gommon/log"
 )
 
 const bearerAuthKey = "Bearer"
