@@ -38,7 +38,7 @@ func initRoutes(e *echo.Echo) {
 
 	e.Static("/public/css", "public/css")
 	e.Static("/public/js", "public/js")
-	e.Static("/public/images", "assets/images")
+	e.Static("/public/images", "public/images")
 
 	if os.Getenv("ABOT_ENV") != "production" {
 		cmd := e.Group("/_/cmd")

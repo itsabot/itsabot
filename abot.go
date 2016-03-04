@@ -288,8 +288,7 @@ func installPlugins() error {
 			// For some reason glock leaves us detached from HEAD,
 			// but this fixes it. FIXME
 			outC, err = exec.
-				os.Mov
-			Command("/bin/sh", "-c", "git checkout "+branch).
+				Command("/bin/sh", "-c", "git checkout "+branch).
 				CombinedOutput()
 			if err != nil {
 				l.Debug(string(outC))
@@ -423,5 +422,6 @@ func randSeq(n int) string {
 // boot. In development, this step is repeated on each server HTTP request prior
 // to serving any assets.
 func compileAssets() error {
-
+	log.Debug("compileAssets not implemented")
+	return nil
 }
