@@ -277,35 +277,10 @@ func installPlugins() error {
 				l.Fatal(err)
 			}
 
-			// Get tag, branch information
-			ext := "-master"
-			if version != "*" {
-				ext = version
-			}
-			name := filepath.Base(url)
+			// Sync to get dependencies
 			var outC []byte
 			outC, err = exec.
-				Command("/bin/sh", "-c", "git rev-parse --abbrev-ref HEAD").
-				CombinedOutput()
-			if err != nil {
-				l.Fatal(err)
-			}
-			branch := string(outC)
-
-			// Sync to get dependencies
-			outC, err = exec.
 				Command("/bin/sh", "-c", "glock sync $(pwd | sed 's/^.*src\\///')").
-				CombinedOutput()
-			if err != nil {
-				l.Debug(string(outC))
-				l.Debug(name, ext)
-				l.Fatal(err)
-			}
-
-			// For some reason glock leaves us detached from HEAD,
-			// but this fixes it. FIXME
-			outC, err = exec.
-				Command("/bin/sh", "-c", "git checkout "+branch).
 				CombinedOutput()
 			if err != nil {
 				l.Debug(string(outC))
