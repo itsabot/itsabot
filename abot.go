@@ -42,7 +42,7 @@ var (
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
-	log.DebugOn(true)
+	log.SetDebug(true)
 	app := cli.NewApp()
 	app.Name = "abot"
 	app.Usage = "digital assistant framework"

@@ -13,7 +13,7 @@ func DebugPrefix(s string) {
 	debugprefix = s
 }
 
-func DebugOn(b bool) {
+func SetDebug(b bool) {
 	debugon = b
 }
 
@@ -77,6 +77,7 @@ func Fatalf(format string, v ...interface{}) {
 type Logger struct {
 	prefix string
 	logger *log.Logger
+	debug  bool
 }
 
 func New(pkgName string) *Logger {
@@ -90,12 +91,16 @@ func New(pkgName string) *Logger {
 	}
 }
 
+func (l *Logger) SetDebug(b bool) {
+	l.debug = b
+}
+
 func (l *Logger) Debug(v ...interface{}) {
 	l.Debugf("%s", fmt.Sprintln(v...))
 }
 
 func (l *Logger) Debugf(format string, v ...interface{}) {
-	if debugon {
+	if l.debug {
 		l.Infof(debugprefix+l.prefix+format, v...)
 	}
 }
