@@ -3,7 +3,6 @@ package language
 import (
 	"database/sql"
 	"encoding/xml"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -191,11 +190,7 @@ func ExtractCount(s string) sql.NullInt64 {
 }
 
 // ExtractCities efficiently from a user's message.
-func ExtractCities(db *sqlx.DB, in *dt.Msg, cc string) ([]dt.City, error) {
-	if len(cc) != 2 {
-		return nil, errors.New("cc must be a 2-letter country code")
-	}
-
+func ExtractCities(db *sqlx.DB, in *dt.Msg) ([]dt.City, error) {
 	// Interface type is used to expand the args in db.Select below.
 	// Although we're only storing strings, []string{} doesn't work.
 	var args []interface{}

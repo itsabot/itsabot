@@ -21,7 +21,7 @@ func TestExtractCities(t *testing.T) {
 	in.Sentence = "I'm in New York"
 	in.Tokens = nlp.TokenizeSentence(in.Sentence)
 	in.Stems = nlp.StemTokens(in.Tokens)
-	cities, err = ExtractCities(db, in, "US")
+	cities, err = ExtractCities(db, in)
 	if err != nil {
 		t.Error(err)
 	}
@@ -32,7 +32,7 @@ func TestExtractCities(t *testing.T) {
 	in.Sentence = "I'm in LA or San Francisco next week"
 	in.Tokens = nlp.TokenizeSentence(in.Sentence)
 	in.Stems = nlp.StemTokens(in.Tokens)
-	cities, err = ExtractCities(db, in, "US")
+	cities, err = ExtractCities(db, in)
 	if err != nil {
 		t.Error(err)
 	}
