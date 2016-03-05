@@ -220,7 +220,7 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 		q := `UPDATE states SET value=$1 WHERE key=$2`
 		b := make([]byte, 8) // space for int64
 		binary.LittleEndian.PutUint64(b, uint64(sm.state))
-		if err, _ := sm.db.Exec(q, b, stateKey); err != nil {
+		if _, err := sm.db.Exec(q, b, stateKey); err != nil {
 			sm.logger.Debug("could not update state", err)
 		}
 		sm.state++
