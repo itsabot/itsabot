@@ -44,7 +44,8 @@ var (
 	ErrMissingTrigger    = errors.New("missing plugin trigger")
 )
 
-func NewPlugin(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin, error) {
+func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
+	error) {
 
 	if len(name) == 0 {
 		return &Plugin{}, ErrMissingPluginName

@@ -3,6 +3,7 @@ package dt
 import (
 	"github.com/dchest/stemmer/porter2"
 	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/shared/nlp"
 )
 
 // Vocab maintains sets of Commands and Objects recognized by plugins as well
@@ -16,13 +17,9 @@ type Vocab struct {
 // VocabHandler maintains sets of Commands and Objects recognized by plugins as
 // well as the functions to be performed when such Commands or Objects are
 // found.
-//
-// TODO use plugin triggers rather than WordTypes, which provides more control
-// over when to run specific functions.
 type VocabHandler struct {
-	Fn       VocabFn
-	WordType string
-	Words    []string
+	Fn      VocabFn
+	Trigger *nlp.StructuredInput
 }
 
 // VocabFn is a function run when the user sends a matched vocab word as
@@ -41,14 +38,15 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 	}
 	eng := porter2.Stemmer
 	for _, vh := range vhs {
-		for i := range vh.Words {
-			vh.Words[i] = eng.Stem(vh.Words[i])
-			v.dict[vh.Words[i]] = vh.Fn
-			if vh.WordType == "Command" {
-				v.Commands[vh.Words[i]] = struct{}{}
-			} else if vh.WordType == "Object" {
-				v.Objects[vh.Words[i]] = struct{}{}
-			}
+		for _, cmd := range vh.Trigger.Commands {
+			v.dict[cmd] = vh.Fn
+			cmd = eng.Stem(cmd)
+			v.Commands[cmd] = struct{}{}
+		}
+		for _, obj := range vh.Trigger.Objects {
+			v.dict[obj] = vh.Fn
+			obj = eng.Stem(obj)
+			v.Objects[obj] = struct{}{}
 		}
 	}
 	return &v
