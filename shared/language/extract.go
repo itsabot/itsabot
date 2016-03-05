@@ -3,6 +3,7 @@ package language
 import (
 	"database/sql"
 	"encoding/xml"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 
 var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
 var regexNum = regexp.MustCompile(`\d+`)
+var regexNonWords = regexp.MustCompile(`[^\w\s]`)
 
 // ExtractCurrency returns a pointer to a string to allow a user a simple check
 // to see if currency text was found. If the response is nil, no currency was
@@ -186,4 +188,66 @@ func ExtractCount(s string) sql.NullInt64 {
 	n.Int64 = int64(val)
 	n.Valid = true
 	return n
+}
+
+// ExtractCities efficiently from a user's message.
+func ExtractCities(db *sqlx.DB, in *dt.Msg, cc string) ([]dt.City, error) {
+	if len(cc) != 2 {
+		return nil, errors.New("cc must be a 2-letter country code")
+	}
+
+	// Interface type is used to expand the args in db.Select below.
+	// Although we're only storing strings, []string{} doesn't work.
+	var args []interface{}
+
+	// Look for "at", "in", "on" prepositions to signal that locations
+	// follow, skipping everything before
+	var start int
+	for i := range in.Stems {
+		switch in.Stems[i] {
+		case "at", "in", "on":
+			start = i
+			break
+		}
+	}
+
+	// Prepare sentence for iteration
+	tmp := regexNonWords.ReplaceAllString(in.Sentence, "")
+	words := strings.Fields(tmp)
+
+	// Iterate through words and bigrams to assemble a DB query
+	for i := start; i < len(words); i++ {
+		args = append(args, words[i])
+	}
+	bgs := bigrams(words, start)
+	for i := 0; i < len(bgs); i++ {
+		args = append(args, bgs[i])
+	}
+
+	cities := []dt.City{}
+	q := `SELECT name, countrycode FROM cities WHERE countrycode='US' AND name IN (?) ORDER BY LENGTH(name) DESC`
+	query, arguments, err := sqlx.In(q, args)
+	query = db.Rebind(query)
+	rows, err := db.Query(query, arguments...)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		city := dt.City{}
+		if err = rows.Scan(&city.Name, &city.CountryCode); err != nil {
+			return nil, err
+		}
+		cities = append(cities, city)
+	}
+	if err = rows.Close(); err != nil {
+		return nil, err
+	}
+	return cities, nil
+}
+
+func bigrams(words []string, startIndex int) (bigrams []string) {
+	for i := startIndex; i < len(words)-1; i++ {
+		bigrams = append(bigrams, words[i]+" "+words[i+1])
+	}
+	return bigrams
 }
