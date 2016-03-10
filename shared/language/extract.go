@@ -45,6 +45,10 @@ func ExtractCurrency(s string) sql.NullInt64 {
 	return n
 }
 
+// ExtractYesNo determines whether a string (typically a sentence sent by a
+// user to Abot) contains a Yes or No response. This is useful for plugins to
+// determine a user's answer to a Yes/No question.
+//
 // TODO should be converted to return a *bool for consistency with the rest of
 // the Extract API.
 func ExtractYesNo(s string) sql.NullBool {
@@ -79,7 +83,7 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	if err != nil {
 		// check DB for historical information associated with that user
 		log.Debug("fetching historical address")
-		addr, err := u.GetAddress(db, s)
+		addr, err = u.GetAddress(db, s)
 		if err != nil {
 			return nil, false, err
 		}
@@ -130,9 +134,11 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 	if err != nil {
 		return nil, false, err
 	}
-	defer response.Body.Close()
 	contents, err := ioutil.ReadAll(response.Body)
 	if err != nil {
+		return nil, false, err
+	}
+	if err = response.Body.Close(); err != nil {
 		return nil, false, err
 	}
 	resp := struct {

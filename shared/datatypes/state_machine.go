@@ -19,7 +19,7 @@ const stateKey string = "__state"
 // As mentioned elsewhere, the OnEntry function is only ever run once.
 const stateEnteredKey string = "__state_entered"
 
-// stateMachine enables plugin developers to easily build complex state
+// StateMachine enables plugin developers to easily build complex state
 // machines given the constraints and use-cases of an A.I. bot. It primarily
 // holds a slice of function Handlers, which is all possible states for a given
 // stateMachine. The unexported variables are useful internally in keeping track
@@ -30,7 +30,6 @@ type StateMachine struct {
 	state        int
 	stateEntered bool
 	states       map[string]int
-	keys         []string
 	pluginName   string
 	logger       *log.Logger
 	db           *sqlx.DB

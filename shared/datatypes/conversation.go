@@ -2,18 +2,14 @@ package dt
 
 import (
 	"database/sql"
-	"database/sql/driver"
-	"encoding/json"
-	"strings"
 	"time"
 
-	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 )
 
-type jsonState json.RawMessage
-
+// Msg is a message received by a user. It holds various fields that are useful
+// for plugins which are populated by Abot core in core/process.
 type Msg struct {
 	ID              uint64
 	FlexID          string
@@ -34,18 +30,7 @@ type Msg struct {
 	Route  string
 }
 
-func (j *jsonState) Scan(value interface{}) error {
-	if err := json.Unmarshal(value.([]byte), *j); err != nil {
-		log.Debug("unmarshal jsonState: ", err)
-		return err
-	}
-	return nil
-}
-
-func (j *jsonState) Value() (driver.Value, error) {
-	return j, nil
-}
-
+// GetMsg returns a message for a given message ID.
 func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 	q := `SELECT id, sentence, abotsent
 	      FROM messages
@@ -57,19 +42,18 @@ func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 	return m, nil
 }
 
-// Update marks a message as needing training and notifies trainers.
-func (m *Msg) Update(db *sqlx.DB /*, mc *MailClient */) error {
+// Update a message as needing training.
+func (m *Msg) Update(db *sqlx.DB) error {
 	q := `UPDATE messages
 	      SET needstraining=$1
 	      WHERE id=$2`
 	if _, err := db.Exec(q, m.NeedsTraining, m.ID); err != nil {
 		return err
 	}
-	// TODO use email driver
-	// return mc.SendTrainingNotification(db, m)
 	return nil
 }
 
+// Save a message to the database, updating the message ID.
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
 	      (userid, sentence, plugin, route, abotsent, needstraining)
@@ -82,6 +66,8 @@ func (m *Msg) Save(db *sqlx.DB) error {
 	return nil
 }
 
+// GetLastRoute for a given user so the previous plugin can be called again if
+// no new trigger is detected.
 func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 	var route string
 	q := `SELECT route FROM messages
@@ -92,171 +78,4 @@ func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 		return "", err
 	}
 	return route, nil
-}
-
-/*
-func (m *Msg) GetLastUserMessage(db *sqlx.DB) error {
-	log.Debug("getting last input")
-	q := `SELECT id, sentence FROM messages
-	      WHERE userid=$1 AND abotsent IS FALSE
-	      ORDER BY createdat DESC`
-	if err := db.Get(&m.LastUserMsg, q, m.User.ID); err != nil {
-		return err
-	}
-	m.LastUserMsg.SentenceFields = SentenceFields(m.LastUserMsg.Sentence)
-	m.LastInput = &tmp
-	return nil
-}
-
-func (m *Msg) NewResponse() *Resp {
-	var uid uint64
-	if m.User != nil {
-		uid = m.User.ID
-	}
-	res := &Resp{
-		MsgID:  m.ID,
-		UserID: uid,
-		Route:  m.Route,
-	}
-	if m.LastResponse != nil {
-		res.State = m.LastResponse.State
-	}
-	return res
-}
-*/
-
-func (m *Msg) GetLastMsg(db *sqlx.DB) (*Msg, error) {
-	if m.User == nil {
-		return nil, ErrMissingUser
-	}
-	q := `SELECT id, route, sentence
-	      FROM messages
-	      WHERE userid=$1 AND abotsent IS TRUE
-	      ORDER BY createdat DESC`
-	row := db.QueryRowx(q, m.User.ID)
-	var msg Msg
-	err := row.StructScan(&msg)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	msg.User = m.User
-	return &msg, nil
-}
-
-/*
-// TODO refactor
-// addContext to a StructuredInput, replacing pronouns with the nouns to which
-// they refer.
-func addContext(db *sqlx.DB, m *Msg) (*Msg, error) {
-	for _, w := range m.StructuredInput.Pronouns() {
-		var ctx string
-		var err error
-		switch nlp.Pronouns[w] {
-		case nlp.ObjectI:
-			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "objects")
-			if err != nil {
-				return m, err
-			}
-			if ctx == "" {
-				return m, nil
-			}
-			for i, o := range m.StructuredInput.Objects {
-				if o != w {
-					continue
-				}
-				m.StructuredInput.Objects[i] = ctx
-			}
-		case nlp.ActorI:
-			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "actors")
-			if err != nil {
-				return m, err
-			}
-			if ctx == "" {
-				return m, nil
-			}
-			for i, o := range m.StructuredInput.Actors {
-				if o != w {
-					continue
-				}
-				m.StructuredInput.Actors[i] = ctx
-			}
-		case nlp.TimeI:
-			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "times")
-			if err != nil {
-				return m, err
-			}
-			if ctx == "" {
-				return m, nil
-			}
-			for i, o := range m.StructuredInput.Times {
-				if o != w {
-					continue
-				}
-				m.StructuredInput.Times[i] = ctx
-			}
-		case nlp.PlaceI:
-			ctx, err = getContextObject(db, m.User,
-				m.StructuredInput, "places")
-			if err != nil {
-				return m, err
-			}
-			if ctx == "" {
-				return m, nil
-			}
-			for i, o := range m.StructuredInput.Places {
-				if o != w {
-					continue
-				}
-				m.StructuredInput.Places[i] = ctx
-			}
-		default:
-			return m, errors.New("unknown type found for pronoun")
-		}
-	}
-	return m, nil
-}
-
-// getContextObject retrieves actors, places, etc. from prior messages
-func getContextObject(db *sqlx.DB, u *User, si *nlp.StructuredInput,
-	datatype string) (string, error) {
-	var tmp *nlp.StringSlice
-	if u == nil {
-		return "", ErrMissingUser
-	}
-	if u != nil {
-		q := `SELECT ` + datatype + `
-		      FROM messages
-		      WHERE userid=$1 AND array_length(objects, 1) > 0`
-		if err := db.Get(&tmp, q, u.ID); err != nil {
-			return "", err
-		}
-	}
-	return tmp.Last(), nil
-}
-*/
-
-func SentenceFields(s string) []string {
-	var ret []string
-	for _, w := range strings.Fields(s) {
-		var end bool
-		for _, r := range w {
-			switch r {
-			case '\'', '"', ',', '.', ':', ';', '!', '?':
-				end = true
-				ret = append(ret, string(r))
-			}
-		}
-		if end {
-			ret = append(ret, strings.ToLower(w[:len(w)-1]))
-		} else {
-			ret = append(ret, strings.ToLower(w))
-		}
-	}
-	return ret
 }

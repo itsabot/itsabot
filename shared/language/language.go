@@ -1,4 +1,5 @@
-// Package language does the following four things:
+// Package language makes it easier to build plugins and natural-sounding
+// responses. This package does the following four things:
 //
 //	1. Provides easy-to-use helpers for returning commonly used, randomized
 //	text such as greetings.
@@ -18,9 +19,10 @@ import (
 	"github.com/itsabot/abot/shared/log"
 )
 
-var yes map[string]bool = map[string]bool{
+var yes = map[string]bool{
 	"yes":          true,
 	"yea":          true,
+	"yah":          true,
 	"yeah":         true,
 	"yup":          true,
 	"yesh":         true,
@@ -33,7 +35,7 @@ var yes map[string]bool = map[string]bool{
 	"affirmative":  true,
 }
 
-var no map[string]bool = map[string]bool{
+var no = map[string]bool{
 	"no":          true,
 	"nope":        true,
 	"nah":         true,
@@ -60,6 +62,7 @@ func Join(ss ...[]string) []string {
 	return s
 }
 
+// Greeting returns a randomized greeting.
 func Greeting(r *rand.Rand, name string) string {
 	var n int
 	if len(name) == 0 {
@@ -85,53 +88,7 @@ func Greeting(r *rand.Rand, name string) string {
 	return ""
 }
 
-func FirstMeeting() string {
-	n := rand.Intn(3)
-	switch n {
-	case 0:
-		return "Hi, I'm Ava. What's your name?"
-	case 1:
-		return "Hi, this is Ava. Who is this?"
-	case 2:
-		return "Hi, my name's Ava. What's your name?"
-	}
-	log.Debug("firstmeeting failed to return a response")
-	return ""
-}
-
-func NiceMeetingYou() string {
-	n := rand.Intn(3)
-	switch n {
-	case 0:
-		return "It's nice to meet you. If we're going to work " +
-			"together, can you sign up for me here? "
-	case 1:
-		return "Nice meeting you. Before we take this further, can " +
-			"you sign up for me here? "
-	case 2:
-		return "Great to meet you! Can you sign up for me here to " +
-			"get started? "
-	}
-	log.Debug("nicemeetingyou failed to return a response")
-	return ""
-}
-
-func Confused() string {
-	n := rand.Intn(4)
-	switch n {
-	case 0:
-		return "I'm not sure I understand you."
-	case 1:
-		return "I'm sorry, I don't understand that."
-	case 2:
-		return "Uh, what are you telling me to do?"
-	case 3:
-		return "What should I do?"
-	}
-	log.Debug("confused failed to return a response")
-	return ""
-}
-
+// Positive returns a randomized positive response to a user message.
 func Positive() string {
 	n := rand.Intn(3)
 	switch n {
@@ -146,6 +103,7 @@ func Positive() string {
 	return ""
 }
 
+// Welcome returns a randomized "you're welcome" response to a user message.
 func Welcome() string {
 	n := rand.Intn(5)
 	switch n {
@@ -164,6 +122,8 @@ func Welcome() string {
 	return ""
 }
 
+// SuggestedPlace returns a randomized place suggestion useful for recommending
+// restaurants, businesses, etc.
 func SuggestedPlace(s string) string {
 	n := rand.Intn(4)
 	switch n {
@@ -180,6 +140,8 @@ func SuggestedPlace(s string) string {
 	return ""
 }
 
+// SuggestedProduct returns natural language, randomized text for a product
+// suggestion.
 func SuggestedProduct(s string, num uint) string {
 	var n int
 	var val, flair string
@@ -209,7 +171,9 @@ func SuggestedProduct(s string, num uint) string {
 	return val + flair + ". " + s
 }
 
-// TODO: Extend
+// Foods returns a list of foods useful in a plugin's object triggers.
+//
+// TODO expand.
 func Foods() []string {
 	return []string{
 		"food",
@@ -227,6 +191,8 @@ func Foods() []string {
 	}
 }
 
+// Vehicles returns a list of vehicle types useful in a plugin's object
+// triggers.
 func Vehicles() []string {
 	return []string{
 		"car",
@@ -237,6 +203,8 @@ func Vehicles() []string {
 	}
 }
 
+// AutomotiveBrands returns a list of automobile manufacturers useful in a
+// plugin's object triggers.
 func AutomotiveBrands() []string {
 	return []string{
 		"abarth",
@@ -318,6 +286,8 @@ func AutomotiveBrands() []string {
 	}
 }
 
+// Recommend returns a slice of words related to recommending a product, which
+// is useful in a plugin's command trigger.
 func Recommend() []string {
 	return []string{
 		"find",
@@ -330,6 +300,8 @@ func Recommend() []string {
 	}
 }
 
+// Repair returns a slice of words related to repairing something, which is
+// useful in a plugin's command trigger.
 func Repair() []string {
 	return []string{
 		"repair",
@@ -339,6 +311,8 @@ func Repair() []string {
 	}
 }
 
+// Broken returns a slice of words related to something breaking, which is
+// useful in a plugin's command trigger.
 func Broken() []string {
 	return []string{
 		"broke",
@@ -352,6 +326,8 @@ func Broken() []string {
 	}
 }
 
+// Purchase returns a slice of words related to purchasing something, which is
+// useful in a plugin's command trigger.
 func Purchase() []string {
 	return []string{
 		"find",
@@ -370,6 +346,7 @@ func Purchase() []string {
 	}
 }
 
+// QuestionLocation returns a randomized question asking a user where they are.
 func QuestionLocation(loc string) string {
 	if len(loc) == 0 {
 		n := rand.Intn(10)
@@ -399,16 +376,22 @@ func QuestionLocation(loc string) string {
 	return fmt.Sprintf("Are you still near %s?", loc)
 }
 
+// Yes determines if a specific word is a positive "Yes" response. For example,
+// "yeah" returns true.
 func Yes(s string) bool {
 	s = strings.ToLower(s)
 	return yes[s]
 }
 
+// No determines if a specific word is a "No" response. For example, "nah"
+// returns true.
 func No(s string) bool {
 	s = strings.ToLower(s)
 	return no[s]
 }
 
+// SliceToString converts a slice of strings into a natural-language list with
+// appropriately placed commas and a custom and/or seperator.
 func SliceToString(ss []string, andor string) string {
 	l := len(ss)
 	if l == 0 {
@@ -438,30 +421,14 @@ func SliceToString(ss []string, andor string) string {
 	return ret
 }
 
+// StopWords are articles that can be ignored by Abot.
 var StopWords = []string{
 	"a",
 	"an",
 	"the",
 }
 
-var SwearWords = map[string]bool{
-	"arse":         true,
-	"ass":          true,
-	"asshole":      true,
-	"bastard":      true,
-	"bitch":        true,
-	"cunt":         true,
-	"damn":         true,
-	"fuck":         true,
-	"fucker":       true,
-	"goddamn":      true,
-	"goddamm":      true,
-	"goddam":       true,
-	"motherfucker": true,
-	"shit":         true,
-	"whore":        true,
-}
-
+// RemoveStopWords finds and removes stopwords from a slice of strings.
 func RemoveStopWords(ss []string) []string {
 	var removal []int
 	for i, s := range ss {
@@ -473,4 +440,41 @@ func RemoveStopWords(ss []string) []string {
 		ss = append(ss[:i], ss[i+1:]...)
 	}
 	return ss
+}
+
+// NiceMeetingYou is used to greet the user and request signup during an
+// onboarding process.
+func NiceMeetingYou() string {
+	n := rand.Intn(3)
+	switch n {
+	case 0:
+		return "It's nice to meet you. If we're going to work " +
+			"together, can you sign up for me here? "
+	case 1:
+		return "Nice meeting you. Before we take this further, can " +
+			"you sign up for me here? "
+	case 2:
+		return "Great to meet you! Can you sign up for me here to " +
+			"get started? "
+	}
+	log.Debug("nicemeetingyou failed to return a response")
+	return ""
+}
+
+// Confused returns a randomized response signalling that Abot is confused or
+// could not understand the user's request.
+func Confused() string {
+	n := rand.Intn(4)
+	switch n {
+	case 0:
+		return "I'm not sure I understand you."
+	case 1:
+		return "I'm sorry, I don't understand that."
+	case 2:
+		return "Uh, what are you telling me to do?"
+	case 3:
+		return "What should I do?"
+	}
+	log.Debug("confused failed to return a response")
+	return ""
 }

@@ -28,10 +28,6 @@ func (c Classifier) ClassifyTokens(tokens []string) *nlp.StructuredInput {
 		if exists {
 			s.Objects = append(s.Objects, t)
 		}
-		_, exists = c["P"+t]
-		if exists {
-			s.People = append(s.People, t)
-		}
 	}
 	return &s
 }

@@ -13,15 +13,17 @@ import (
 	"github.com/labstack/echo"
 )
 
+// User represents a user, which is usually the user that sent a message to
+// Abot.
 type User struct {
-	ID                       uint64
 	Name                     string
 	Email                    string
-	LocationID               int
 	PaymentServiceID         string
+	LocationID               int
+	ID                       uint64
 	AuthorizationID          sql.NullInt64
-	LastAuthenticated        *time.Time
 	LastAuthenticationMethod AuthMethod
+	LastAuthenticated        *time.Time
 	Admin                    bool
 
 	// Trainer determines whether the user has access to the training
@@ -29,15 +31,6 @@ type User struct {
 	// required
 	Trainer bool
 }
-
-// AuthMethod allows you as the plugin developer to control the level of
-// security required in an authentication. Select an appropriate security level
-// depending upon your risk tolerance for fraud compared against the quality and
-// ease of the user experience.
-//
-// NOTE this is just a stub and isn't implemented
-// TODO build the constants defining the types of AuthMethods
-type AuthMethod int
 
 // FlexIDType is used to identify a user when only an email, phone, or other
 // "flexible" ID is available.
@@ -57,12 +50,24 @@ const (
 )
 
 var (
-	ErrMissingUser       = errors.New("missing user")
-	ErrMissingFlexIdType = errors.New("missing flexidtype")
-	ErrMissingFlexID     = errors.New("missing flexid")
+	// ErrMissingUser is returned when a user expected, but none found.
+	ErrMissingUser = errors.New("missing user")
+
+	// ErrMissingFlexIDType is returned when a FlexIDType is expected, but
+	// none found.
+	ErrMissingFlexIDType = errors.New("missing flexidtype")
+
+	// ErrMissingFlexID is returned when a FlexID is expected, but none
+	// found.
+	ErrMissingFlexID = errors.New("missing flexid")
+
+	// ErrInvalidFlexIDType is returned when a FlexIDType is invalid not
+	// matching one of the pre-defined FlexIDTypes for email (1) or phone
+	// (2).
 	ErrInvalidFlexIDType = errors.New("invalid flexid type")
 )
 
+// GetUser from an HTTP request.
 func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	p, err := extractUserParams(db, c)
 	if err != nil {
@@ -70,7 +75,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	}
 	log.Debug("extracted user params", p)
 	if p.UserID == 0 {
-		// XXX temporary. we only have phone numbers atm
+		// XXX temporary. We only have phone numbers at the moment.
 		p.FlexIDType = fidtPhone
 		if p.FlexID == "" {
 			return nil, ErrMissingFlexID
@@ -114,6 +119,8 @@ func (u *User) GetEmail() string {
 	return u.Email
 }
 
+// IsAuthenticated confirms that the user is authenticated for a particular
+// AuthMethod.
 func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 	var oldTime time.Time
 	tmp := os.Getenv("ABOT_REQUIRE_AUTH_IN_HOURS")
@@ -141,24 +148,23 @@ func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
 	return authenticated, nil
 }
 
+// GetCards retrieves credit cards for a specific user.
 func (u *User) GetCards(db *sqlx.DB) ([]Card, error) {
-	q := `
-		SELECT id, addressid, last4, cardholdername, expmonth, expyear,
-		       brand, stripeid, zip5hash
-		FROM cards
-		WHERE userid=$1`
-	log.Debug("getting cards for user", u.ID)
+	q := `SELECT id, addressid, last4, cardholdername, expmonth, expyear,
+	          brand, stripeid, zip5hash
+	      FROM cards
+	      WHERE userid=$1`
 	var cards []Card
 	err := db.Select(&cards, q, u.ID)
 	return cards, err
 }
 
+// GetPrimaryCard retrieves the primary credit card for a specific user.
 func (u *User) GetPrimaryCard(db *sqlx.DB) (*Card, error) {
-	q := `
-		SELECT id, addressid, last4, cardholdername, expmonth, expyear,
-		       brand, stripeid
-		FROM cards
-		WHERE userid=$1 AND primary=TRUE`
+	q := `SELECT id, addressid, last4, cardholdername, expmonth, expyear,
+	          brand, stripeid
+	      FROM cards
+	      WHERE userid=$1 AND primary=TRUE`
 	var card *Card
 	if err := db.Get(&card, q, u.ID); err != nil {
 		return card, err
@@ -166,6 +172,8 @@ func (u *User) GetPrimaryCard(db *sqlx.DB) (*Card, error) {
 	return card, nil
 }
 
+// DeleteSessions removes any open sessions by the user. This enables "logging
+// out" of the web-based client.
 func (u *User) DeleteSessions(db *sqlx.DB) error {
 	q := `DELETE FROM sessions WHERE userid=$1`
 	_, err := db.Exec(q, u.ID)
@@ -175,6 +183,7 @@ func (u *User) DeleteSessions(db *sqlx.DB) error {
 	return nil
 }
 
+// SaveAddress of a specific user to the database.
 func (u *User) SaveAddress(db *sqlx.DB, addr *Address) (uint64, error) {
 	q := `INSERT INTO addresses
 	      (userid, cardid, name, line1, line2, city, state, country, zip,
@@ -219,6 +228,7 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 	return addr, nil
 }
 
+// UpdateAddressName such as "home" or "office" when learned.
 func (u *User) UpdateAddressName(db *sqlx.DB, id uint64, name string) (*Address,
 	error) {
 	q := `UPDATE addresses SET name=$1 WHERE id=$2`
@@ -294,3 +304,12 @@ func extractUserParams(db *sqlx.DB, c *echo.Context) (*userParams, error) {
 	p.FlexIDType = FlexIDType(typ)
 	return p, nil
 }
+
+// AuthMethod allows you as the plugin developer to control the level of
+// security required in an authentication. Select an appropriate security level
+// depending upon your risk tolerance for fraud compared against the quality and
+// ease of the user experience.
+//
+// NOTE this is just a stub and isn't implemented
+// TODO build the constants defining the types of AuthMethods
+type AuthMethod int

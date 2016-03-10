@@ -1,3 +1,4 @@
+// Package address provides address extraction and validation tools.
 package address
 
 import (
@@ -9,6 +10,9 @@ import (
 	"github.com/itsabot/abot/shared/log"
 )
 
+// ErrInvalidAddress is returned when an address is expected but none found or
+// when an address is found but missing core components such as the state *and*
+// zip code.
 var ErrInvalidAddress = errors.New("invalid address")
 
 var regexAddress = regexp.MustCompile(

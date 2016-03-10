@@ -1,15 +1,20 @@
 package language
 
-import (
-	"math/rand"
-	"regexp"
-	"strings"
+import "strings"
 
-	"github.com/itsabot/abot/shared/datatypes"
-)
+// Contains determines whether a slice of strings contains a specific word.
+func Contains(wordList []string, s string) bool {
+	s = strings.TrimRight(strings.ToLower(s), ".,;:!?'\"")
+	for _, word := range wordList {
+		if s == word {
+			return true
+		}
+	}
+	return false
+}
 
-var regexArticle = regexp.MustCompile(`^(a|an|the|A|An|The)\s`)
-
+// TODO remove elasticsearch dependency
+/*
 type WordT struct {
 	Word  string
 	POS   string
@@ -38,8 +43,6 @@ func (a ByIndex) StringSlice() []string {
 	return tmp
 }
 
-// TODO remove elasticsearch dependency
-/*
 // Summarize identifies keyword phrases in text. keywordSource is the
 // ElasticSearch type in the form of index_type. For example, to identify
 // keywords in a wine review, keywordSource would be "products_alcohol".
@@ -70,7 +73,6 @@ func Summarize(product *dt.Product, keywordSource string) (string, error) {
 	summary := buildSummary(product, keywords)
 	return shortSummary + summary, nil
 }
-*/
 
 func buildSummary(product *dt.Product, keywords []WordT) string {
 	var totalNounLen int
@@ -217,8 +219,6 @@ func appendStops(buf *WordT, keywords []WordT, i, j int) (*WordT, int) {
 	return buf, i + 1
 }
 
-// TODO support directly in Postgres, removing the elasticsearch dependency
-/*
 func extractKeywords(text string, hits []elastigo.Hit) ([]WordT, error) {
 	var keywords []WordT
 	words := strings.Fields(text)
@@ -254,7 +254,6 @@ func extractKeywords(text string, hits []elastigo.Hit) ([]WordT, error) {
 	sort.Sort(ByIndex(keywords))
 	return keywords, nil
 }
-*/
 
 var SummaryStopWords = []string{
 	"and",
@@ -277,16 +276,6 @@ var SummaryStopWords = []string{
 	"under",
 	"some",
 	"alongside",
-}
-
-func Contains(wordList []string, s string) bool {
-	s = strings.TrimRight(strings.ToLower(s), ".,;:!?'\"")
-	for _, word := range wordList {
-		if s == word {
-			return true
-		}
-	}
-	return false
 }
 
 func buildShortSummary(p *dt.Product) string {
@@ -313,3 +302,4 @@ func buildShortSummary(p *dt.Product) string {
 	}
 	return tmp + p.Category + ". "
 }
+*/

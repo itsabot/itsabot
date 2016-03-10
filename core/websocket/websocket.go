@@ -1,3 +1,6 @@
+// Package websocket manages websocket connections and notifications for Abot
+// clients. This is used by github.com/itsabot/plugin_training to notify
+// trainers of new user messages without requiring page reload.
 package websocket
 
 import (

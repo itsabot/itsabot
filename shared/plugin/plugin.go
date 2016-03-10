@@ -10,10 +10,11 @@ import (
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
 
-type PluginWrapper struct {
+// Wrapper wraps a plugin with an open connection to an RPC client.
+type Wrapper struct {
 	P         *Plugin
 	RPCClient *rpc.Client
 }
@@ -22,28 +23,32 @@ type PluginWrapper struct {
 // Port takes the format of ":1234". Note that the colon is significant.
 // ServerAddress will default to localhost if left blank.
 type Plugin struct {
-	Config  PluginConfig
+	Config  Config
 	Vocab   *dt.Vocab
 	Trigger *nlp.StructuredInput
 }
 
-type PluginConfig struct {
+// Config holds options for a plugin.
+type Config struct {
 	Name          string
 	Route         string
 	CoreRPCAddr   string
 	PluginRPCAddr string
 }
 
-type Abot int
-
 var client *rpc.Client
 var db *sqlx.DB
 var (
+	// ErrMissingPluginName is returned when a plugin name is expected, but
+	// but a blank name is provided.
 	ErrMissingPluginName = errors.New("missing plugin name")
-	ErrMissingPort       = errors.New("missing plugin port")
-	ErrMissingTrigger    = errors.New("missing plugin trigger")
+
+	// ErrMissingTrigger is returned when a trigger is expected but none
+	// were found.
+	ErrMissingTrigger = errors.New("missing plugin trigger")
 )
 
+// New builds a plugin with a filled out config and a trigger.
 func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
 	error) {
 
@@ -53,8 +58,7 @@ func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
 	if trigger == nil {
 		return &Plugin{}, ErrMissingTrigger
 	}
-
-	c := PluginConfig{
+	c := Config{
 		Name:        name,
 		CoreRPCAddr: coreRPCAddr,
 	}
@@ -71,7 +75,7 @@ func (p *Plugin) Register(pluginT interface{}) error {
 	}
 	p.Config.PluginRPCAddr = ln.Addr().String()
 
-	if err := rpc.Register(pluginT); err != nil {
+	if err = rpc.Register(pluginT); err != nil {
 		return err
 	}
 
@@ -80,7 +84,7 @@ func (p *Plugin) Register(pluginT interface{}) error {
 		return err
 	}
 
-	if err := client.Call("Abot.RegisterPlugin", p, nil); err != nil {
+	if err = client.Call("Abot.RegisterPlugin", p, nil); err != nil {
 		return err
 	}
 
@@ -99,9 +103,9 @@ func (p *Plugin) Register(pluginT interface{}) error {
 		}
 		go rpc.ServeConn(conn)
 	}
-	return nil
 }
 
+// ConnectDB opens a connection to the database.
 func ConnectDB() (*sqlx.DB, error) {
 	var db *sqlx.DB
 	var err error

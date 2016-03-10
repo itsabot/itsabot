@@ -33,6 +33,10 @@ type TimeContext struct {
 	ampm  int
 }
 
+// ErrInvalidTimeFormat is returned when time.Parse could not parse the time
+// across all known valid time formats. For a list of valid time formats, see
+// the unexported variables timeFormatsNoDay and timeFormatsWithDay in
+// shared/helpers/timeparse.
 var ErrInvalidTimeFormat = errors.New("invalid time format")
 
 const (
@@ -112,7 +116,6 @@ var days = map[string]time.Weekday{
 	"Sat": time.Weekday(6),
 }
 
-// normalizeTime translates a
 func normalizeTime(t string) (normalizedTime string, location *time.Location,
 	relativeTime bool) {
 
@@ -409,10 +412,10 @@ func parseTimeRelative(nlTime string, t time.Time) time.Time {
 	year := t.Year()
 	futureTime := 1
 	if strings.Contains(nlTime, "Tomorrow") {
-		day += 1
+		day++
 	}
 	if strings.Contains(nlTime, "Yesterday") {
-		day -= 1
+		day--
 	}
 	if strings.Contains(nlTime, "Month") {
 		// TODO handle relative months

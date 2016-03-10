@@ -24,6 +24,7 @@ type Address struct {
 	DisplayAddress string
 }
 
+// ErrNoAddress signals that no address could be found when one was expected.
 var ErrNoAddress = errors.New("no address")
 
 // GetAddress searches the database for a specific address by its ID.

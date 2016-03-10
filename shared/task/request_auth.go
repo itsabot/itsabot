@@ -1,19 +1,5 @@
 package task
 
-import (
-	"errors"
-	"regexp"
-)
-
-var regexNum = regexp.MustCompile(`\d+`)
-var ErrNoAuth = errors.New("no auth found")
-var ErrInvalidAuth = errors.New("invalid auth")
-
-const (
-	authStateStart float64 = iota
-	authStateConfirm
-)
-
 const (
 	// MethodZip requires the zip code associated with a credit card on
 	// file. The user will be asked for a credit card if not on file.
@@ -34,6 +20,16 @@ const (
 
 // TODO convert to new API
 /*
+var regexNum = regexp.MustCompile(`\d+`)
+
+const (
+	authStateStart float64 = iota
+	authStateConfirm
+)
+
+var ErrNoAuth = errors.New("no auth found")
+var ErrInvalidAuth = errors.New("invalid auth")
+
 // RequestAuth ensures you're speaking to the correct user. Select the LOWEST
 // level of authentication you'll allow based on a tolerance for fraud weighed
 // against the convenience of the user experience. Methods are organized in

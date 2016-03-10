@@ -93,7 +93,7 @@ func BootDependencies(avaRPCAddr string) error {
 // plugin for that. If there is no previously used plugin, we return
 // ErrMissingPlugin. The bool value return indicates whether this plugin is
 // different from the last plugin used by the user.
-func GetPlugin(db *sqlx.DB, m *dt.Msg) (*plugin.PluginWrapper, string, bool, error) {
+func GetPlugin(db *sqlx.DB, m *dt.Msg) (*plugin.Wrapper, string, bool, error) {
 	// First check if the user is missing. AKA, needs to be onboarded
 	if m.User == nil {
 		p := regPlugins.Get("onboard_onboard")
@@ -146,7 +146,7 @@ func GetPlugin(db *sqlx.DB, m *dt.Msg) (*plugin.PluginWrapper, string, bool, err
 // plugin a message, or if the user is engaged in a conversation with the plugin.
 // This difference enables plugins to respond differently--like reset state--
 // when messaged for the first time in each new conversation.
-func CallPlugin(pw *plugin.PluginWrapper, m *dt.Msg, followup bool) (pluginReply string,
+func CallPlugin(pw *plugin.Wrapper, m *dt.Msg, followup bool) (pluginReply string,
 	err error) {
 
 	tmp := ""
@@ -169,10 +169,10 @@ func CallPlugin(pw *plugin.PluginWrapper, m *dt.Msg, followup bool) (pluginReply
 
 // pkgMap is a thread-safe atomic map that's used to route user messages to the
 // appropriate plugins. The map's key is the route in the form of
-// command_object, e.g. "find_restaurant", and the PluginWrapper contains both the
+// command_object, e.g. "find_restaurant", and the Wrapper contains both the
 // plugin and the RPC client used to communicate with it.
 type pkgMap struct {
-	pkgs  map[string]*plugin.PluginWrapper
+	pkgs  map[string]*plugin.Wrapper
 	mutex *sync.Mutex
 }
 
@@ -186,7 +186,7 @@ type pluginsConf struct {
 // regPlugins initializes a pkgMap and holds it in global memory, which works OK
 // given pkgMap is an atomic, thread-safe map.
 var regPlugins = pkgMap{
-	pkgs:  make(map[string]*plugin.PluginWrapper),
+	pkgs:  make(map[string]*plugin.Wrapper),
 	mutex: &sync.Mutex{},
 }
 
@@ -208,15 +208,15 @@ func (t *Abot) RegisterPlugin(p *plugin.Plugin, reply *string) error {
 				log.Info("found duplicate plugin or trigger",
 					p.Config.Name, "on", s)
 			}
-			regPlugins.Set(s, &plugin.PluginWrapper{P: p, RPCClient: client})
+			regPlugins.Set(s, &plugin.Wrapper{P: p, RPCClient: client})
 		}
 	}
 	return nil
 }
 
 // Get is a thread-safe, locking way to access the values of a pkgMap.
-func (pm pkgMap) Get(k string) *plugin.PluginWrapper {
-	var pw *plugin.PluginWrapper
+func (pm pkgMap) Get(k string) *plugin.Wrapper {
+	var pw *plugin.Wrapper
 	pm.mutex.Lock()
 	pw = pm.pkgs[k]
 	pm.mutex.Unlock()
@@ -225,7 +225,7 @@ func (pm pkgMap) Get(k string) *plugin.PluginWrapper {
 }
 
 // Set is a thread-safe, locking way to set the values of a pkgMap.
-func (pm pkgMap) Set(k string, v *plugin.PluginWrapper) {
+func (pm pkgMap) Set(k string, v *plugin.Wrapper) {
 	pm.mutex.Lock()
 	pm.pkgs[k] = v
 	pm.mutex.Unlock()

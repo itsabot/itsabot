@@ -42,11 +42,13 @@ func Drivers() []string {
 	return list
 }
 
+// Conn is a connection to a specific emailsender driver.
 type Conn struct {
 	driver driver.Driver
 	conn   driver.Conn
 }
 
+// Open a connection to a registered driver.
 func Open(driverName, auth string) (*Conn, error) {
 	driversMu.RLock()
 	driveri, ok := drivers[driverName]
@@ -66,14 +68,17 @@ func Open(driverName, auth string) (*Conn, error) {
 	return c, nil
 }
 
+// SendHTML email through the opened driver connection.
 func (c *Conn) SendHTML(to []string, from, subj, html string) error {
 	return c.conn.SendHTML(to, from, subj, html)
 }
 
+// SendPlainText email through the opened driver connection.
 func (c *Conn) SendPlainText(to []string, from, subj, plaintext string) error {
 	return c.conn.SendPlainText(to, from, subj, plaintext)
 }
 
+// Driver returns the driver used by a connection.
 func (c *Conn) Driver() driver.Driver {
 	return c.driver
 }

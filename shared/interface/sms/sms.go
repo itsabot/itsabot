@@ -40,11 +40,13 @@ func Drivers() []string {
 	return list
 }
 
+// Conn is a connection to a specific sms driver.
 type Conn struct {
 	driver driver.Driver
 	conn   driver.Conn
 }
 
+// Open a connection to a registered driver.
 func Open(driverName, auth string) (*Conn, error) {
 	driversMu.RLock()
 	driveri, ok := drivers[driverName]
@@ -64,10 +66,12 @@ func Open(driverName, auth string) (*Conn, error) {
 	return c, nil
 }
 
+// Driver returns the driver used by a connection.
 func (c *Conn) Driver() driver.Driver {
 	return c.driver
 }
 
+// Send an SMS message through an opened driver connection.
 func (c *Conn) Send(from, to, msg string) error {
 	return c.conn.Send(from, to, msg)
 }

@@ -46,7 +46,6 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	log.Debug("processed input into message...")
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
-	log.Debug("  people:", msg.StructuredInput.People)
 	plugin, route, followup, err := GetPlugin(db, msg)
 	if err != nil {
 		return "", msg.User.ID, err

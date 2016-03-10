@@ -44,6 +44,9 @@ type SMS interface {
 	Content() string
 }
 
+// PhoneNumber defines an interface by which phone numbers can be validated.
 type PhoneNumber interface {
+	// Valid determines if a specific phone number is valid for a given
+	// SMS driver.
 	Valid() bool
 }

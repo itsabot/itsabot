@@ -1,3 +1,5 @@
+// Package auth ensures that a user has sufficient permissions to access
+// content.
 package auth
 
 import (
@@ -21,6 +23,9 @@ import (
 
 const bearerAuthKey = "Bearer"
 
+// Header represents an HTTP request's header from the front-end JS client. This
+// is used to identify the logged in user in each web request and the
+// permissions of that user.
 type Header struct {
 	ID       uint64
 	Email    string
@@ -28,6 +33,7 @@ type Header struct {
 	IssuedAt int64
 }
 
+// LoggedIn determines if the user is currently logged in.
 func LoggedIn() echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		log.Debug("validating logged in")
@@ -100,9 +106,9 @@ func LoggedIn() echo.HandlerFunc {
 	}
 }
 
-// validateCSRF ensures that any forms posted to Abot are protected against
-// Cross-Site Request Forgery. Without this function, Abot would be vulnerable
-// to the attack because tokens are stored client-side in cookies.
+// CSRF ensures that any forms posted to Abot are protected against Cross-Site
+// Request Forgery. Without this function, Abot would be vulnerable to the
+// attack because tokens are stored client-side in cookies.
 func CSRF(db *sqlx.DB) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		// TODO look into other session-based temporary storage systems

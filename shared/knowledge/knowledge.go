@@ -1,5 +1,6 @@
 // Package knowledge provides known and commonly required information about the
-// user to 3rd party apps, such as a user's last known location.
+// user. This is useful for plugins to retrieve information such as a user's
+// last known location.
 package knowledge
 
 import (
@@ -13,6 +14,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// ErrNoLocation is returned when a location is expected but none can be found.
 var ErrNoLocation = errors.New("no previous location")
 
 // GetLocation returns the last known location of a user. If the location isn't

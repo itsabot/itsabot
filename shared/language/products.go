@@ -1,5 +1,7 @@
 package language
 
+// Alcohol is a collection of alcohol related words useful in a plugin's object
+// trigger.
 func Alcohol() []string {
 	return []string{
 		"beer",

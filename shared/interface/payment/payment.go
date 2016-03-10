@@ -43,11 +43,13 @@ func Drivers() []string {
 	return list
 }
 
+// Conn is a connection to a specific payment driver.
 type Conn struct {
 	driver driver.Driver
 	conn   driver.Conn
 }
 
+// Open a connection to a registered driver.
 func Open(driverName string, db *sqlx.DB, e *echo.Echo, auth string) (*Conn,
 	error) {
 
@@ -69,6 +71,7 @@ func Open(driverName string, db *sqlx.DB, e *echo.Echo, auth string) (*Conn,
 	return c, nil
 }
 
+// Driver returns the driver used by a connection.
 func (c *Conn) Driver() driver.Driver {
 	return c.driver
 }

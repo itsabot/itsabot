@@ -33,9 +33,9 @@ type ProductSel struct {
 // total).
 type ProductSels []ProductSel
 
-// ProductSels represents a slice of product selections, adding a helper method
-// that makes it easy to calculate the prices (subtotal, tax, shipping, and
-// total) for a given group of product selections.
+// Prices calculates the various prices for a given product selection. This
+// includes a product subtotal, tax, shipping, and a total combining all the
+// above.
 func (prods ProductSels) Prices(addr *Address) map[string]uint64 {
 	m := map[string]uint64{
 		"products": 0,

@@ -7,13 +7,17 @@ import (
 	"github.com/labstack/echo"
 )
 
+// HTTPRoute defines a route to be used within a HandlerMap.
 type HTTPRoute struct {
 	Method string
 	Path   string
 }
 
+// HandlerMap maps HTTPRoutes (the method and URL path) to a echo router
+// handler.
 type HandlerMap map[HTTPRoute]func(*echo.Context) error
 
+// RouteHandler is a complete struct containing both an HTTPRoute and a handler.
 type RouteHandler struct {
 	Method  string
 	Path    string
@@ -45,6 +49,9 @@ func (hm HandlerMap) AddRoutes(prefix string, e *echo.Echo) {
 	}
 }
 
+// NewHandlerMap builds a HandlerMap from a slice of RouteHandlers. This is a
+// convenience function, since RouteHandlers directly is very verbose for
+// plugins.
 func NewHandlerMap(rhs []RouteHandler) HandlerMap {
 	hm := HandlerMap{}
 	for _, rh := range rhs {

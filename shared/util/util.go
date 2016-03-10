@@ -1,3 +1,4 @@
+// Package util provides utility functions for Abot's core and shared packages.
 package util
 
 import (
@@ -7,7 +8,7 @@ import (
 	"github.com/labstack/echo"
 )
 
-// CookieVal retrieves a cookie's value as a string.
+// CookieVal retrieves a cookie's value from an HTTP echo request as a string.
 func CookieVal(c *echo.Context, name string) (value string, err error) {
 	ck, err := c.Request().Cookie(name)
 	if err != nil {
