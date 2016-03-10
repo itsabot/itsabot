@@ -44,7 +44,8 @@ func BootRPCServer() (addr string, err error) {
 	addr = ln.Addr().String()
 	go func() {
 		for {
-			conn, err := ln.Accept()
+			var conn net.Conn
+			conn, err = ln.Accept()
 			if err != nil {
 				log.Debug("could not accept rpc", err)
 			}
@@ -65,7 +66,7 @@ func BootDependencies(avaRPCAddr string) error {
 		return err
 	}
 	var conf pluginsConf
-	if err := json.Unmarshal(content, &conf); err != nil {
+	if err = json.Unmarshal(content, &conf); err != nil {
 		return err
 	}
 	for name, version := range conf.Dependencies {

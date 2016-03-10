@@ -6,6 +6,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+// NewMsg builds a message struct with Tokens, Stems, and a Structured Input.
 func NewMsg(db *sqlx.DB, classifier Classifier, u *dt.User,
 	cmd string) *dt.Msg {
 
