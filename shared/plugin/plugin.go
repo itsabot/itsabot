@@ -1,3 +1,5 @@
+// Package plugin enables plugins to register with Abot and connect to the
+// database.
 package plugin
 
 import (
