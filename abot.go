@@ -145,8 +145,16 @@ func startServer() error {
 
 func startConsole(c *cli.Context) error {
 	args := c.Args()
-	if len(args) != 2 {
+	if len(args) == 0 || len(args) >= 3 {
 		return errors.New("usage: abot console abot-address user-phone")
+	}
+	var addr, phone string
+	if len(args) == 1 {
+		addr = "localhost:" + os.Getenv("PORT")
+		phone = args[0]
+	} else if len(args) == 2 {
+		addr = args[0]
+		phone = args[1]
 	}
 	// Capture ^C interrupt to add a newline
 	sig := make(chan os.Signal, 1)
@@ -157,7 +165,7 @@ func startConsole(c *cli.Context) error {
 			os.Exit(0)
 		}
 	}()
-	base := "http://" + args[0] + "?flexidtype=2&flexid=" + url.QueryEscape(args[1]) + "&cmd="
+	base := "http://" + addr + "?flexidtype=2&flexid=" + url.QueryEscape(phone) + "&cmd="
 	scanner := bufio.NewScanner(os.Stdin)
 	// Test connection
 	req, err := http.NewRequest("GET", base, nil)
