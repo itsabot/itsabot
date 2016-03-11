@@ -61,12 +61,9 @@ Fetching 3 plugins...
 Success!
 ```
 
-That will download the plugins to the `/plugins` directory. Be sure to follow
-the integration instructions in the README of each plugin you add (found in
-`/plugins/pluginname/README.md`), as adding a plugin may require you to make some
-minor code changes in Abot. Once you've integrated the plugins, recompile and
-run Abot again: `abot server`. You can use the included Abot console to
-communicate with Abot locally:
+That will download the plugins to the `/plugins` directory. Once you've
+integrated the plugins, recompile and run Abot again: `abot server`. You can
+use the included Abot console to communicate with Abot locally:
 
 ```bash
 $ abot console +13105555555
