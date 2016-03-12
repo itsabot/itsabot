@@ -76,17 +76,17 @@ You can learn more in our
 
 ## Goals
 
-We believe that A.I. will impact every business worldwide. While Apple, Google
-and others rush to build proprietary digital assistants, there's a great need
-for an open approach that can be made to run anywhere and be customized to do
-anything you need.
+We believe that A.I. will impact every business worldwide and dramatically
+change our lives. While Apple, Google and others rush to build proprietary
+digital assistants, there's a great need for an open approach that can be made
+to run anywhere and be customized to do anything you need.
 
-Abot enables every person and business to build digital assistants like Siri
-using plugins that are as easy to install and run as WordPress. Soon it'll be
-as easy to leverage A.I. in your business as it is to start a blog or an online
-store. Imagine setting up an AI assistant to answer your phones, schedule
-meetings, and book travel for your company in 30 seconds or less. The future's
-almost here, and Abot's going to lead the way.
+Abot enables any person or business to build digital assistants like Siri using
+plugins that are as easy to install and run as WordPress. Soon it'll be as easy
+to leverage A.I. in your business as it is to start a blog or an online store.
+Imagine setting up an AI assistant to answer your phones, schedule meetings,
+and book travel for your company in 30 seconds or less. The future's almost
+here, and Abot's going to lead the way.
 
 We have a long road ahead of us, but "nothing ever comes to one that is worth
 having except as a result of hard work." *-- Booker T. Washington*
