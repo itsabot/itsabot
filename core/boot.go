@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -32,12 +33,12 @@ func Offensive() map[string]struct{} {
 // server connection, database connection, and map of offensive words.
 func NewServer() (*echo.Echo, error) {
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
-		log.Fatal("must set ABOT_SECRET env var in production to >= 32 characters")
+		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	var err error
 	db, err = plugin.ConnectDB()
 	if err != nil {
-		log.Fatal("could not connect to database", err)
+		return nil, fmt.Errorf("could not connect to database: %s", err.Error())
 	}
 	if err = checkRequiredEnvVars(); err != nil {
 		return nil, err
@@ -79,7 +80,7 @@ func CompileAssets() error {
 		CombinedOutput()
 	if err != nil {
 		log.Debug(string(outC))
-		log.Fatal(err)
+		return err
 	}
 	return nil
 }
