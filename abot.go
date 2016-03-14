@@ -24,19 +24,12 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 )
 
-var db *sqlx.DB
-var ner core.Classifier
 var tmplLayout *template.Template
 var ws = websocket.NewAtomicWebSocketSet()
-var offensive map[string]struct{}
-var (
-	errInvalidUserPass = errors.New("Invalid username/password combination")
-)
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -51,7 +44,8 @@ func main() {
 			Aliases: []string{"s"},
 			Usage:   "run server",
 			Action: func(c *cli.Context) {
-				if err := startServer(); err != nil {
+				var err error
+				if err = startServer(); err != nil {
 					l := log.New("")
 					l.SetFlags(0)
 					l.Fatalf("could not start server\n%s", err)

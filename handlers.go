@@ -30,9 +30,12 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+var errInvalidUserPass = errors.New("Invalid username/password combination")
+
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
 	e.SetDebug(true)
+	log.Debug("ROUTES ARE SET UP")
 	logger := log.New("")
 	e.SetLogger(logger)
 
@@ -57,13 +60,23 @@ func initRoutes(e *echo.Echo) {
 	e.Post("/api/reset_password.json", handlerAPIResetPasswordSubmit)
 
 	// API routes (restricted by login)
-	api := e.Group("/api/user", auth.LoggedIn(), auth.CSRF(db))
+	var api *echo.Group
+	if os.Getenv("ABOT_ENV") == "production" {
+		api = e.Group("/api/user", auth.LoggedIn(), auth.CSRF(core.DB()))
+	} else {
+		api = e.Group("/api/user", auth.LoggedIn())
+	}
 	api.Get("/profile.json", handlerAPIProfile)
 	api.Put("/profile.json", handlerAPIProfileView)
 
 	// API routes (restricted to admins)
-	apiAdmin := e.Group("/api/admin", auth.LoggedIn(), auth.CSRF(db),
-		auth.Admin())
+	var apiAdmin *echo.Group
+	if os.Getenv("ABOT_ENV") == "production" {
+		apiAdmin = e.Group("/api/admin", auth.LoggedIn(), auth.CSRF(core.DB()),
+			auth.Admin())
+	} else {
+		apiAdmin = e.Group("/api/admin", auth.LoggedIn(), auth.Admin())
+	}
 	apiAdmin.Get("/plugins.json", handlerAPIPlugins)
 
 	// WebSockets
@@ -129,7 +142,7 @@ func initCMDGroup(g *echo.Group) {
 // handlerIndex presents the homepage to the user and populates the HTML with
 // server-side variables.
 func handlerIndex(c *echo.Context) error {
-	if os.Getenv("ABOT_ENV") == "development" {
+	if os.Getenv("ABOT_ENV") != "development" {
 		var err error
 		tmplLayout, err = template.ParseFiles("assets/html/layout.html")
 		if err != nil {
@@ -192,7 +205,7 @@ func handlerAPILogoutSubmit(c *echo.Context) error {
 		return nil
 	}
 	q := `DELETE FROM sessions WHERE userid=$1`
-	if _, err = db.Exec(q, uid); err != nil {
+	if _, err = core.DB().Exec(q, uid); err != nil {
 		return core.JSONError(err)
 	}
 	if err = c.JSON(http.StatusOK, nil); err != nil {
@@ -218,7 +231,7 @@ func handlerAPILoginSubmit(c *echo.Context) error {
 		Admin    bool
 	}
 	q := `SELECT id, password, trainer, admin FROM users WHERE email=$1`
-	err := db.Get(&u, q, req.Email)
+	err := core.DB().Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		return core.JSONError(errInvalidUserPass)
 	} else if err != nil {
@@ -302,13 +315,14 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 
 	// TODO format phone number for SMS interface (international format)
 	user := &dt.User{
-		Name:     req.Name,
-		Email:    req.Email,
+		Name:  req.Name,
+		Email: req.Email,
+		// Password is hashed in user.Create()
 		Password: req.Password,
 		Trainer:  false,
 		Admin:    false,
 	}
-	if err := user.Create(db, dt.FlexIDType(2), req.FID); err != nil {
+	if err := user.Create(core.DB(), dt.FlexIDType(2), req.FID); err != nil {
 		return core.JSONError(err)
 	}
 	csrfToken, err := createCSRFToken(user)
@@ -372,14 +386,14 @@ func handlerAPIProfile(c *echo.Context) error {
 		}
 	}
 	q := `SELECT name, email FROM users WHERE id=$1`
-	err = db.Get(&user, q, uid)
+	err = core.DB().Get(&user, q, uid)
 	if err != nil {
 		return core.JSONError(err)
 	}
 	q = `SELECT flexid FROM userflexids
 	     WHERE flexidtype=2 AND userid=$1
 	     LIMIT 10`
-	err = db.Select(&user.Phones, q, uid)
+	err = core.DB().Select(&user.Phones, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return core.JSONError(err)
 	}
@@ -387,7 +401,7 @@ func handlerAPIProfile(c *echo.Context) error {
 	     FROM cards
 	     WHERE userid=$1
 	     LIMIT 10`
-	err = db.Select(&user.Cards, q, uid)
+	err = core.DB().Select(&user.Cards, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return core.JSONError(err)
 	}
@@ -395,7 +409,7 @@ func handlerAPIProfile(c *echo.Context) error {
 	     FROM addresses
 	     WHERE userid=$1
 	     LIMIT 10`
-	err = db.Select(&user.Addresses, q, uid)
+	err = core.DB().Select(&user.Addresses, q, uid)
 	if err != nil && err != sql.ErrNoRows {
 		return core.JSONError(err)
 	}
@@ -421,14 +435,14 @@ func handlerAPIProfileView(c *echo.Context) error {
 	}
 	q := `SELECT authorizationid FROM users WHERE id=$1`
 	var authID sql.NullInt64
-	if err = db.Get(&authID, q, uid); err != nil {
+	if err = core.DB().Get(&authID, q, uid); err != nil {
 		return core.JSONError(err)
 	}
 	if !authID.Valid {
 		goto Response
 	}
 	q = `UPDATE authorizations SET authorizedat=$1 WHERE id=$2`
-	_, err = db.Exec(q, time.Now(), authID)
+	_, err = core.DB().Exec(q, time.Now(), authID)
 	if err != nil && err != sql.ErrNoRows {
 		return core.JSONError(err)
 	}
@@ -450,7 +464,7 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	}
 	var user dt.User
 	q := `SELECT id, name, email FROM users WHERE email=$1`
-	err := db.Get(&user, q, req.Email)
+	err := core.DB().Get(&user, q, req.Email)
 	if err == sql.ErrNoRows {
 		return core.JSONError(errors.New("Sorry, there's no record of that email. Are you sure that's the email you used to sign up with and that you typed it correctly?"))
 	}
@@ -459,7 +473,7 @@ func handlerAPIForgotPasswordSubmit(c *echo.Context) error {
 	}
 	secret := randSeq(40)
 	q = `INSERT INTO passwordresets (userid, secret) VALUES ($1, $2)`
-	if _, err = db.Exec(q, user.ID, secret); err != nil {
+	if _, err = core.DB().Exec(q, user.ID, secret); err != nil {
 		return core.JSONError(err)
 	}
 	if len(emailsender.Drivers()) == 0 {
@@ -490,7 +504,7 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	q := `SELECT userid FROM passwordresets
 	      WHERE secret=$1 AND
 	            createdat >= CURRENT_TIMESTAMP - interval '30 minutes'`
-	err := db.Get(&userid, q, req.Secret)
+	err := core.DB().Get(&userid, q, req.Secret)
 	if err == sql.ErrNoRows {
 		return core.JSONError(errors.New("Sorry, that information doesn't match our records."))
 	}
@@ -501,7 +515,7 @@ func handlerAPIResetPasswordSubmit(c *echo.Context) error {
 	if err != nil {
 		return core.JSONError(err)
 	}
-	tx, err := db.Begin()
+	tx, err := core.DB().Begin()
 	if err != nil {
 		return core.JSONError(err)
 	}
@@ -578,7 +592,7 @@ func createCSRFToken(u *dt.User) (token string, err error) {
 	      VALUES ($1, $2, 'csrfToken')
 	      ON CONFLICT (userid, label) DO UPDATE SET token=$1`
 	token = randSeq(32)
-	if _, err := db.Exec(q, token, u.ID); err != nil {
+	if _, err := core.DB().Exec(q, token, u.ID); err != nil {
 		return "", err
 	}
 	return token, nil

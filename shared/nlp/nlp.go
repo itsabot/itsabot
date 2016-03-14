@@ -57,7 +57,7 @@ func TokenizeSentence(sent string) []string {
 			}
 		}
 	}
-	log.Debug("tokens", tokens)
+	log.Debug("found tokens", tokens)
 	return tokens
 }
 
