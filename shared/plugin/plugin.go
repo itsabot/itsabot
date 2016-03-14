@@ -38,8 +38,6 @@ type Config struct {
 	PluginRPCAddr string
 }
 
-var client *rpc.Client
-var db *sqlx.DB
 var (
 	// ErrMissingPluginName is returned when a plugin name is expected, but
 	// but a blank name is provided.
@@ -70,33 +68,22 @@ func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
 // Register with Abot to begin communicating over RPC.
 func (p *Plugin) Register(pluginT interface{}) error {
 	log.Debug("connecting to", p.Config.Name)
-
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}
 	p.Config.PluginRPCAddr = ln.Addr().String()
-
 	if err = rpc.Register(pluginT); err != nil {
 		return err
 	}
-
 	client, err := rpc.Dial("tcp", p.Config.CoreRPCAddr)
 	if err != nil {
 		return err
 	}
-
 	if err = client.Call("Abot.RegisterPlugin", p, nil); err != nil {
 		return err
 	}
-
 	log.Debug("connected to", p.Config.Name)
-
-	db, err = ConnectDB()
-	if err != nil {
-		log.Debug("could not connect to database")
-		return err
-	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -113,6 +100,9 @@ func ConnectDB() (*sqlx.DB, error) {
 	var err error
 	if os.Getenv("ABOT_ENV") == "production" {
 		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
+	} else if os.Getenv("ABOT_ENV") == "test" {
+		db, err = sqlx.Connect("postgres",
+			"user=postgres dbname=abot_test sslmode=disable")
 	} else {
 		db, err = sqlx.Connect("postgres",
 			"user=postgres dbname=abot sslmode=disable")

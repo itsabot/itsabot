@@ -2,23 +2,13 @@
 // by package sms.
 package driver
 
+import "github.com/labstack/echo"
+
 // Driver is the interface that must be implemented by an SMS driver.
 type Driver interface {
 	// Open returns a new connection to the SMS server. The name is a string
 	// in a driver-specific format.
-	Open(name string) (Conn, error)
-
-	// FromKey is the key in an SMS service's request that contains the
-	// From telephone number.
-	FromKey() string
-
-	// ToKey is the key in an SMS service's request that contains the
-	// To telephone number.
-	ToKey() string
-
-	// MsgKey is the key in an SMS service's request that contains the
-	// content of the message.
-	MsgKey() string
+	Open(name string, e *echo.Echo) (Conn, error)
 }
 
 // Conn is a connection to the external SMS service.

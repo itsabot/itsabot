@@ -6,7 +6,6 @@ import (
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/language"
 	log "github.com/itsabot/abot/shared/log"
-	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 )
 
@@ -16,16 +15,16 @@ var ErrInvalidCommand = errors.New("invalid command")
 
 // Preprocess converts a user input into a Msg that's been persisted to the
 // database
-func Preprocess(db *sqlx.DB, ner Classifier, c *echo.Context) (*dt.Msg, error) {
+func Preprocess(c *echo.Context) (*dt.Msg, error) {
 	cmd := c.Get("cmd").(string)
 	if len(cmd) == 0 {
 		return nil, ErrInvalidCommand
 	}
-	u, err := dt.GetUser(db, c)
+	u, err := dt.GetUser(DB(), c)
 	if err != nil {
 		return nil, err
 	}
-	msg := NewMsg(db, ner, u, cmd)
+	msg := NewMsg(u, cmd)
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
 }
@@ -36,17 +35,15 @@ func Preprocess(db *sqlx.DB, ner Classifier, c *echo.Context) (*dt.Msg, error) {
 // is returned in the string. Errors returned from this function are not for the
 // user, so they are handled by Abot explicitly on this function's return
 // (logging, notifying admins, etc.).
-func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
-	c *echo.Context) (ret string, uid uint64, err error) {
-
-	msg, err := Preprocess(db, ner, c)
+func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
+	msg, err := Preprocess(c)
 	if err != nil {
 		return "", 0, err
 	}
 	log.Debug("processed input into message...")
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
-	plugin, route, followup, err := GetPlugin(db, msg)
+	plugin, route, followup, err := GetPlugin(DB(), msg)
 	if err != nil {
 		return "", msg.User.ID, err
 	}
@@ -56,10 +53,10 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	} else {
 		msg.Plugin = plugin.P.Config.Name
 	}
-	if err = msg.Save(db); err != nil {
+	if err = msg.Save(DB()); err != nil {
 		return "", msg.User.ID, err
 	}
-	ret = RespondWithOffense(offensive, msg)
+	ret = RespondWithOffense(Offensive(), msg)
 	if len(ret) == 0 {
 		if followup {
 			log.Debug("message is a followup")
@@ -83,7 +80,7 @@ func ProcessText(db *sqlx.DB, ner Classifier, offensive map[string]struct{},
 	if len(ret) == 0 {
 		m.Sentence = language.Confused()
 		msg.NeedsTraining = true
-		if err = msg.Update(db); err != nil {
+		if err = msg.Update(DB()); err != nil {
 			return "", m.User.ID, err
 		}
 	} else {

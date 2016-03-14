@@ -17,7 +17,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -25,7 +24,6 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/itsabot/abot/shared/plugin"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
@@ -101,44 +99,17 @@ func main() {
 
 // startServer initializes any clients that are needed and boots plugins
 func startServer() error {
-	if len(os.Getenv("ABOT_SECRET")) < 32 || os.Getenv("ABOT_ENV") == "production" {
-		log.Fatal("must set ABOT_SECRET env var in production to >= 32 characters")
-	}
+	var e *echo.Echo
 	var err error
-	db, err = plugin.ConnectDB()
+	e, err = core.NewServer()
 	if err != nil {
-		log.Fatal("could not connect to database", err)
-	}
-	if err = checkRequiredEnvVars(); err != nil {
 		return err
 	}
 	tmplLayout, err = template.ParseFiles("assets/html/layout.html")
 	if err != nil {
 		return err
 	}
-	if err = compileAssets(); err != nil {
-		return err
-	}
-	addr, err := core.BootRPCServer()
-	if err != nil {
-		return err
-	}
-	go func() {
-		if err = core.BootDependencies(addr); err != nil {
-			log.Debug("could not boot dependency", err)
-		}
-	}()
-	ner, err = core.BuildClassifier()
-	if err != nil {
-		log.Debug("could not build classifier", err)
-	}
-	offensive, err = core.BuildOffensiveMap()
-	if err != nil {
-		log.Debug("could not build offensive map", err)
-	}
-	e := echo.New()
 	initRoutes(e)
-	log.Info("booted ava http server")
 	e.Run(":" + os.Getenv("PORT"))
 	return nil
 }
@@ -344,24 +315,6 @@ func installPlugins() error {
 	return nil
 }
 
-func checkRequiredEnvVars() error {
-	port := os.Getenv("PORT")
-	_, err := strconv.Atoi(port)
-	if err != nil {
-		return errors.New("PORT is not set to an integer")
-	}
-	base := os.Getenv("ABOT_URL")
-	l := len(base)
-	if l == 0 {
-		return errors.New("ABOT_URL not set")
-	}
-	if l < 4 || base[0:4] != "http" {
-		return errors.New("ABOT_URL invalid. Must include http/https")
-	}
-	// TODO Check for ABOT_DATABASE_URL if ABOT_ENV==production
-	return nil
-}
-
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 type pluginJSON struct {
@@ -432,18 +385,4 @@ func randSeq(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
-}
-
-// compileAssets compresses and merges assets from Abot core and all plugins on
-// boot. In development, this step is repeated on each server HTTP request prior
-// to serving any assets.
-func compileAssets() error {
-	outC, err := exec.
-		Command("/bin/sh", "-c", "cmd/compileassets.sh").
-		CombinedOutput()
-	if err != nil {
-		log.Debug(string(outC))
-		log.Fatal(err)
-	}
-	return nil
 }

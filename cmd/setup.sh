@@ -21,25 +21,16 @@ then
 	echo "WARN: could not create abot database. If you already created one, you can ignore this message."
 fi
 
-echo "Migrating database..."
-if ! cmd/migrateup.sh &> /dev/null
+echo "Creating abot_test database..."
+if ! createdb -U postgres abot_test -O postgres &> /dev/null
 then
-	echo "Failed migrating db"
+	echo "WARN: could not create abot database. If you already created one, you can ignore this message."
 fi
 
-echo "Creating local admin account..."
-echo -n "Email: "
-read username;
-echo -n "Password: "
-read -s pw;
-if psql -U postgres -d abot -c "
-	INSERT INTO users (name, email, password, admin, locationid)
-	VALUES ('admin', '$username', '$pw', TRUE, 0)
-	" > /dev/null
+echo "Migrating databases..."
+if ! cmd/migrateup.sh &> /dev/null
 then
-	echo "Created admin account."
-else
-	echo "Could not create admin account. Continuing..."
+	echo "WARN: could not migrate db."
 fi
 
 echo "Updating environment variables"
@@ -71,6 +62,12 @@ export ABOT_URL="http://localhost:4200"
 export ABOT_SECRET="$SECRET"
 EOT
 
+# Source new env vars for current terminal
+export PORT="4200"
+export ABOT_ENV="development"
+export ABOT_URL="http://localhost:4200"
+export ABOT_SECRET="$SECRET"
+
 echo "Installing Abot..."
 go install
 abot plugin install
@@ -78,4 +75,5 @@ abot plugin install
 echo "Seeding database..."
 cat data/cities.csv | psql -U postgres -d abot -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
 
-echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200"
+echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200."
+echo "You'll want to sign up to create a user account next."

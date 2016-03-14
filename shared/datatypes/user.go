@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/itsabot/abot/shared/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
@@ -18,6 +20,7 @@ import (
 type User struct {
 	Name                     string
 	Email                    string
+	Password                 string // temp storage prior to hashing
 	PaymentServiceID         string
 	LocationID               int
 	ID                       uint64
@@ -119,6 +122,45 @@ func (u *User) GetEmail() string {
 	return u.Email
 }
 
+// Create a new user in the database.
+func (u *User) Create(db *sqlx.DB, fidT FlexIDType, fid string) error {
+	// Create the password hash
+	hpw, err := bcrypt.GenerateFromPassword([]byte(u.Password), 10)
+	if err != nil {
+		return err
+	}
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	q := `INSERT INTO users (name, email, password, locationid)
+	      VALUES ($1, $2, $3, 0)
+	      RETURNING id`
+	var uid uint64
+	err = tx.QueryRowx(q, u.Name, u.Email, hpw).Scan(&uid)
+	if err != nil && err.Error() ==
+		`pq: duplicate key value violates unique constraint "users_email_key"` {
+		_ = tx.Rollback()
+		return err
+	}
+	if uid == 0 {
+		_ = tx.Rollback()
+		return err
+	}
+	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
+	     VALUES ($1, $2, $3)`
+	_, err = tx.Exec(q, uid, fid, 2)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	u.ID = uid
+	return nil
+}
+
 // IsAuthenticated confirms that the user is authenticated for a particular
 // AuthMethod.
 func (u *User) IsAuthenticated(m AuthMethod) (bool, error) {
@@ -213,10 +255,9 @@ func (u *User) GetAddress(db *sqlx.DB, text string) (*Address, error) {
 		log.Debug("no address found: " + text)
 		return nil, ErrNoAddress
 	}
-	q := `
-		SELECT name, line1, line2, city, state, country, zip
-		FROM addresses
-		WHERE userid=$1 AND name=$2 AND cardid=0`
+	q := `SELECT name, line1, line2, city, state, country, zip
+	      FROM addresses
+	      WHERE userid=$1 AND name=$2 AND cardid=0`
 	err := db.Get(addr, q, u.ID, name)
 	if err == sql.ErrNoRows {
 		return nil, ErrNoAddress

@@ -135,7 +135,7 @@ func handlerIndex(c *echo.Context) error {
 		if err != nil {
 			return err
 		}
-		if err = compileAssets(); err != nil {
+		if err = core.CompileAssets(); err != nil {
 			return err
 		}
 	}
@@ -162,7 +162,7 @@ func handlerMain(c *echo.Context) error {
 	c.Set("uid", c.Form("uid"))
 	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
 	errSent := false
-	ret, uid, err := core.ProcessText(db, ner, offensive, c)
+	ret, uid, err := core.ProcessText(c)
 	if err != nil {
 		ret = errMsg
 		errSent = true
@@ -300,49 +300,16 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		}
 	*/
 
-	// create the password hash
 	// TODO format phone number for SMS interface (international format)
-	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
-	if err != nil {
-		return core.JSONError(err)
-	}
-
-	tx, err := db.Beginx()
-	if err != nil {
-		return core.JSONError(errors.New("Something went wrong. Try again."))
-	}
-	q := `INSERT INTO users (name, email, password, locationid)
-	      VALUES ($1, $2, $3, 0)
-	      RETURNING id`
-	var uid uint64
-	err = tx.QueryRowx(q, req.Name, req.Email, hpw).Scan(&uid)
-	if err != nil && err.Error() ==
-		`pq: duplicate key value violates unique constraint "users_email_key"` {
-		_ = tx.Rollback()
-		return core.JSONError(errors.New("Sorry, that email is taken."))
-	}
-	if uid == 0 {
-		_ = tx.Rollback()
-		return core.JSONError(errors.New(
-			"Something went wrong. Please try again."))
-	}
-	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
-	     VALUES ($1, $2, $3)`
-	_, err = tx.Exec(q, uid, req.FID, 2)
-	if err != nil {
-		_ = tx.Rollback()
-		return core.JSONError(errors.New(
-			"Couldn't sign up. Did you use the link sent to you?"))
-	}
-	if err = tx.Commit(); err != nil {
-		return core.JSONError(errors.New(
-			"Something went wrong. Please try again."))
-	}
 	user := &dt.User{
-		ID:      uid,
-		Email:   req.Email,
-		Trainer: false,
-		Admin:   false,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Trainer:  false,
+		Admin:    false,
+	}
+	if err := user.Create(db, dt.FlexIDType(2), req.FID); err != nil {
+		return core.JSONError(err)
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
@@ -367,7 +334,7 @@ func handlerAPISignupSubmit(c *echo.Context) error {
 		IssuedAt:  header.IssuedAt,
 		CSRFToken: csrfToken,
 	}
-	resp.ID = uid
+	resp.ID = user.ID
 	if err = c.JSON(http.StatusOK, resp); err != nil {
 		return core.JSONError(err)
 	}
