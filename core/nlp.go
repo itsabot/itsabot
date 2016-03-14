@@ -127,6 +127,8 @@ func RespondWithNicety(in *dt.Msg) (responseNecessary bool, response string) {
 			return false, ""
 		case "sorri":
 			return true, "That's OK. I forgive you."
+		case "hi", "hello":
+			return true, "Hi there. :)"
 		}
 	}
 	return true, ""
