@@ -1,7 +1,7 @@
-# Abot [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/itsabot/abot)
+# Abot [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/itsabot/abot) [![Travis CI](https://img.shields.io/travis/itsabot/abot.svg?style=flat-square)](https://travis-ci.org/itsabot/abot)
 
-[Website](https://www.itsabot.org) | [Getting
-Started](https://github.com/itsabot/abot/wiki/Getting-Started) |
+[Website](https://www.itsabot.org) |
+[Getting Started](https://github.com/itsabot/abot/wiki/Getting-Started) |
 [Contributing](https://github.com/itsabot/abot/wiki/How-to-Contribute) |
 [Mailing List](https://groups.google.com/forum/#!forum/abot-discussion)
  
