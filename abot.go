@@ -64,7 +64,7 @@ func main() {
 						if err := installPlugins(); err != nil {
 							l := log.New("")
 							l.SetFlags(0)
-							l.Fatalf("could not start server\n%s", err)
+							l.Fatalf("could not install plugins\n%s", err)
 						}
 					},
 				},
