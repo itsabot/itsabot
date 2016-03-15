@@ -15,7 +15,7 @@ func TestExtractCities(t *testing.T) {
 	log.SetDebug(true)
 	db, err := plugin.ConnectDB()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	var cities []dt.City
 	in := &dt.Msg{}
@@ -24,13 +24,13 @@ func TestExtractCities(t *testing.T) {
 	in.Stems = nlp.StemTokens(in.Tokens)
 	cities, err = ExtractCities(db, in)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if len(cities) == 0 {
-		t.Error(errors.New("expected New York, extracted none"))
+		t.Fatal(errors.New("expected New York, extracted none"))
 	}
 	if cities[0].Name != "New York" {
-		t.Error(fmt.Errorf("expected New York, extracted %s", cities[0].Name))
+		t.Fatal(fmt.Errorf("expected New York, extracted %s", cities[0].Name))
 	}
 	in = &dt.Msg{}
 	in.Sentence = "I'm in LA or San Francisco next week"
@@ -38,10 +38,10 @@ func TestExtractCities(t *testing.T) {
 	in.Stems = nlp.StemTokens(in.Tokens)
 	cities, err = ExtractCities(db, in)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if len(cities) < 2 {
-		t.Error(fmt.Errorf("expected >2 cities, but got %d\n", len(cities)))
+		t.Fatal(fmt.Errorf("expected >2 cities, but got %d\n", len(cities)))
 	}
 	in = &dt.Msg{}
 	in.Sentence = "What's the weather like in San Francisco?"
@@ -49,11 +49,12 @@ func TestExtractCities(t *testing.T) {
 	in.Stems = nlp.StemTokens(in.Tokens)
 	cities, err = ExtractCities(db, in)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	if len(cities) == 0 {
-		t.Error(fmt.Errorf("expected San Francisco"))
+		t.Fatal(fmt.Errorf("expected San Francisco, extracted none"))
 	}
 	if cities[0].Name != "San Francisco" {
+		t.Fatal(fmt.Errorf("expected San Francisco, extracted %s", cities[0].Name))
 	}
 }
