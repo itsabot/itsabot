@@ -9,7 +9,7 @@ then
 	exit 1
 fi
 
-echo "Confirming postgres user exists..."
+echo "Confirming Postgres user exists..."
 if ! psql -U postgres postgres -tAc "SELECT '' FROM pg_roles WHERE rolname='postgres'" > /dev/null
 then
 	echo "Please create a PostgreSQL user named postgres to continue. Google \"createuser postgres\""
@@ -24,7 +24,7 @@ fi
 echo "Creating abot_test database..."
 if ! createdb -U postgres abot_test -O postgres &> /dev/null
 then
-	echo "WARN: could not create abot database. If you already created one, you can ignore this message."
+	echo "WARN: could not create abot_test database. If you already created one, you can ignore this message."
 fi
 
 echo "Migrating databases..."
@@ -73,8 +73,14 @@ go install
 abot plugin install
 
 echo "Seeding database..."
-cat data/cities.csv | psql -U postgres -d abot -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
-cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
+if ! cat data/cities.csv | psql -U postgres -d abot -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;" &> /dev/null
+then
+	echo "WARN: could not seed abot database. If you already seeded it, you can ignore this message."
+fi
+if ! cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;" &> /dev/null
+then
+	echo "WARN: could not seed abot_test database. If you already seeded it, you can ignore this message."
+fi
 
 echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200."
 echo "You'll want to sign up to create a user account next."
