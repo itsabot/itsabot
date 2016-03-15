@@ -35,7 +35,6 @@ var errInvalidUserPass = errors.New("Invalid username/password combination")
 func initRoutes(e *echo.Echo) {
 	e.Use(mw.Logger(), mw.Gzip(), mw.Recover())
 	e.SetDebug(true)
-	log.Debug("ROUTES ARE SET UP")
 	logger := log.New("")
 	e.SetLogger(logger)
 
