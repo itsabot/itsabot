@@ -302,7 +302,7 @@ func installPlugins() error {
 		Command("/bin/sh", "-c", "go install ./...").
 		CombinedOutput()
 	if err != nil {
-		l.Debug(string(outC))
+		l.Info(string(outC))
 		l.Fatal(err)
 	}
 	l.Info("Success!")
