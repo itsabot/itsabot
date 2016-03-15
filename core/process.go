@@ -43,9 +43,9 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 	log.Debug("processed input into message...")
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
-	plugin, route, followup, err := GetPlugin(DB(), msg)
-	if err != nil {
-		return "", msg.User.ID, err
+	plugin, route, followup, pluginErr := GetPlugin(DB(), msg)
+	if pluginErr != nil && pluginErr != ErrMissingPlugin {
+		return "", msg.User.ID, pluginErr
 	}
 	msg.Route = route
 	if plugin == nil {
@@ -57,7 +57,10 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 		return "", msg.User.ID, err
 	}
 	ret = RespondWithOffense(Offensive(), msg)
-	if len(ret) == 0 {
+	if len(ret) > 0 {
+		return ret, msg.User.ID, nil
+	}
+	if pluginErr != ErrMissingPlugin {
 		if followup {
 			log.Debug("message is a followup")
 		}
@@ -65,15 +68,14 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 		if err != nil {
 			return "", msg.User.ID, err
 		}
-		responseNeeded := true
-		if len(ret) == 0 {
-			responseNeeded, ret = RespondWithNicety(msg)
-		}
-		if !responseNeeded {
-			return "", msg.User.ID, nil
-		}
 	}
-	log.Debug("message response:", ret)
+	responseNeeded := true
+	if len(ret) == 0 {
+		responseNeeded, ret = RespondWithNicety(msg)
+	}
+	if !responseNeeded {
+		return "", msg.User.ID, nil
+	}
 	m := &dt.Msg{}
 	m.AbotSent = true
 	m.User = msg.User
