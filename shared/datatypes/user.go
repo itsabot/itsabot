@@ -52,23 +52,21 @@ const (
 	fidtPhone                     // 2
 )
 
-var (
-	// ErrMissingUser is returned when a user expected, but none found.
-	ErrMissingUser = errors.New("missing user")
+// ErrMissingUser is returned when a user expected, but none found.
+var ErrMissingUser = errors.New("missing user")
 
-	// ErrMissingFlexIDType is returned when a FlexIDType is expected, but
-	// none found.
-	ErrMissingFlexIDType = errors.New("missing flexidtype")
+// ErrMissingFlexIDType is returned when a FlexIDType is expected, but
+// none found.
+var ErrMissingFlexIDType = errors.New("missing flexidtype")
 
-	// ErrMissingFlexID is returned when a FlexID is expected, but none
-	// found.
-	ErrMissingFlexID = errors.New("missing flexid")
+// ErrMissingFlexID is returned when a FlexID is expected, but none
+// found.
+var ErrMissingFlexID = errors.New("missing flexid")
 
-	// ErrInvalidFlexIDType is returned when a FlexIDType is invalid not
-	// matching one of the pre-defined FlexIDTypes for email (1) or phone
-	// (2).
-	ErrInvalidFlexIDType = errors.New("invalid flexid type")
-)
+// ErrInvalidFlexIDType is returned when a FlexIDType is invalid not
+// matching one of the pre-defined FlexIDTypes for email (1) or phone
+// (2).
+var ErrInvalidFlexIDType = errors.New("invalid flexid type")
 
 // GetUser from an HTTP request.
 func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
