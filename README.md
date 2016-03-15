@@ -15,8 +15,8 @@ providing an extensible platform onto which anyone can easily add functionality,
 Abot is the first A.I. framework that aims to be available everywhere and—
 ultimately—to do everything.
 
-**Note: This is pre-alpha software and shouldn't yet be considered for
-production use.** Follow our progress on the
+**Note: This is being developed heavily.** There may be breaking API changes
+in each release until we hit v1.0. Follow our progress on the
 [Roadmap](https://github.com/itsabot/abot/wiki/Roadmap).
 
 ## Installation
