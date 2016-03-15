@@ -297,8 +297,16 @@ func installPlugins() error {
 		}(url, version)
 	}
 	wg.Wait()
-	l.Info("Installing plugins...")
+	l.Info("Fetching dependencies...")
 	outC, err := exec.
+		Command("/bin/sh", "-c", "go get ./...").
+		CombinedOutput()
+	if err != nil {
+		l.Info(string(outC))
+		l.Fatal(err)
+	}
+	l.Info("Installing plugins...")
+	outC, err = exec.
 		Command("/bin/sh", "-c", "go install ./...").
 		CombinedOutput()
 	if err != nil {
