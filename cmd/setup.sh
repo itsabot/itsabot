@@ -74,6 +74,7 @@ abot plugin install
 
 echo "Seeding database..."
 cat data/cities.csv | psql -U postgres -d abot -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
+cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
 
 echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200."
 echo "You'll want to sign up to create a user account next."

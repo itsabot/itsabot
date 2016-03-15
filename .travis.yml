@@ -1,0 +1,31 @@
+language: go
+sudo: required
+go:
+        - 1.6
+before_script:
+        # Install Postgres 9.5
+        - sudo /etc/init.d/postgresql stop
+        - sudo apt-get -y remove --purge postgresql-9.1
+        - sudo apt-get -y remove --purge postgresql-9.2
+        - sudo apt-get -y remove --purge postgresql-9.3
+        - sudo apt-get -y remove --purge postgresql-9.4
+        - sudo apt-get -y autoremove
+        - sudo apt-key adv --keyserver keys.gnupg.net --recv-keys 7FCC7D46ACCC4CF8
+        - sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ precise-pgdg main 9.5" >> /etc/apt/sources.list.d/postgresql.list'
+        - sudo apt-get update
+        - sudo apt-get -y install postgresql-9.5
+        - sudo sh -c 'echo "local all postgres trust" > /etc/postgresql/9.5/main/pg_hba.conf'
+        - sudo sh -c 'echo -n "host all all 127.0.0.1/32 trust" >> /etc/postgresql/9.5/main/pg_hba.conf'
+        - sudo /etc/init.d/postgresql restart
+        - psql --version
+        - psql -c 'CREATE DATABASE abot_test;' -U postgres
+        - ls db/migrations/up/*.sql | xargs -I{} -- psql -U postgres abot_test -f {}
+        - cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
+        - go vet ./...
+install:
+        - go get github.com/robfig/glock
+        - go install github.com/robfig/glock
+        - glock sync github.com/itsabot/abot
+        - go install ./...
+script:
+        - go test ./...
