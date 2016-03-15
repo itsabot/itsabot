@@ -48,7 +48,7 @@ var (
 	ErrMissingTrigger = errors.New("missing plugin trigger")
 )
 
-// New builds a plugin with a filled out config and a trigger.
+// New builds a Plugin with its trigger, RPC, and name configured.
 func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
 	error) {
 
