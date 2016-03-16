@@ -3,6 +3,7 @@ package core
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"os"
 	"os/exec"
 	"strconv"
@@ -68,6 +69,10 @@ func NewServer() (*echo.Echo, error) {
 		}
 	}
 	e := echo.New()
+	if err = loadHTMLTemplate("assets/html/layout.html"); err != nil {
+		return nil, err
+	}
+	initRoutes(e)
 	return e, nil
 }
 
@@ -83,6 +88,12 @@ func CompileAssets() error {
 		return err
 	}
 	return nil
+}
+
+func loadHTMLTemplate(p string) error {
+	var err error
+	tmplLayout, err = template.ParseFiles(p)
+	return err
 }
 
 func checkRequiredEnvVars() error {

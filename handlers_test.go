@@ -29,7 +29,6 @@ func TestMain(m *testing.M) {
 		log.Info("failed to start server", err)
 		os.Exit(1)
 	}
-	initRoutes(e)
 	log.SetDebug(true)
 	os.Exit(m.Run())
 }

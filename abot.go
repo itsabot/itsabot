@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -22,14 +21,10 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 )
-
-var tmplLayout *template.Template
-var ws = websocket.NewAtomicWebSocketSet()
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -91,7 +86,8 @@ func main() {
 	}
 }
 
-// startServer initializes any clients that are needed and boots plugins
+// startServer initializes any clients that are needed, sets up routes, and
+// boots plugins.
 func startServer() error {
 	var e *echo.Echo
 	var err error
@@ -99,11 +95,6 @@ func startServer() error {
 	if err != nil {
 		return err
 	}
-	tmplLayout, err = template.ParseFiles("assets/html/layout.html")
-	if err != nil {
-		return err
-	}
-	initRoutes(e)
 	e.Run(":" + os.Getenv("PORT"))
 	return nil
 }
@@ -221,7 +212,7 @@ func installPlugins() error {
 					resp.StatusCode)
 				l.Fatal(errors.New(e))
 			}
-			fiName := "tmp_" + randSeq(8) + ".zip"
+			fiName := "tmp_" + core.RandSeq(8) + ".zip"
 			fpZip := filepath.Join("./plugins", fiName)
 			var out *os.File
 			out, err = os.Create(fpZip)
@@ -317,8 +308,6 @@ func installPlugins() error {
 	return nil
 }
 
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
 type pluginJSON struct {
 	Dependencies map[string]string
 }
@@ -378,13 +367,4 @@ func extractAndWriteFile(dest string, f *zip.File) error {
 		}
 	}
 	return nil
-}
-
-// From https://stackoverflow.com/questions/22892120/how-to-generate-a-random-string-of-a-fixed-length-in-golang
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
 }
