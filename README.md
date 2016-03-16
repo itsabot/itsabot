@@ -30,8 +30,6 @@ You can install Abot via git:
 
 ```bash
 $ git clone git@github.com:itsabot/abot.git && cd abot
-$ go get github.com/robfig/glock
-$ glock sync github.com/itsabot/abot && glock install github.com/itsabot/abot
 $ cmd/setup.sh
 $ abot server
 ```

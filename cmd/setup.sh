@@ -68,6 +68,11 @@ export ABOT_ENV="development"
 export ABOT_URL="http://localhost:4200"
 export ABOT_SECRET="$SECRET"
 
+echo "Fetching dependencies..."
+go get github.com/robfig/glock &>/dev/null
+glock sync github.com/itsabot/abot &>/dev/null
+glock install github.com/itsabot/abot &>/dev/null
+
 echo "Installing Abot..."
 go install
 abot plugin install
