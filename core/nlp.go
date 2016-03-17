@@ -3,6 +3,7 @@ package core
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/itsabot/abot/shared/datatypes"
@@ -32,7 +33,7 @@ func (c Classifier) ClassifyTokens(tokens []string) *nlp.StructuredInput {
 	return &s
 }
 
-// BuildClassifier prepares the Named Entity Recognizer (NER) to find Commands
+// buildClassifier prepares the Named Entity Recognizer (NER) to find Commands
 // and Objects using a simple dictionary lookup. This has the benefit of high
 // speed--constant time, O(1)--with insignificant memory use and high accuracy
 // given false positives (marking something as both a Command and an Object when
@@ -40,9 +41,11 @@ func (c Classifier) ClassifyTokens(tokens []string) *nlp.StructuredInput {
 // pass, and any double-marked words should be passed through something like an
 // n-gram Bayesian filter to determine the correct part of speech within its
 // context in the sentence.
-func BuildClassifier() (Classifier, error) {
+func buildClassifier() (Classifier, error) {
 	ner := Classifier{}
-	fi, err := os.Open("data/ner/nouns.txt")
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "data", "ner")
+	fi, err := os.Open(filepath.Join(p, "nouns.txt"))
 	if err != nil {
 		return ner, err
 	}
@@ -54,7 +57,7 @@ func BuildClassifier() (Classifier, error) {
 	if err = fi.Close(); err != nil {
 		return ner, err
 	}
-	fi, err = os.Open("data/ner/verbs.txt")
+	fi, err = os.Open(filepath.Join(p, "verbs.txt"))
 	if err != nil {
 		return ner, err
 	}
@@ -66,7 +69,7 @@ func BuildClassifier() (Classifier, error) {
 	if err = fi.Close(); err != nil {
 		return ner, err
 	}
-	fi, err = os.Open("data/ner/adjectives.txt")
+	fi, err = os.Open(filepath.Join(p, "adjectives.txt"))
 	if err != nil {
 		return ner, err
 	}
@@ -78,7 +81,7 @@ func BuildClassifier() (Classifier, error) {
 	if err = fi.Close(); err != nil {
 		return ner, err
 	}
-	fi, err = os.Open("data/ner/adverbs.txt")
+	fi, err = os.Open(filepath.Join(p, "adverbs.txt"))
 	if err != nil {
 		return ner, err
 	}
@@ -93,13 +96,15 @@ func BuildClassifier() (Classifier, error) {
 	return ner, nil
 }
 
-// BuildOffensiveMap creates a map of offensive terms for which Abot will refuse
+// buildOffensiveMap creates a map of offensive terms for which Abot will refuse
 // to respond. This helps ensure that users are somewhat respectful to Abot and
 // her human trainers, since sentences caught by the OffensiveMap are rejected
 // before any human ever sees them.
-func BuildOffensiveMap() (map[string]struct{}, error) {
+func buildOffensiveMap() (map[string]struct{}, error) {
 	o := map[string]struct{}{}
-	fi, err := os.Open("data/offensive.txt")
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "data", "offensive.txt")
+	fi, err := os.Open(p)
 	if err != nil {
 		return o, err
 	}

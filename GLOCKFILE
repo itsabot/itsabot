@@ -1,3 +1,4 @@
+github.com/NickPresta/GoURLShortener eaed3e167e4ca10342e1446e8fc81b092dd76a17
 github.com/agonopol/go-stem 98588501825042276ca6d7cbc73bc8bb56ea8d77
 github.com/codegangsta/cli cf1f63a7274872768d4037305d572b70b1199397
 github.com/dchest/stemmer f1ab276e6cf5fad3f8db813f22e25b1939c8ef70
@@ -7,6 +8,5 @@ github.com/labstack/gommon bfff5bf04688a4048a5cb4dd3b3f0697caaad19c
 github.com/lib/pq 8ad2b298cadd691a77015666a5372eae5dbfac8f
 github.com/mattn/go-colorable 9cbef7c35391cca05f15f8181dc0b18bc9736dbb
 github.com/mattn/go-isatty 56b76bdf51f7708750eac80fa38b952bb9f32639
-github.com/satori/go.uuid d41af8bb6a7704f00bc3b7cba9355ae6a5a80048
 golang.org/x/crypto 1f22c0103821b9390939b6776727195525381532
 golang.org/x/net 6acef71eb69611914f7a30939ea9f6e194c78172

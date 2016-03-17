@@ -22,7 +22,6 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/log"
-	"github.com/labstack/echo"
 	_ "github.com/lib/pq"
 )
 
@@ -89,9 +88,7 @@ func main() {
 // startServer initializes any clients that are needed, sets up routes, and
 // boots plugins.
 func startServer() error {
-	var e *echo.Echo
-	var err error
-	e, err = core.NewServer()
+	e, _, _, err := core.NewServer()
 	if err != nil {
 		return err
 	}

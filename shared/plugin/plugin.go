@@ -68,7 +68,14 @@ func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
 // Register with Abot to begin communicating over RPC.
 func (p *Plugin) Register(pluginT interface{}) error {
 	log.Debug("connecting to", p.Config.Name)
-	ln, err := net.Listen("tcp", ":0")
+	// This may be set manually during testing
+	var ln net.Listener
+	port := ":0"
+	if len(p.Config.PluginRPCAddr) > 0 {
+		port = p.Config.PluginRPCAddr
+	}
+	var err error
+	ln, err = net.Listen("tcp", port)
 	if err != nil {
 		return err
 	}

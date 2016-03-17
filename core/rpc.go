@@ -30,16 +30,16 @@ type Abot int
 var ErrMissingPlugin = errors.New("missing plugin")
 
 // BootRPCServer starts the rpc for Abot core in a go routine and returns the
-// server address
-func BootRPCServer() (addr string, err error) {
+// server address.
+func BootRPCServer() (abot *Abot, addr string, err error) {
 	log.Debug("booting abot core rpc server")
-	abot := new(Abot)
+	abot = new(Abot)
 	if err = rpc.Register(abot); err != nil {
-		return
+		return abot, "", err
 	}
 	var ln net.Listener
 	if ln, err = net.Listen("tcp", ":0"); err != nil {
-		return
+		return abot, "", err
 	}
 	addr = ln.Addr().String()
 	go func() {
@@ -52,7 +52,7 @@ func BootRPCServer() (addr string, err error) {
 			go rpc.ServeConn(conn)
 		}
 	}()
-	return addr, err
+	return abot, addr, err
 }
 
 // BootDependencies executes all binaries listed in "plugins.json". each
@@ -61,7 +61,9 @@ func BootRPCServer() (addr string, err error) {
 // themselves with the ava core.
 func BootDependencies(avaRPCAddr string) error {
 	log.Debug("booting dependencies")
-	content, err := ioutil.ReadFile("plugins.json")
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "plugins.json")
+	content, err := ioutil.ReadFile(p)
 	if err != nil {
 		return err
 	}
@@ -195,7 +197,7 @@ var regPlugins = pkgMap{
 // plugins will only listen when ALL criteria are met and that there's no
 // support currently for duplicate routes (e.g. "find_restaurant" leading to
 // either one of two plugins).
-func (t *Abot) RegisterPlugin(p *plugin.Plugin, reply *string) error {
+func (t *Abot) RegisterPlugin(p *plugin.Plugin, _ *string) error {
 	log.Debug("registering", p.Config.Name, "at", p.Config.PluginRPCAddr)
 	client, err := rpc.Dial("tcp", p.Config.PluginRPCAddr)
 	if err != nil {
