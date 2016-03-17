@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	}
 	var err error
 	log.Info("starting server")
-	e, err = core.NewServer()
+	e, _, _, err = core.NewServer()
 	if err != nil {
 		log.Info("failed to start server", err)
 		os.Exit(1)
