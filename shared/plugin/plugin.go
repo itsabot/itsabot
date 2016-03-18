@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/itsabot/abot/shared/datatypes"
@@ -70,8 +71,12 @@ func New(coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin, error) {
 		return &Plugin{}, ErrMissingTrigger
 	}
 	// Read plugin.json, unmarshal into struct
+	_, file := path.Split(os.Args[0])
+	if os.Getenv("ABOT_ENV") == "test" {
+		file = file[:len(file)-5] // Remove ".test" from the end
+	}
 	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "plugins", os.Args[0], "plugin.json")
+		"abot", "plugins", file, "plugin.json")
 	log.Debug(p)
 	contents, err := ioutil.ReadFile(p)
 	if err != nil {
