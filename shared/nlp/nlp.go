@@ -155,6 +155,16 @@ func (s StringSlice) StringSlice() []string {
 	return ss
 }
 
+// Map converts a StringSlice into a map to check quickly if words exist within
+// it.
+func (s StringSlice) Map() map[string]struct{} {
+	m := map[string]struct{}{}
+	for _, w := range s {
+		m[w] = struct{}{}
+	}
+	return m
+}
+
 /*
 // TODO with addContext
 const (
