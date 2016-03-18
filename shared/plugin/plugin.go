@@ -35,11 +35,17 @@ type Plugin struct {
 
 // Config holds options for a plugin.
 type Config struct {
-	// Name is defined in plugin.json
+	// Name is the user-presentable name of the plugin and must be
+	// unique.It's defined in plugin.json
 	Name string
 
-	// Icon is defined in plugin.json
+	// Icon is the relative path to an icon image. It's defined in
+	// plugin.json.
 	Icon string
+
+	// Type specifies the type of plugin and can be either "action" or
+	// "driver". It's defined in plugin.json.
+	Type string
 
 	Route         string
 	CoreRPCAddr   string
