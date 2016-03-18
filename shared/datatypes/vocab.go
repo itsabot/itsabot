@@ -26,7 +26,7 @@ type VocabHandler struct {
 // defined by a plugin. For an example, see
 // github.com/itsabot/plugin_purchase/plugin_purchase.go. The response returned
 // is a user-presentable string from the VocabFn.
-type VocabFn func(m *Msg, mod int) (response string)
+type VocabFn func(in *Msg) (response string)
 
 // NewVocab returns Vocab with all Commands and Objects stemmed using the
 // Porter2 Snowball algorithm.
@@ -56,13 +56,12 @@ func NewVocab(vhs ...VocabHandler) *Vocab {
 // example, see github.com/itsabot/plugin_purchase/plugin_purchase.go.
 func (v *Vocab) HandleKeywords(m *Msg) string {
 	var resp string
-	mod := 1
 	for _, w := range m.Stems {
 		if v.dict[w] == nil {
 			continue
 		}
 		log.Debug("found fn in stems", w, v.dict[w])
-		resp = (v.dict[w])(m, mod)
+		resp = (v.dict[w])(m)
 		break
 	}
 	return resp
