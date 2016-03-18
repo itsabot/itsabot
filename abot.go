@@ -88,7 +88,7 @@ func main() {
 // startServer initializes any clients that are needed, sets up routes, and
 // boots plugins.
 func startServer() error {
-	e, _, _, err := core.NewServer()
+	e, _, err := core.NewServer()
 	if err != nil {
 		return err
 	}

@@ -33,25 +33,29 @@ func Offensive() map[string]struct{} {
 
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
-func NewServer() (e *echo.Echo, abot *Abot, rpcAddr string, err error) {
+func NewServer() (e *echo.Echo, abot *Abot, err error) {
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
-		return nil, abot, "", errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
+		return nil, abot, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	db, err = plugin.ConnectDB()
 	if err != nil {
-		return nil, abot, "", fmt.Errorf("could not connect to database: %s", err.Error())
+		return nil, abot, fmt.Errorf("could not connect to database: %s", err.Error())
 	}
 	if err = checkRequiredEnvVars(); err != nil {
-		return nil, abot, "", err
+		return nil, abot, err
 	}
 	if os.Getenv("ABOT_ENV") != "test" {
 		if err = CompileAssets(); err != nil {
-			return nil, abot, "", err
+			return nil, abot, err
 		}
 	}
+	var rpcAddr string
 	abot, rpcAddr, err = BootRPCServer()
 	if err != nil {
-		return nil, abot, "", err
+		return nil, abot, err
+	}
+	if err = os.Setenv("CORE_ADDR", rpcAddr); err != nil {
+		log.Fatal("failed to set CORE_ADDR", err)
 	}
 	go func() {
 		if err = BootDependencies(rpcAddr); err != nil {
@@ -70,10 +74,10 @@ func NewServer() (e *echo.Echo, abot *Abot, rpcAddr string, err error) {
 	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
 		"abot", "assets", "html", "layout.html")
 	if err = loadHTMLTemplate(p); err != nil {
-		return nil, abot, "", err
+		return nil, abot, err
 	}
 	initRoutes(e)
-	return e, abot, rpcAddr, nil
+	return e, abot, nil
 }
 
 // CompileAssets compresses and merges assets from Abot core and all plugins on

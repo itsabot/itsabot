@@ -3,10 +3,13 @@
 package plugin
 
 import (
+	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"net"
 	"net/rpc"
 	"os"
+	"path/filepath"
 
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
@@ -32,7 +35,12 @@ type Plugin struct {
 
 // Config holds options for a plugin.
 type Config struct {
-	Name          string
+	// Name is defined in plugin.json
+	Name string
+
+	// Icon is defined in plugin.json
+	Icon string
+
 	Route         string
 	CoreRPCAddr   string
 	PluginRPCAddr string
@@ -48,20 +56,29 @@ var (
 	ErrMissingTrigger = errors.New("missing plugin trigger")
 )
 
-// New builds a Plugin with its trigger, RPC, and name configured.
-func New(name, coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin,
-	error) {
-
-	if len(name) == 0 {
-		return &Plugin{}, ErrMissingPluginName
-	}
+// New builds a Plugin with its trigger, RPC, and configuration settings from
+// its pl
+// in.json.
+func New(coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin, error) {
 	if trigger == nil {
 		return &Plugin{}, ErrMissingTrigger
 	}
-	c := Config{
-		Name:        name,
-		CoreRPCAddr: coreRPCAddr,
+	// Read plugin.json, unmarshal into struct
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "plugins", os.Args[0], "plugin.json")
+	log.Debug(p)
+	contents, err := ioutil.ReadFile(p)
+	if err != nil {
+		return nil, err
 	}
+	c := Config{}
+	if err = json.Unmarshal(contents, &c); err != nil {
+		return nil, err
+	}
+	if len(c.Name) == 0 {
+		return &Plugin{}, ErrMissingPluginName
+	}
+	c.CoreRPCAddr = coreRPCAddr
 	return &Plugin{Config: c, Trigger: trigger}, nil
 }
 
