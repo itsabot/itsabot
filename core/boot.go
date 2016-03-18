@@ -1,9 +1,13 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io/ioutil"
+	"net"
+	"net/rpc"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -78,6 +82,69 @@ func NewServer() (e *echo.Echo, abot *Abot, err error) {
 	}
 	initRoutes(e)
 	return e, abot, nil
+}
+
+// BootRPCServer starts the rpc for Abot core in a go routine and returns the
+// server address.
+func BootRPCServer() (abot *Abot, addr string, err error) {
+	log.Debug("booting abot core rpc server")
+	abot = new(Abot)
+	if err = rpc.Register(abot); err != nil {
+		return abot, "", err
+	}
+	var ln net.Listener
+	if ln, err = net.Listen("tcp", ":0"); err != nil {
+		return abot, "", err
+	}
+	addr = ln.Addr().String()
+	go func() {
+		for {
+			var conn net.Conn
+			conn, err = ln.Accept()
+			if err != nil {
+				log.Debug("could not accept rpc", err)
+			}
+			go rpc.ServeConn(conn)
+		}
+	}()
+	return abot, addr, err
+}
+
+// BootDependencies executes all binaries listed in "plugins.json". each
+// dependencies is passed the rpc address of the ava core. it is expected that
+// each dependency respond with there own rpc address when registering
+// themselves with the ava core.
+func BootDependencies(avaRPCAddr string) error {
+	log.Debug("booting dependencies")
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "plugins.json")
+	content, err := ioutil.ReadFile(p)
+	if err != nil {
+		return err
+	}
+	var conf pluginsConf
+	if err = json.Unmarshal(content, &conf); err != nil {
+		return err
+	}
+	for name, version := range conf.Dependencies {
+		_, name = filepath.Split(name)
+		if version == "*" {
+			name += "-master"
+		} else {
+			name += "-" + version
+		}
+		log.Debug("booting", name)
+		// This assumes plugins are installed with go install ./...
+		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return err
+		}
+		log.Debug(string(out))
+		// cmd.Stdout = os.Stdout
+		// cmd.Stderr = os.Stderr
+	}
+	return nil
 }
 
 // CompileAssets compresses and merges assets from Abot core and all plugins on

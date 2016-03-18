@@ -2,14 +2,8 @@ package core
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"io/ioutil"
-	"net"
 	"net/rpc"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -28,67 +22,6 @@ type Abot int
 // most commonly seen on first run if the user's message doesn't initially
 // trigger a plugin.
 var ErrMissingPlugin = errors.New("missing plugin")
-
-// BootRPCServer starts the rpc for Abot core in a go routine and returns the
-// server address.
-func BootRPCServer() (abot *Abot, addr string, err error) {
-	log.Debug("booting abot core rpc server")
-	abot = new(Abot)
-	if err = rpc.Register(abot); err != nil {
-		return abot, "", err
-	}
-	var ln net.Listener
-	if ln, err = net.Listen("tcp", ":0"); err != nil {
-		return abot, "", err
-	}
-	addr = ln.Addr().String()
-	go func() {
-		for {
-			var conn net.Conn
-			conn, err = ln.Accept()
-			if err != nil {
-				log.Debug("could not accept rpc", err)
-			}
-			go rpc.ServeConn(conn)
-		}
-	}()
-	return abot, addr, err
-}
-
-// BootDependencies executes all binaries listed in "plugins.json". each
-// dependencies is passed the rpc address of the ava core. it is expected that
-// each dependency respond with there own rpc address when registering
-// themselves with the ava core.
-func BootDependencies(avaRPCAddr string) error {
-	log.Debug("booting dependencies")
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "plugins.json")
-	content, err := ioutil.ReadFile(p)
-	if err != nil {
-		return err
-	}
-	var conf pluginsConf
-	if err = json.Unmarshal(content, &conf); err != nil {
-		return err
-	}
-	for name, version := range conf.Dependencies {
-		_, name = filepath.Split(name)
-		if version == "*" {
-			name += "-master"
-		} else {
-			name += "-" + version
-		}
-		log.Debug("booting", name)
-		// This assumes plugins are installed with go install ./...
-		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err = cmd.Start(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
 
 // GetPlugin attempts to find a plugin and route for the given msg input if none
 // can be found, it checks the database for the last route used and gets the
