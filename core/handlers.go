@@ -506,22 +506,26 @@ func HandlerWSConversations(c *echo.Context) error {
 	}
 }
 
+// HandlerAPIPlugins responds with all of the server's installed plugin
+// configurations from each their respective plugin.json files.
 func HandlerAPIPlugins(c *echo.Context) error {
-	// Get all files in the plugins directory
-	fis, err := ioutil.ReadDir("./plugins")
-	if err != nil {
-		return JSONError(err)
-	}
 	var pJSON struct {
 		Plugins []json.RawMessage
 	}
-	for _, fi := range fis {
-		// Skip anything that's not a directory
-		if !fi.IsDir() {
-			continue
-		}
+
+	// Read plugins.json, unmarshal into struct
+	contents, err := ioutil.ReadFile("./plugins.json")
+	if err != nil {
+		return JSONError(err)
+	}
+	var plugins PluginJSON
+	if err = json.Unmarshal(contents, &plugins); err != nil {
+		return JSONError(err)
+	}
+	for url := range plugins.Dependencies {
 		// Add each plugin.json to array of plugins
-		p := filepath.Join("./plugins", fi.Name(), "plugin.json")
+		p := filepath.Join(os.Getenv("GOPATH"), "src", url,
+			"plugin.json")
 		var byt []byte
 		byt, err = ioutil.ReadFile(p)
 		if err != nil {
@@ -549,9 +553,7 @@ func createCSRFToken(u *dt.User) (token string, err error) {
 
 // getAuthToken returns a token used for future client authorization with a CSRF
 // token.
-func getAuthToken(u *dt.User) (header *Header, authToken string,
-	err error) {
-
+func getAuthToken(u *dt.User) (header *Header, authToken string, err error) {
 	scopes := []string{}
 	if u.Admin {
 		scopes = append(scopes, "admin")

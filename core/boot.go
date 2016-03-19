@@ -1,20 +1,15 @@
 package core
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
-	"io/ioutil"
-	"net"
-	"net/rpc"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 
 	"github.com/itsabot/abot/shared/log"
-	"github.com/itsabot/abot/shared/plugin"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 )
@@ -37,35 +32,24 @@ func Offensive() map[string]struct{} {
 
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
-func NewServer() (e *echo.Echo, abot *Abot, err error) {
+func NewServer() (e *echo.Echo, err error) {
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
-		return nil, abot, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
+		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
-	db, err = plugin.ConnectDB()
-	if err != nil {
-		return nil, abot, fmt.Errorf("could not connect to database: %s", err.Error())
+	if db == nil {
+		db, err = connectDB()
+		if err != nil {
+			return nil, fmt.Errorf("could not connect to database: %s", err.Error())
+		}
 	}
 	if err = checkRequiredEnvVars(); err != nil {
-		return nil, abot, err
+		return nil, err
 	}
 	if os.Getenv("ABOT_ENV") != "test" {
 		if err = CompileAssets(); err != nil {
-			return nil, abot, err
+			return nil, err
 		}
 	}
-	var rpcAddr string
-	abot, rpcAddr, err = BootRPCServer()
-	if err != nil {
-		return nil, abot, err
-	}
-	if err = os.Setenv("CORE_ADDR", rpcAddr); err != nil {
-		log.Fatal("failed to set CORE_ADDR", err)
-	}
-	go func() {
-		if err = BootDependencies(rpcAddr); err != nil {
-			log.Debug("could not boot dependency", err)
-		}
-	}()
 	ner, err = buildClassifier()
 	if err != nil {
 		log.Debug("could not build classifier", err)
@@ -78,73 +62,10 @@ func NewServer() (e *echo.Echo, abot *Abot, err error) {
 	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
 		"abot", "assets", "html", "layout.html")
 	if err = loadHTMLTemplate(p); err != nil {
-		return nil, abot, err
+		return nil, err
 	}
 	initRoutes(e)
-	return e, abot, nil
-}
-
-// BootRPCServer starts the rpc for Abot core in a go routine and returns the
-// server address.
-func BootRPCServer() (abot *Abot, addr string, err error) {
-	log.Debug("booting abot core rpc server")
-	abot = new(Abot)
-	if err = rpc.Register(abot); err != nil {
-		return abot, "", err
-	}
-	var ln net.Listener
-	if ln, err = net.Listen("tcp", ":0"); err != nil {
-		return abot, "", err
-	}
-	addr = ln.Addr().String()
-	go func() {
-		for {
-			var conn net.Conn
-			conn, err = ln.Accept()
-			if err != nil {
-				log.Debug("could not accept rpc", err)
-			}
-			go rpc.ServeConn(conn)
-		}
-	}()
-	return abot, addr, err
-}
-
-// BootDependencies executes all binaries listed in "plugins.json". each
-// dependencies is passed the rpc address of the ava core. it is expected that
-// each dependency respond with there own rpc address when registering
-// themselves with the ava core.
-func BootDependencies(avaRPCAddr string) error {
-	log.Debug("booting dependencies")
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "plugins.json")
-	content, err := ioutil.ReadFile(p)
-	if err != nil {
-		return err
-	}
-	var conf pluginsConf
-	if err = json.Unmarshal(content, &conf); err != nil {
-		return err
-	}
-	for name, version := range conf.Dependencies {
-		_, name = filepath.Split(name)
-		if version == "*" {
-			name += "-master"
-		} else {
-			name += "-" + version
-		}
-		log.Debug("booting", name)
-		// This assumes plugins are installed with go install ./...
-		cmd := exec.Command(name, "-coreaddr", avaRPCAddr)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return err
-		}
-		log.Debug(string(out))
-		// cmd.Stdout = os.Stdout
-		// cmd.Stderr = os.Stderr
-	}
-	return nil
+	return e, nil
 }
 
 // CompileAssets compresses and merges assets from Abot core and all plugins on
@@ -183,4 +104,20 @@ func checkRequiredEnvVars() error {
 	}
 	// TODO Check for ABOT_DATABASE_URL if ABOT_ENV==production
 	return nil
+}
+
+// connectDB opens a connection to the database.
+func connectDB() (*sqlx.DB, error) {
+	var db *sqlx.DB
+	var err error
+	if os.Getenv("ABOT_ENV") == "production" {
+		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
+	} else if os.Getenv("ABOT_ENV") == "test" {
+		db, err = sqlx.Connect("postgres",
+			"user=postgres dbname=abot_test sslmode=disable")
+	} else {
+		db, err = sqlx.Connect("postgres",
+			"user=postgres dbname=abot sslmode=disable")
+	}
+	return db, err
 }

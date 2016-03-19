@@ -13,6 +13,12 @@ import (
 // processed.
 var ErrInvalidCommand = errors.New("invalid command")
 
+// ErrMissingPlugin denotes that Abot could find neither a plugin with
+// matching triggers for a user's message nor any prior plugin used.
+// This is most commonly seen on first run if the user's message
+// doesn't initially trigger a plugin.
+var ErrMissingPlugin = errors.New("missing plugin")
+
 // Preprocess converts a user input into a Msg that's been persisted to the
 // database
 func Preprocess(c *echo.Context) (*dt.Msg, error) {
@@ -51,7 +57,7 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 	if plugin == nil {
 		msg.Plugin = ""
 	} else {
-		msg.Plugin = plugin.P.Config.Name
+		msg.Plugin = plugin.Config.Name
 	}
 	if err = msg.Save(DB()); err != nil {
 		return "", msg.User.ID, err
@@ -64,10 +70,7 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 		if followup {
 			log.Debug("message is a followup")
 		}
-		ret, err = CallPlugin(plugin, msg, followup)
-		if err != nil {
-			return "", msg.User.ID, err
-		}
+		ret = CallPlugin(plugin, msg, followup)
 	}
 	responseNeeded := true
 	if len(ret) == 0 {
@@ -89,7 +92,7 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 		m.Sentence = ret
 	}
 	if plugin != nil {
-		m.Plugin = plugin.P.Config.Name
+		m.Plugin = plugin.Config.Name
 	}
 	if err = m.Save(db); err != nil {
 		return "", m.User.ID, err

@@ -6,12 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"net"
-	"net/rpc"
 	"os"
-	"path"
 	"path/filepath"
+	"strings"
 
+	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/log"
 	"github.com/itsabot/abot/shared/nlp"
@@ -19,122 +18,68 @@ import (
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
 
-// Wrapper wraps a plugin with an open connection to an RPC client.
-type Wrapper struct {
-	P         *Plugin
-	RPCClient *rpc.Client
-}
+// ErrMissingPluginName is returned when a plugin name is expected, but
+// but a blank name is provided.
+var ErrMissingPluginName = errors.New("missing plugin name")
 
-// Plugin holds config options for any Abot plugin. Name must be globally unique.
-// Port takes the format of ":1234". Note that the colon is significant.
-// ServerAddress will default to localhost if left blank.
-type Plugin struct {
-	Config  Config
-	Vocab   *dt.Vocab
-	Trigger *nlp.StructuredInput
-}
+// ErrMissingTrigger is returned when a trigger is expected but none
+// were found.
+var ErrMissingTrigger = errors.New("missing plugin trigger")
 
-// Config holds options for a plugin.
-type Config struct {
-	// Name is the user-presentable name of the plugin and must be
-	// unique.It's defined in plugin.json
-	Name string
-
-	// Icon is the relative path to an icon image. It's defined in
-	// plugin.json.
-	Icon string
-
-	// Type specifies the type of plugin and can be either "action" or
-	// "driver". It's defined in plugin.json.
-	Type string
-
-	Route         string
-	CoreRPCAddr   string
-	PluginRPCAddr string
-}
-
-var (
-	// ErrMissingPluginName is returned when a plugin name is expected, but
-	// but a blank name is provided.
-	ErrMissingPluginName = errors.New("missing plugin name")
-
-	// ErrMissingTrigger is returned when a trigger is expected but none
-	// were found.
-	ErrMissingTrigger = errors.New("missing plugin trigger")
-)
+// ErrMissingPluginFns is returned when plugin functions are expected but none
+// were found.
+var ErrMissingPluginFns = errors.New("missing plugin functions")
 
 // New builds a Plugin with its trigger, RPC, and configuration settings from
-// its pl
-// in.json.
-func New(coreRPCAddr string, trigger *nlp.StructuredInput) (*Plugin, error) {
+// its plugin.json.
+func New(url string, trigger *nlp.StructuredInput,
+	fns *dt.PluginFns) (*dt.Plugin, error) {
+
 	if trigger == nil {
-		return &Plugin{}, ErrMissingTrigger
+		return &dt.Plugin{}, ErrMissingTrigger
+	}
+	if fns == nil || fns.Run == nil || fns.FollowUp == nil {
+		return &dt.Plugin{}, ErrMissingPluginFns
 	}
 	// Read plugin.json, unmarshal into struct
-	_, file := path.Split(os.Args[0])
-	if os.Getenv("ABOT_ENV") == "test" {
-		file = file[:len(file)-5] // Remove ".test" from the end
-	}
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "plugins", file, "plugin.json")
-	log.Debug(p)
+	p := filepath.Join(os.Getenv("GOPATH"), "src", url, "plugin.json")
 	contents, err := ioutil.ReadFile(p)
 	if err != nil {
 		return nil, err
 	}
-	c := Config{}
+	c := dt.PluginConfig{}
 	if err = json.Unmarshal(contents, &c); err != nil {
 		return nil, err
 	}
 	if len(c.Name) == 0 {
-		return &Plugin{}, ErrMissingPluginName
+		return nil, ErrMissingPluginName
 	}
-	c.CoreRPCAddr = coreRPCAddr
-	return &Plugin{Config: c, Trigger: trigger}, nil
+	db, err := connectDB()
+	if err != nil {
+		return nil, err
+	}
+	l := log.New(c.Name)
+	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+	plg := &dt.Plugin{
+		Config:    c,
+		Trigger:   trigger,
+		DB:        db,
+		Log:       log.New(c.Name),
+		PluginFns: fns,
+	}
+	if err = RegisterPlugin(plg); err != nil {
+		return nil, err
+	}
+	return plg, nil
 }
 
-// Register with Abot to begin communicating over RPC.
-func (p *Plugin) Register(pluginT interface{}) error {
-	log.Debug("connecting to", p.Config.Name)
-	// This may be set manually during testing
-	var ln net.Listener
-	port := ":0"
-	if len(p.Config.PluginRPCAddr) > 0 {
-		port = p.Config.PluginRPCAddr
-	}
-	var err error
-	ln, err = net.Listen("tcp", port)
-	if err != nil {
-		return err
-	}
-	p.Config.PluginRPCAddr = ln.Addr().String()
-	if err = rpc.Register(pluginT); err != nil {
-		return err
-	}
-	client, err := rpc.Dial("tcp", p.Config.CoreRPCAddr)
-	if err != nil {
-		return err
-	}
-	if err = client.Call("Abot.RegisterPlugin", p, nil); err != nil {
-		return err
-	}
-	log.Debug("connected to", p.Config.Name)
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Debug("could not accept connections for",
-				p.Config.Name, ", ", err)
-		}
-		go rpc.ServeConn(conn)
-	}
-}
-
-// ConnectDB opens a connection to the database.
-func ConnectDB() (*sqlx.DB, error) {
+// connectDB opens a connection to the database.
+func connectDB() (*sqlx.DB, error) {
 	var db *sqlx.DB
 	var err error
 	if os.Getenv("ABOT_ENV") == "production" {
-		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
+		db, err = sqlx.Connect("postgres",
+			os.Getenv("ABOT_DATABASE_URL"))
 	} else if os.Getenv("ABOT_ENV") == "test" {
 		db, err = sqlx.Connect("postgres",
 			"user=postgres dbname=abot_test sslmode=disable")
@@ -143,4 +88,24 @@ func ConnectDB() (*sqlx.DB, error) {
 			"user=postgres dbname=abot sslmode=disable")
 	}
 	return db, err
+}
+
+// RegisterPlugin enables Abot to notify plugins when specific StructuredInput
+// is encountered matching triggers set in the plugins themselves. Note that
+// plugins will only listen when ALL criteria are met and that there's no
+// support currently for duplicate routes (e.g. "find_restaurant" leading to
+// either one of two plugins).
+func RegisterPlugin(p *dt.Plugin) error {
+	log.Debug("registering", p.Config.Name)
+	for _, c := range p.Trigger.Commands {
+		for _, o := range p.Trigger.Objects {
+			s := strings.ToLower(c + "_" + o)
+			if core.RegPlugins.Get(s) != nil {
+				log.Info("found duplicate plugin or trigger",
+					p.Config.Name, "on", s)
+			}
+			core.RegPlugins.Set(s, p)
+		}
+	}
+	return nil
 }

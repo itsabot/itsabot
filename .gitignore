@@ -2,5 +2,4 @@
 .DS_Store
 client_secret.json
 public/*
-plugins/*
 Procfile

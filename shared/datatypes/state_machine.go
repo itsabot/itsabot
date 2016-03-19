@@ -86,11 +86,15 @@ type State struct {
 type EventRequest int
 
 // NewStateMachine initializes a stateMachine to its starting state.
-func NewStateMachine(pluginName string) *StateMachine {
-	sm := StateMachine{state: 0, pluginName: pluginName}
+func NewStateMachine(p *Plugin) *StateMachine {
+	sm := StateMachine{
+		state:      0,
+		pluginName: p.Config.Name,
+		logger:     p.Log,
+		db:         p.DB,
+	}
 	sm.states = map[string]int{}
 	sm.resetFn = func(*Msg) {}
-	sm.logger = log.New(pluginName)
 	return &sm
 }
 
@@ -107,21 +111,6 @@ func (sm *StateMachine) SetStates(sss ...[]State) {
 			}
 		}
 	}
-}
-
-// SetLogger enables the logger with any plugin-defined settings to be used
-// internally by the stateMachine. This ensures consistency in the logs of a
-// plugin.
-func (sm *StateMachine) SetLogger(l *log.Logger) {
-	sm.logger = l
-}
-
-// SetDBConn gives a stateMachine itsabot.org/abot/shared access to a plugin's database
-// connection. This is required even if no states require database access, since
-// the stateMachine's current state (among other things) are peristed to the
-// database between user requests.
-func (sm *StateMachine) SetDBConn(s *sqlx.DB) {
-	sm.db = s
 }
 
 // SetOnReset sets the OnReset function for the stateMachine, which should be
