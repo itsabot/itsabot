@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
 )

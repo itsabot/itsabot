@@ -21,7 +21,7 @@ import (
 
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	_ "github.com/lib/pq"
 )
 

@@ -3,7 +3,7 @@ package dt
 import (
 	"strconv"
 
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 )
 
 // Memory holds a generic "memory" of Ava's usually set by a plugin, such as

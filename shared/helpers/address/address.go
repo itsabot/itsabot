@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 )
 
 // ErrInvalidAddress is returned when an address is expected but none found or

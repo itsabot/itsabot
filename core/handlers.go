@@ -24,7 +24,7 @@ import (
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/interface/emailsender"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/util"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"

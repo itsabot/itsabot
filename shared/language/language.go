@@ -16,7 +16,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 )
 
 var yes = map[string]bool{

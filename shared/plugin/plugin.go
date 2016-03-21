@@ -12,7 +12,7 @@ import (
 
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver

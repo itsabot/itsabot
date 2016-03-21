@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 )
 
 // timeLocation tracks the timezone of a time. Since time.Location.String()

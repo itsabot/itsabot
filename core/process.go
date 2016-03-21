@@ -5,7 +5,7 @@ import (
 
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/language"
-	log "github.com/itsabot/abot/shared/log"
+	log "github.com/itsabot/abot/core/log"
 	"github.com/labstack/echo"
 )
 

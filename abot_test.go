@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/labstack/echo"
 )
 

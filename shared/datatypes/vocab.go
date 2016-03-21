@@ -2,7 +2,7 @@ package dt
 
 import (
 	"github.com/dchest/stemmer/porter2"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/nlp"
 )
 

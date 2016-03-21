@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/log"
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/itsabot/abot/shared/plugin"
 )
