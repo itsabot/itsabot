@@ -1,6 +1,7 @@
 {
 	"Name": "abot",
-	"Version": "0.1.0",
+	"Description": "digital assistant framework",
+	"Version": "0.2.0-alpha",
 	"Dependencies": {
 		"github.com/itsabot/plugin_onboard": "*"
 	}

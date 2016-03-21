@@ -27,10 +27,25 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+	fi, err := os.Open("plugins.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+	var abotConf struct {
+		Name        string
+		Description string
+		Version     string
+	}
+	if err = json.NewDecoder(fi).Decode(&abotConf); err != nil {
+		log.Fatal(err)
+	}
+	if err = fi.Close(); err != nil {
+		log.Fatal(err)
+	}
 	app := cli.NewApp()
-	app.Name = "abot"
-	app.Usage = "digital assistant framework"
-	app.Version = "0.2.0-alpha"
+	app.Name = abotConf.Name
+	app.Usage = abotConf.Description
+	app.Version = abotConf.Version
 	app.Commands = []cli.Command{
 		{
 			Name:    "server",
