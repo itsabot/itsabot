@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/nlp"
-	"github.com/itsabot/abot/shared/plugin"
 )
 
 func TestExtractCities(t *testing.T) {
 	log.SetDebug(true)
-	db, err := plugin.ConnectDB()
+	var cities []dt.City
+	in := &dt.Msg{}
+	db, err := core.ConnectDB()
 	if err != nil {
 		t.Fatal(err)
 	}
-	var cities []dt.City
-	in := &dt.Msg{}
 	in.Sentence = "I'm in New York"
 	in.Tokens = nlp.TokenizeSentence(in.Sentence)
 	in.Stems = nlp.StemTokens(in.Tokens)

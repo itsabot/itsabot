@@ -3,9 +3,8 @@ package core
 import (
 	"errors"
 
-	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/language"
 	log "github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/labstack/echo"
 )
 
@@ -83,7 +82,7 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 	m.AbotSent = true
 	m.User = msg.User
 	if len(ret) == 0 {
-		m.Sentence = language.Confused()
+		m.Sentence = ConfusedLang()
 		msg.NeedsTraining = true
 		if err = msg.Update(DB()); err != nil {
 			return "", m.User.ID, err

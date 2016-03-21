@@ -12,6 +12,7 @@ import (
 	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
+	_ "github.com/lib/pq"
 )
 
 var db *sqlx.DB
@@ -37,7 +38,7 @@ func NewServer() (e *echo.Echo, err error) {
 		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	if db == nil {
-		db, err = connectDB()
+		db, err = ConnectDB()
 		if err != nil {
 			return nil, fmt.Errorf("could not connect to database: %s", err.Error())
 		}
@@ -106,8 +107,8 @@ func checkRequiredEnvVars() error {
 	return nil
 }
 
-// connectDB opens a connection to the database.
-func connectDB() (*sqlx.DB, error) {
+// ConnectDB opens a connection to the database.
+func ConnectDB() (*sqlx.DB, error) {
 	var db *sqlx.DB
 	var err error
 	if os.Getenv("ABOT_ENV") == "production" {

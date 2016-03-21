@@ -533,21 +533,3 @@ func NiceMeetingYou() string {
 	log.Debug("nicemeetingyou failed to return a response")
 	return ""
 }
-
-// Confused returns a randomized response signalling that Abot is confused or
-// could not understand the user's request.
-func Confused() string {
-	n := rand.Intn(4)
-	switch n {
-	case 0:
-		return "I'm not sure I understand you."
-	case 1:
-		return "I'm sorry, I don't understand that."
-	case 2:
-		return "Uh, what are you telling me to do?"
-	case 3:
-		return "What should I do?"
-	}
-	log.Debug("confused failed to return a response")
-	return ""
-}
