@@ -25,6 +25,7 @@ func Preprocess(c *echo.Context) (*dt.Msg, error) {
 	if len(cmd) == 0 {
 		return nil, ErrInvalidCommand
 	}
+	sendPostReceiveEvent(&cmd)
 	u, err := dt.GetUser(DB(), c)
 	if err != nil {
 		return nil, err
@@ -61,6 +62,7 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 	if err = msg.Save(DB()); err != nil {
 		return "", msg.User.ID, err
 	}
+	sendPostProcessingEvent(msg)
 	ret = RespondWithOffense(Offensive(), msg)
 	if len(ret) > 0 {
 		return ret, msg.User.ID, nil
@@ -96,5 +98,24 @@ func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
 	if err = m.Save(db); err != nil {
 		return "", m.User.ID, err
 	}
+	sendPostResponseEvent(msg, &ret)
 	return m.Sentence, m.User.ID, nil
+}
+
+func sendPostReceiveEvent(cmd *string) {
+	for _, p := range AllPlugins {
+		p.Events.PostReceive(cmd)
+	}
+}
+
+func sendPostProcessingEvent(in *dt.Msg) {
+	for _, p := range AllPlugins {
+		p.Events.PostProcessing(in)
+	}
+}
+
+func sendPostResponseEvent(in *dt.Msg, resp *string) {
+	for _, p := range AllPlugins {
+		p.Events.PostResponse(in, resp)
+	}
 }

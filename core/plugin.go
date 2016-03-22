@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/gommon/log"
 )
 
 // PluginJSON holds the plugins.json structure.
@@ -29,6 +29,9 @@ var RegPlugins = pkgMap{
 	pkgs:  make(map[string]*dt.Plugin),
 	mutex: &sync.Mutex{},
 }
+
+// AllPlugins contains a set of all registered plugins.
+var AllPlugins = []*dt.Plugin{}
 
 // pkgMap is a thread-safe atomic map that's used to route user messages to the
 // appropriate plugins. The map's key is the route in the form of

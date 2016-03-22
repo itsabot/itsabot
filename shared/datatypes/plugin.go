@@ -15,15 +15,18 @@ type Plugin struct {
 	Trigger *nlp.StructuredInput
 	DB      *sqlx.DB
 	Log     *log.Logger
+	Events  *PluginEvents
 	*PluginFns
 }
 
 // PluginFns defines the required functions for a plugin to be used.
 type PluginFns struct {
-	// Run when beginning a new conversation with a plugin.
+	// Run when beginning a new conversation with a plugin. Run is a
+	// required function.
 	Run func(in *Msg) (string, error)
 
 	// FollowUp runs with 2+ consecutive messages to the same plugin.
+	// FollowUp is a required function.
 	FollowUp func(in *Msg) (string, error)
 }
 
@@ -43,4 +46,12 @@ type PluginConfig struct {
 
 	// route is created dynamically by each package's trigger.
 	route string
+}
+
+// PluginEvents allow plugins to listen to events as they happen in Abot core.
+// Simply overwrite the plugin's function
+type PluginEvents struct {
+	PostReceive    func(cmd *string)
+	PostProcessing func(in *Msg)
+	PostResponse   func(in *Msg, resp *string)
 }

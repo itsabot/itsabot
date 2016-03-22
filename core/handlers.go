@@ -21,10 +21,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	w "golang.org/x/net/websocket"
 
+	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/interface/emailsender"
-	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/util"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
