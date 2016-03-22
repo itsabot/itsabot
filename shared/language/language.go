@@ -428,6 +428,7 @@ var StopWords = []string{
 	"the",
 }
 
+// Prepositions contains the most commonly used prepositions.
 var Prepositions = map[string]struct{}{
 	"aboard":      struct{}{},
 	"about":       struct{}{},

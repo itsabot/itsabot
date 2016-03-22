@@ -1,13 +1,11 @@
 package main
 
 import (
-	"archive/zip"
 	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -221,17 +219,17 @@ func installPlugins() {
 	for url, version := range plugins.Dependencies {
 		go func(url, version string) {
 			// Check out specific commit
-			var outC []byte
+			var outB []byte
 			if version != "*" {
 				l.Debug("checking out", url, "at", version)
 				p := filepath.Join(os.Getenv("GOPATH"), "src",
 					url)
 				c := fmt.Sprintf("git -C %s checkout %s", p, version)
-				outC, err = exec.
+				outB, err = exec.
 					Command("/bin/sh", "-c", c).
 					CombinedOutput()
 				if err != nil {
-					l.Debug(string(outC))
+					l.Debug(string(outB))
 					l.Fatal(err)
 				}
 			}
@@ -242,7 +240,7 @@ func installPlugins() {
 			p := struct {
 				Path string
 			}{Path: url}
-			outC, err = json.Marshal(p)
+			outB, err = json.Marshal(p)
 			if err != nil {
 				l.Info("failed to build itsabot.org JSON.", err)
 				wg.Done()
@@ -254,16 +252,16 @@ func installPlugins() {
 			} else {
 				u = "https://www.itsabot.org/api/plugins.json"
 			}
-			resp, err := http.Post(u, "application/json",
-				bytes.NewBuffer(outC))
-			if err != nil {
-				l.Info("failed to update itsabot.org.", err)
+			resp, errB := http.Post(u, "application/json",
+				bytes.NewBuffer(outB))
+			if errB != nil {
+				l.Info("failed to update itsabot.org.", errB)
 				wg.Done()
 				return
 			}
 			defer func() {
-				if err = resp.Body.Close(); err != nil {
-					l.Fatal(err)
+				if errB = resp.Body.Close(); errB != nil {
+					l.Fatal(errB)
 				}
 			}()
 			if resp.StatusCode != 200 {
@@ -293,61 +291,4 @@ func installPlugins() {
 		l.Fatal(err)
 	}
 	l.Info("Success!")
-}
-
-// From https://stackoverflow.com/questions/20357223/easy-way-to-unzip-file-with-golang
-func unzip(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err = r.Close(); err != nil {
-			panic(err)
-		}
-	}()
-	if err = os.MkdirAll(dest, 0755); err != nil {
-		return err
-	}
-	for _, f := range r.File {
-		err = extractAndWriteFile(dest, f)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// From https://stackoverflow.com/questions/20357223/easy-way-to-unzip-file-with-golang
-func extractAndWriteFile(dest string, f *zip.File) error {
-	rc, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err = rc.Close(); err != nil {
-			panic(err)
-		}
-	}()
-	path := filepath.Join(dest, f.Name)
-	if f.FileInfo().IsDir() {
-		if err = os.MkdirAll(path, f.Mode()); err != nil {
-			return err
-		}
-	} else {
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err = f.Close(); err != nil {
-				panic(err)
-			}
-		}()
-		_, err = io.Copy(f, rc)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

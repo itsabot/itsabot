@@ -16,13 +16,6 @@ type PluginJSON struct {
 	Dependencies map[string]string
 }
 
-// pluginsConf holds the structure of the plugins.json configuration file.
-type pluginsConf struct {
-	Name         string
-	Version      string
-	Dependencies map[string]string
-}
-
 // RegPlugins initializes a pkgMap and holds it in global memory, which works OK
 // given pkgMap is an atomic, thread-safe map.
 var RegPlugins = pkgMap{

@@ -12,21 +12,24 @@ import (
 	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Postgres driver
 )
 
 var db *sqlx.DB
 var ner Classifier
 var offensive map[string]struct{}
 
+// DB returns a connection to the database.
 func DB() *sqlx.DB {
 	return db
 }
 
+// NER returns the classifiers used for named entity recognition.
 func NER() Classifier {
 	return ner
 }
 
+// Offensive returns a map of offensive words that Abot should ignore.
 func Offensive() map[string]struct{} {
 	return offensive
 }
@@ -109,16 +112,16 @@ func checkRequiredEnvVars() error {
 
 // ConnectDB opens a connection to the database.
 func ConnectDB() (*sqlx.DB, error) {
-	var db *sqlx.DB
+	var d *sqlx.DB
 	var err error
 	if os.Getenv("ABOT_ENV") == "production" {
-		db, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
+		d, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
 	} else if os.Getenv("ABOT_ENV") == "test" {
-		db, err = sqlx.Connect("postgres",
+		d, err = sqlx.Connect("postgres",
 			"user=postgres dbname=abot_test sslmode=disable")
 	} else {
-		db, err = sqlx.Connect("postgres",
+		d, err = sqlx.Connect("postgres",
 			"user=postgres dbname=abot sslmode=disable")
 	}
-	return db, err
+	return d, err
 }

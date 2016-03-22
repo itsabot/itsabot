@@ -43,9 +43,6 @@ type PluginConfig struct {
 	// Type specifies the type of plugin and can be either "action" or
 	// "driver". It's defined in plugin.json.
 	Type string
-
-	// route is created dynamically by each package's trigger.
-	route string
 }
 
 // PluginEvents allow plugins to listen to events as they happen in Abot core.
