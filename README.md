@@ -26,10 +26,11 @@ in each release until we hit v1.0. Follow our progress on the
 > * [Go](https://golang.org/dl/) >= 1.6
 > * [PostgreSQL](http://www.postgresql.org/download/) >= 9.5
 
-You can install Abot via git:
+You can install Abot via Go:
 
-```bash
-$ git clone git@github.com:itsabot/abot.git && cd abot
+```
+$ go get github.com/itsabot/abot.git
+$ cd $GOPATH/src/github.com/itsabot/abot
 $ cmd/setup.sh
 $ abot server
 ```
