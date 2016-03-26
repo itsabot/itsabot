@@ -1,11 +1,12 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
 
 	log "github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/labstack/echo"
 )
 
 // ErrInvalidCommand denotes that a user-inputted command could not be
@@ -20,17 +21,19 @@ var ErrMissingPlugin = errors.New("missing plugin")
 
 // Preprocess converts a user input into a Msg that's been persisted to the
 // database
-func Preprocess(c *echo.Context) (*dt.Msg, error) {
-	cmd := c.Get("cmd").(string)
-	if len(cmd) == 0 {
-		return nil, ErrInvalidCommand
+func Preprocess(r *http.Request) (*dt.Msg, error) {
+	req := &dt.Request{}
+	err := json.NewDecoder(r.Body).Decode(req)
+	if err != nil {
+		log.Info("could not parse empty body", err)
+		return nil, err
 	}
-	sendPostReceiveEvent(&cmd)
-	u, err := dt.GetUser(DB(), c)
+	sendPostReceiveEvent(&req.CMD)
+	u, err := dt.GetUser(DB(), req)
 	if err != nil {
 		return nil, err
 	}
-	msg := NewMsg(u, cmd)
+	msg := NewMsg(u, req.CMD)
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
 }
@@ -41,8 +44,8 @@ func Preprocess(c *echo.Context) (*dt.Msg, error) {
 // is returned in the string. Errors returned from this function are not for the
 // user, so they are handled by Abot explicitly on this function's return
 // (logging, notifying admins, etc.).
-func ProcessText(c *echo.Context) (ret string, uid uint64, err error) {
-	msg, err := Preprocess(c)
+func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
+	msg, err := Preprocess(r)
 	if err != nil {
 		return "", 0, err
 	}

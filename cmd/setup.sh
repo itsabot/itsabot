@@ -42,12 +42,13 @@ else
 fi
 
 # Delete old lines
-sed -i -n '/\n# Added by Abot via /!p' $FILE
-sed -i -n '/# Added by Abot via /!p' $FILE
-sed -i -n '/export PORT=/!p' $FILE
-sed -i -n '/export ABOT_URL=/!p' $FILE
-sed -i -n '/export ABOT_ENV=/!p' $FILE
-sed -i -n '/export ABOT_SECRET=/!p' $FILE
+sed -i='' -n '/\n\n# Added by Abot via /!p' $FILE
+sed -i='' -n '/\n# Added by Abot via /!p' $FILE
+sed -i='' -n '/# Added by Abot via /!p' $FILE
+sed -i='' -n '/export PORT=/!p' $FILE
+sed -i='' -n '/export ABOT_URL=/!p' $FILE
+sed -i='' -n '/export ABOT_ENV=/!p' $FILE
+sed -i='' -n '/export ABOT_SECRET=/!p' $FILE
 
 # Generate ABOT_SECRET used for validating cookie values
 SECRET=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-64};echo;)

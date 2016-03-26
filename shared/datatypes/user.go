@@ -12,7 +12,6 @@ import (
 
 	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo"
 )
 
 // User represents a user, which is usually the user that sent a message to
@@ -39,17 +38,9 @@ type User struct {
 // "flexible" ID is available.
 type FlexIDType int
 
-// userParams holds the identifiers for a user used in a message.
-type userParams struct {
-	UserID uint64
-	FlexID string
-	FlexIDType
-}
-
 const (
-	fidtInvalid FlexIDType = iota // 0
-	fidtEmail                     // 1
-	fidtPhone                     // 2
+	fidtEmail FlexIDType = iota + 1 // 1
+	fidtPhone                       // 2
 )
 
 // ErrMissingUser is returned when a user expected, but none found.
@@ -69,30 +60,27 @@ var ErrMissingFlexID = errors.New("missing flexid")
 var ErrInvalidFlexIDType = errors.New("invalid flexid type")
 
 // GetUser from an HTTP request.
-func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
-	p, err := extractUserParams(db, c)
-	if err != nil {
-		return nil, err
-	}
-	log.Debug("extracted user params", p)
-	if p.UserID == 0 {
-		// XXX temporary. We only have phone numbers at the moment.
-		p.FlexIDType = fidtPhone
-		if p.FlexID == "" {
+func GetUser(db *sqlx.DB, req *Request) (*User, error) {
+	if req.UserID == 0 {
+		if req.FlexID == "" {
 			return nil, ErrMissingFlexID
-		} else if p.FlexIDType == fidtInvalid {
+		}
+		switch req.FlexIDType {
+		case fidtEmail, fidtPhone:
+			// Do nothing
+		default:
 			return nil, ErrInvalidFlexIDType
 		}
-		log.Debug("searching for user from", p.FlexID, p.FlexIDType)
+		log.Debug("searching for user from", req.FlexID, req.FlexIDType)
 		q := `SELECT userid
 		      FROM userflexids
 		      WHERE flexid=$1 AND flexidtype=$2
 		      ORDER BY createdat DESC`
-		err := db.Get(&p.UserID, q, p.FlexID, p.FlexIDType)
+		err := db.Get(&req.UserID, q, req.FlexID, req.FlexIDType)
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		}
-		log.Debug("got uid", p.UserID)
+		log.Debug("got uid", req.UserID)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +89,7 @@ func GetUser(db *sqlx.DB, c *echo.Context) (*User, error) {
 	      FROM users
 	      WHERE id=$1`
 	u := &User{}
-	if err := db.Get(u, q, p.UserID); err != nil {
+	if err := db.Get(u, q, req.UserID); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, ErrMissingUser
 		}
@@ -297,51 +285,6 @@ func (u *User) CheckActiveAuthorization(db *sqlx.DB) (bool, error) {
 		return false, nil
 	}
 	return true, nil
-}
-
-// extractUserParams splits out user-identifying params passed in through
-// endpoints.
-func extractUserParams(db *sqlx.DB, c *echo.Context) (*userParams, error) {
-	p := &userParams{}
-	tmp, ok := c.Get("uid").(string)
-	if !ok {
-		tmp = ""
-	}
-	var err error
-	if len(tmp) > 0 {
-		p.UserID, err = strconv.ParseUint(tmp, 10, 64)
-		if err != nil && err.Error() != `strconv.ParseInt: parsing "": invalid syntax` {
-			return p, err
-		}
-	}
-	if p.UserID > 0 {
-		return p, nil
-	}
-	tmp, ok = c.Get("flexid").(string)
-	if !ok {
-		tmp = ""
-	}
-	if len(tmp) == 0 {
-		return p, errors.New("flexid is blank")
-	}
-	p.FlexID = tmp
-	tmp, ok = c.Get("flexidtype").(string)
-	if !ok {
-		tmp = ""
-	}
-	var typ int
-	if len(tmp) > 0 {
-		typ, err = strconv.Atoi(tmp)
-		if err != nil && err.Error() ==
-			`strconv.ParseInt: parsing "": invalid syntax` {
-			// default to 2 (SMS)
-			p.FlexIDType = FlexIDType(2)
-		} else if err != nil {
-			return p, err
-		}
-	}
-	p.FlexIDType = FlexIDType(typ)
-	return p, nil
 }
 
 // AuthMethod allows you as the plugin developer to control the level of

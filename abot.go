@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"text/tabwriter"
 	"time"
 
 	"github.com/codegangsta/cli"
@@ -22,28 +24,22 @@ import (
 	"github.com/itsabot/abot/core/log"
 )
 
+var conf *core.PluginJSON
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-	fi, err := os.Open("plugins.json")
+
+	var err error
+	conf, err = core.LoadConf()
 	if err != nil {
 		log.Fatal(err)
 	}
-	var abotConf struct {
-		Name        string
-		Description string
-		Version     string
-	}
-	if err = json.NewDecoder(fi).Decode(&abotConf); err != nil {
-		log.Fatal(err)
-	}
-	if err = fi.Close(); err != nil {
-		log.Fatal(err)
-	}
+
 	app := cli.NewApp()
-	app.Name = abotConf.Name
-	app.Usage = abotConf.Description
-	app.Version = abotConf.Version
+	app.Name = conf.Name
+	app.Usage = conf.Description
+	app.Version = conf.Version
 	app.Commands = []cli.Command{
 		{
 			Name:    "server",
@@ -68,6 +64,30 @@ func main() {
 					Usage: "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
 						installPlugins()
+					},
+				},
+				{
+					Name:    "search",
+					Aliases: []string{"s"},
+					Usage:   "search plugins indexed on itsabot.org",
+					Action: func(c *cli.Context) {
+						l := log.New("")
+						l.SetFlags(0)
+						args := c.Args()
+						if len(args) == 0 || len(args) > 2 {
+							l.Fatal(errors.New(`usage: abot plugin search "{term}"`))
+						}
+						if err := searchPlugins(args.First()); err != nil {
+							l.Fatalf("could not start console\n%s", err)
+						}
+					},
+				},
+				{
+					Name:    "update",
+					Aliases: []string{"u", "upgrade"},
+					Usage:   "update and install plugins listed in plugins.json",
+					Action: func(c *cli.Context) {
+						updatePlugins()
 					},
 				},
 			},
@@ -96,19 +116,82 @@ func main() {
 // startServer initializes any clients that are needed, sets up routes, and
 // boots plugins.
 func startServer() error {
-	e, err := core.NewServer()
+	hr, err := core.NewServer()
 	if err != nil {
 		return err
 	}
-	log.Debug("started server")
-	e.Run(":" + os.Getenv("PORT"))
+	log.Info("started", conf.Name)
+	if err = http.ListenAndServe(":"+os.Getenv("PORT"), hr); err != nil {
+		return err
+	}
 	return nil
+}
+
+func searchPlugins(query string) error {
+	byt, err := searchItsAbot(query)
+	if err != nil {
+		return err
+	}
+	if err = outputPluginResults(os.Stdout, byt); err != nil {
+		return err
+	}
+	return nil
+}
+
+func outputPluginResults(w io.Writer, byt []byte) error {
+	var results []struct {
+		ID            uint64
+		Name          string
+		Username      string
+		Description   string
+		Path          string
+		Readme        string
+		DownloadCount uint64
+		Similarity    float64
+	}
+	if err := json.Unmarshal(byt, &results); err != nil {
+		return err
+	}
+	writer := tabwriter.Writer{}
+	writer.Init(w, 0, 8, 1, '\t', 0)
+	_, err := writer.Write([]byte("NAME\tDESCRIPTION\tUSERNAME\tDOWNLOADS\n"))
+	if err != nil {
+		return err
+	}
+	for _, result := range results {
+		d := result.Description
+		if len(result.Description) >= 30 {
+			d = d[:27] + "..."
+		}
+		_, err = writer.Write([]byte(fmt.Sprintf("%s\t%s\t%s\t%d\n",
+			result.Name, d, result.Username, result.DownloadCount)))
+		if err != nil {
+			return err
+		}
+	}
+	return writer.Flush()
+}
+
+func searchItsAbot(q string) ([]byte, error) {
+	u := fmt.Sprintf("https://www.itsabot.org/api/search.json?q=%s",
+		url.QueryEscape(q))
+	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	res, err := client.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			return
+		}
+	}()
+	return ioutil.ReadAll(res.Body)
 }
 
 func startConsole(c *cli.Context) error {
 	args := c.Args()
 	if len(args) == 0 || len(args) >= 3 {
-		return errors.New("usage: abot console abot-address user-phone")
+		return errors.New("usage: abot console {abotAddress} {userPhone}")
 	}
 	var addr, phone string
 	if len(args) == 1 {
@@ -118,6 +201,7 @@ func startConsole(c *cli.Context) error {
 		addr = args[0]
 		phone = args[1]
 	}
+
 	// Capture ^C interrupt to add a newline
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -127,8 +211,10 @@ func startConsole(c *cli.Context) error {
 			os.Exit(0)
 		}
 	}()
+
 	base := "http://" + addr + "?flexidtype=2&flexid=" + url.QueryEscape(phone) + "&cmd="
 	scanner := bufio.NewScanner(os.Stdin)
+
 	// Test connection
 	req, err := http.NewRequest("GET", base, nil)
 	client := &http.Client{}
@@ -140,6 +226,8 @@ func startConsole(c *cli.Context) error {
 		return err
 	}
 	fmt.Print("> ")
+
+	// Handle each user input
 	for scanner.Scan() {
 		cmd := scanner.Text()
 		req, err := http.NewRequest("POST", base+url.QueryEscape(cmd), nil)
@@ -169,38 +257,7 @@ func installPlugins() {
 	l.SetFlags(0)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 
-	// Read plugins.json, unmarshal into struct
-	contents, err := ioutil.ReadFile("plugins.json")
-	if err != nil {
-		l.Fatal(err)
-	}
-	var plugins core.PluginJSON
-	if err = json.Unmarshal(contents, &plugins); err != nil {
-		l.Fatal(err)
-	}
-
-	// Create plugin.go file, truncate if exists
-	fi, err := os.Create("plugins.go")
-	if err != nil {
-		l.Fatal(err)
-	}
-	defer func() {
-		if err = fi.Close(); err != nil {
-			l.Fatal(err)
-		}
-	}()
-
-	// Insert _ imports
-	s := "// This file is generated by `abot plugin install`. Do not edit.\n\n"
-	s += "package main\n\nimport (\n"
-	for url := range plugins.Dependencies {
-		s += fmt.Sprintf("\t_ \"%s\"\n", url)
-	}
-	s += ")"
-	_, err = fi.WriteString(s)
-	if err != nil {
-		l.Fatal(err)
-	}
+	plugins := buildPluginFile(l)
 
 	// Fetch all plugins
 	l.Info("Fetching", len(plugins.Dependencies), "plugins...")
@@ -237,9 +294,7 @@ func installPlugins() {
 			// Anonymously increment the plugin's download count
 			// at itsabot.org
 			l.Debug("incrementing download count", url)
-			p := struct {
-				Path string
-			}{Path: url}
+			p := struct{ URL string }{URL: url}
 			outB, err = json.Marshal(p)
 			if err != nil {
 				l.Info("failed to build itsabot.org JSON.", err)
@@ -265,7 +320,7 @@ func installPlugins() {
 				}
 			}()
 			if resp.StatusCode != 200 {
-				l.Info("WARN: %d - %s\n", resp.StatusCode,
+				l.Infof("WARN: %d - %s\n", resp.StatusCode,
 					resp.Status)
 			}
 			wg.Done()
@@ -283,6 +338,56 @@ func installPlugins() {
 		l.Info(string(outC))
 		l.Fatal(err)
 	}
+
+	updateGlockfileAndInstall(l)
+	l.Info("Success!")
+}
+
+func updatePlugins() {
+	l := log.New("")
+	l.SetFlags(0)
+	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+
+	plugins := buildPluginFile(l)
+
+	l.Info("Updating plugins...")
+	for path, version := range plugins.Dependencies {
+		if version != "*" {
+			continue
+		}
+		l.Infof("Updating %s...\n", path)
+		outC, err := exec.
+			Command("/bin/sh", "-c", "go get -u "+path).
+			CombinedOutput()
+		if err != nil {
+			l.Info(string(outC))
+			l.Fatal(err)
+		}
+	}
+
+	updateGlockfileAndInstall(l)
+	l.Info("Success!")
+}
+
+func updateGlockfileAndInstall(l *log.Logger) {
+	outC, err := exec.
+		Command("/bin/sh", "-c", `pwd | sed "s|$GOPATH/src/||"`).
+		CombinedOutput()
+	if err != nil {
+		l.Info(string(outC))
+		l.Fatal(err)
+	}
+
+	// Update plugin dependency versions in GLOCKFILE
+	p := string(outC)
+	outC, err = exec.
+		Command("/bin/sh", "-c", "glock save "+p).
+		CombinedOutput()
+	if err != nil {
+		l.Info(string(outC))
+		l.Fatal(err)
+	}
+
 	outC, err = exec.
 		Command("/bin/sh", "-c", "go install").
 		CombinedOutput()
@@ -290,5 +395,36 @@ func installPlugins() {
 		l.Info(string(outC))
 		l.Fatal(err)
 	}
-	l.Info("Success!")
+}
+
+func buildPluginFile(l *log.Logger) *core.PluginJSON {
+	plugins, err := core.LoadConf()
+	if err != nil {
+		l.Fatal(err)
+	}
+
+	// Create plugin.go file, truncate if exists
+	fi, err := os.Create("plugins.go")
+	if err != nil {
+		l.Fatal(err)
+	}
+	defer func() {
+		if err = fi.Close(); err != nil {
+			l.Fatal(err)
+		}
+	}()
+
+	// Insert _ imports
+	s := "// This file is generated by `abot plugin install`. Do not edit.\n\n"
+	s += "package main\n\nimport (\n"
+	for url := range plugins.Dependencies {
+		s += fmt.Sprintf("\t_ \"%s\"\n", url)
+	}
+	s += ")"
+	_, err = fi.WriteString(s)
+	if err != nil {
+		l.Fatal(err)
+	}
+
+	return plugins
 }

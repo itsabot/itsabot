@@ -5,7 +5,7 @@ package driver
 import (
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo"
+	"github.com/julienschmidt/httprouter"
 )
 
 // Driver is the interface that must be implemented by a payment driver.
@@ -15,7 +15,7 @@ type Driver interface {
 	// connection allows the implementation to set and retrieve
 	// User.PaymentServiceID in the database.The name is a string in a
 	// driver-specific format.
-	Open(db *sqlx.DB, e *echo.Echo, name string) (Conn, error)
+	Open(db *sqlx.DB, r *httprouter.Router, name string) (Conn, error)
 }
 
 // Conn is a connection to the external payment service.

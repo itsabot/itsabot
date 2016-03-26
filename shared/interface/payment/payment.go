@@ -11,7 +11,7 @@ import (
 
 	"github.com/itsabot/abot/shared/interface/payment/driver"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo"
+	"github.com/julienschmidt/httprouter"
 )
 
 var driversMu sync.RWMutex
@@ -50,8 +50,8 @@ type Conn struct {
 }
 
 // Open a connection to a registered driver.
-func Open(driverName string, db *sqlx.DB, e *echo.Echo, auth string) (*Conn,
-	error) {
+func Open(driverName string, db *sqlx.DB, r *httprouter.Router,
+	auth string) (*Conn, error) {
 
 	driversMu.RLock()
 	driveri, ok := drivers[driverName]
@@ -60,7 +60,7 @@ func Open(driverName string, db *sqlx.DB, e *echo.Echo, auth string) (*Conn,
 		return nil, fmt.Errorf("sms: unknown driver %q (forgotten import?)",
 			driverName)
 	}
-	conn, err := driveri.Open(db, e, auth)
+	conn, err := driveri.Open(db, r, auth)
 	if err != nil {
 		return nil, err
 	}
