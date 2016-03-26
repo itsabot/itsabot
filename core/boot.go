@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +13,7 @@ import (
 
 	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo"
+	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq" // Postgres driver
 )
 
@@ -36,9 +38,9 @@ func Offensive() map[string]struct{} {
 
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
-func NewServer() (e *echo.Echo, err error) {
+func NewServer() (r *httprouter.Router, err error) {
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
-		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
+		return nil, errors.New("must set ABOT_SECRET env var in production to >= 33 characters")
 	}
 	if db == nil {
 		db, err = ConnectDB()
@@ -47,6 +49,17 @@ func NewServer() (e *echo.Echo, err error) {
 		}
 	}
 	if err = checkRequiredEnvVars(); err != nil {
+		return nil, err
+	}
+
+	// Get ImportPath from plugins.json
+	conf, err := LoadConf()
+	if err != nil {
+		return nil, err
+	}
+	p := filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath)
+
+	if err = os.Setenv("ABOT_PATH", p); err != nil {
 		return nil, err
 	}
 	if os.Getenv("ABOT_ENV") != "test" {
@@ -62,22 +75,21 @@ func NewServer() (e *echo.Echo, err error) {
 	if err != nil {
 		log.Debug("could not build offensive map", err)
 	}
-	e = echo.New()
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "assets", "html", "layout.html")
+	p = filepath.Join(p, "assets", "html", "layout.html")
 	if err = loadHTMLTemplate(p); err != nil {
 		return nil, err
 	}
-	initRoutes(e)
-	return e, nil
+	return newRouter(), nil
 }
 
 // CompileAssets compresses and merges assets from Abot core and all plugins on
 // boot. In development, this step is repeated on each server HTTP request prior
 // to serving any assets.
 func CompileAssets() error {
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "cmd", "compileassets.sh")
 	outC, err := exec.
-		Command("/bin/sh", "-c", "cmd/compileassets.sh").
+		Command("/bin/sh", "-c", p).
 		CombinedOutput()
 	if err != nil {
 		log.Debug(string(outC))
@@ -124,4 +136,23 @@ func ConnectDB() (*sqlx.DB, error) {
 			"user=postgres dbname=abot sslmode=disable")
 	}
 	return d, err
+}
+
+// LoadConf plugins.json into a usable struct.
+func LoadConf() (*PluginJSON, error) {
+	contents, err := ioutil.ReadFile("plugins.json")
+	if err != nil {
+		if err.Error() != "open plugins.json: no such file or directory" {
+			return nil, err
+		}
+		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.json"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	plugins := &PluginJSON{}
+	if err = json.Unmarshal(contents, plugins); err != nil {
+		return nil, err
+	}
+	return plugins, nil
 }

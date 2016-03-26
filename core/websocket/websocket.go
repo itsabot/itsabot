@@ -8,8 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labstack/echo"
-
 	"golang.org/x/net/websocket"
 )
 
@@ -50,9 +48,7 @@ func (as AtomicWebSocketSet) Set(userID uint64, conn *websocket.Conn) {
 
 // NotifySockets sends listening clients new messages over WebSockets,
 // eliminating the need for trainers to constantly reload the page.
-func (as AtomicWebSocketSet) NotifySockets(c *echo.Context, uid uint64, cmd,
-	ret string) error {
-
+func (as AtomicWebSocketSet) NotifySockets(uid uint64, cmd, ret string) error {
 	s := as.Get(uid)
 	if s == nil {
 		// Trainer is not online.

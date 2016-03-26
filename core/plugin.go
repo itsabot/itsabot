@@ -13,6 +13,10 @@ import (
 
 // PluginJSON holds the plugins.json structure.
 type PluginJSON struct {
+	Name         string
+	Description  string
+	Version      string
+	ImportPath   string
 	Dependencies map[string]string
 }
 

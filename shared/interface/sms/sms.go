@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/itsabot/abot/shared/interface/sms/driver"
-	"github.com/labstack/echo"
+	"github.com/julienschmidt/httprouter"
 )
 
 var driversMu sync.RWMutex
@@ -48,7 +48,7 @@ type Conn struct {
 }
 
 // Open a connection to a registered driver.
-func Open(driverName, auth string, e *echo.Echo) (*Conn, error) {
+func Open(driverName, auth string, r *httprouter.Router) (*Conn, error) {
 	driversMu.RLock()
 	driveri, ok := drivers[driverName]
 	driversMu.RUnlock()
@@ -56,7 +56,7 @@ func Open(driverName, auth string, e *echo.Echo) (*Conn, error) {
 		return nil, fmt.Errorf("sms: unknown driver %q (forgotten import?)",
 			driverName)
 	}
-	conn, err := driveri.Open(auth, e)
+	conn, err := driveri.Open(auth, r)
 	if err != nil {
 		return nil, err
 	}

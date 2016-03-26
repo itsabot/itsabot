@@ -2,13 +2,13 @@
 // by package sms.
 package driver
 
-import "github.com/labstack/echo"
+import "github.com/julienschmidt/httprouter"
 
 // Driver is the interface that must be implemented by an SMS driver.
 type Driver interface {
 	// Open returns a new connection to the SMS server. The name is a string
 	// in a driver-specific format.
-	Open(name string, e *echo.Echo) (Conn, error)
+	Open(name string, r *httprouter.Router) (Conn, error)
 }
 
 // Conn is a connection to the external SMS service.

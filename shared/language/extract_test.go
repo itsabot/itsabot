@@ -3,16 +3,22 @@ package language
 import (
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/itsabot/abot/core"
-	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/nlp"
 )
 
+func TestMain(m *testing.M) {
+	if err := os.Setenv("ABOT_ENV", "test"); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+}
+
 func TestExtractCities(t *testing.T) {
-	log.SetDebug(true)
 	var cities []dt.City
 	in := &dt.Msg{}
 	db, err := core.ConnectDB()
