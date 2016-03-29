@@ -22,6 +22,7 @@ import (
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
 )
 
 var conf *core.PluginJSON
@@ -212,7 +213,15 @@ func startConsole(c *cli.Context) error {
 		}
 	}()
 
-	base := "http://" + addr + "?flexidtype=2&flexid=" + url.QueryEscape(phone) + "&cmd="
+	body := struct {
+		CMD        string
+		FlexID     string
+		FlexIDType dt.FlexIDType
+	}{
+		FlexID:     phone,
+		FlexIDType: 2,
+	}
+	base := "http://" + addr
 	scanner := bufio.NewScanner(os.Stdin)
 
 	// Test connection
@@ -229,8 +238,15 @@ func startConsole(c *cli.Context) error {
 
 	// Handle each user input
 	for scanner.Scan() {
-		cmd := scanner.Text()
-		req, err := http.NewRequest("POST", base+url.QueryEscape(cmd), nil)
+		body.CMD = scanner.Text()
+		byt, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		req, err := http.NewRequest("POST", base, bytes.NewBuffer(byt))
+		if err != nil {
+			return err
+		}
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
