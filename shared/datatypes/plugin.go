@@ -1,6 +1,8 @@
 package dt
 
 import (
+	"time"
+
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
@@ -51,4 +53,22 @@ type PluginEvents struct {
 	PostReceive    func(cmd *string)
 	PostProcessing func(in *Msg)
 	PostResponse   func(in *Msg, resp *string)
+}
+
+// Schedule a message to the user to be delivered at a future time. This is
+// particularly useful for reminders. The method of delivery, e.g. SMS or
+// email, will be determined automatically by Abot at the time of sending the
+// message. Abot will contact the user using that user's the most recently used
+// communication method. This method returns the scheduled event ID in the
+// database for future reference and an error if the event could not be
+// scheduled.
+func (p *Plugin) Schedule(u *User, content string, sendat time.Time) (uint64,
+	error) {
+
+	q := `INSERT INTO scheduledevents (content, userid, sendat)
+	      VALUES ($1, $2, $3)
+	      RETURNING id`
+	var sid uint64
+	err := p.DB.QueryRow(q, content, u.ID, sendat).Scan(&sid)
+	return sid, err
 }

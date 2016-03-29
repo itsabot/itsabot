@@ -19,6 +19,7 @@ var router *httprouter.Router
 
 func TestMain(m *testing.M) {
 	if err := os.Setenv("ABOT_ENV", "test"); err != nil {
+		log.Info("failed to set ABOT_ENV", err)
 		os.Exit(1)
 	}
 	var err error

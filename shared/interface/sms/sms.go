@@ -48,7 +48,7 @@ type Conn struct {
 }
 
 // Open a connection to a registered driver.
-func Open(driverName, auth string, r *httprouter.Router) (*Conn, error) {
+func Open(driverName string, r *httprouter.Router) (*Conn, error) {
 	driversMu.RLock()
 	driveri, ok := drivers[driverName]
 	driversMu.RUnlock()
@@ -56,7 +56,7 @@ func Open(driverName, auth string, r *httprouter.Router) (*Conn, error) {
 		return nil, fmt.Errorf("sms: unknown driver %q (forgotten import?)",
 			driverName)
 	}
-	conn, err := driveri.Open(auth, r)
+	conn, err := driveri.Open(r)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,8 @@ func (c *Conn) Driver() driver.Driver {
 	return c.driver
 }
 
-// Send an SMS message through an opened driver connection.
-func (c *Conn) Send(from, to, msg string) error {
-	return c.conn.Send(from, to, msg)
+// Send an SMS message through an opened driver connection. The from number is
+// handled by the driver.
+func (c *Conn) Send(to, msg string) error {
+	return c.conn.Send(to, msg)
 }
