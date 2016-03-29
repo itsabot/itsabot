@@ -6,16 +6,17 @@ import "github.com/julienschmidt/httprouter"
 
 // Driver is the interface that must be implemented by an SMS driver.
 type Driver interface {
-	// Open returns a new connection to the SMS server. The name is a string
-	// in a driver-specific format.
-	Open(name string, r *httprouter.Router) (Conn, error)
+	// Open returns a new connection to the SMS server. Authentication is
+	// handled by the individual drivers.
+	Open(r *httprouter.Router) (Conn, error)
 }
 
 // Conn is a connection to the external SMS service.
 type Conn interface {
 	// Send an SMS from one number to another. It's up to each individual
-	// SMS driver to specify the format of the numbers.
-	Send(from, to, msg string) error
+	// SMS driver to specify the format of the numbers. The From number is
+	// handled by the drivers themselves.
+	Send(to, msg string) error
 
 	// Close the connection.
 	Close() error

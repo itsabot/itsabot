@@ -10,8 +10,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/interface/sms"
 	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq" // Postgres driver
@@ -20,6 +23,7 @@ import (
 var db *sqlx.DB
 var ner Classifier
 var offensive map[string]struct{}
+var smsConn *sms.Conn
 
 // DB returns a connection to the database.
 func DB() *sqlx.DB {
@@ -54,14 +58,17 @@ func NewServer() (r *httprouter.Router, err error) {
 
 	// Get ImportPath from plugins.json
 	conf, err := LoadConf()
-	if err != nil {
+	if err != nil && os.Getenv("ABOT_ENV") != "test" {
 		return nil, err
 	}
-	p := filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath)
+	var p string
+	if err == nil {
+		p = filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath)
+		if err = os.Setenv("ABOT_PATH", p); err != nil {
+			return nil, err
+		}
+	}
 
-	if err = os.Setenv("ABOT_PATH", p); err != nil {
-		return nil, err
-	}
 	if os.Getenv("ABOT_ENV") != "test" {
 		if err = CompileAssets(); err != nil {
 			return nil, err
@@ -75,11 +82,72 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err != nil {
 		log.Debug("could not build offensive map", err)
 	}
-	p = filepath.Join(p, "assets", "html", "layout.html")
-	if err = loadHTMLTemplate(p); err != nil {
-		return nil, err
+	if len(p) > 0 {
+		p = filepath.Join(p, "assets", "html", "layout.html")
+		if err = loadHTMLTemplate(p); err != nil {
+			return nil, err
+		}
 	}
-	return newRouter(), nil
+
+	// Initialize a router with routes
+	r = newRouter()
+
+	// Open a connection to an SMS service
+	if len(sms.Drivers()) > 0 {
+		drv := sms.Drivers()[0]
+		smsConn, err = sms.Open(drv, r)
+		if err != nil {
+			log.Info("failed to open sms driver connection", drv,
+				err)
+		}
+	} else {
+		log.Debug("no sms drivers imported")
+	}
+
+	// Listen for events that need to be sent.
+	evtChan := make(chan *dt.ScheduledEvent)
+	go func(chan *dt.ScheduledEvent) {
+		q := `UPDATE scheduledevents SET sent=TRUE WHERE id=$1`
+		select {
+		case evt := <-evtChan:
+			log.Debug("received event")
+			// Send event. On error, event will be retried next
+			// minute.
+			if err := evt.Send(smsConn); err != nil {
+				log.Info("failed to send scheduled event", err)
+				return
+			}
+			// Update event as sent
+			if _, err := db.Exec(q); err != nil {
+				log.Info("failed to update scheduled event as sent",
+					err)
+				return
+			}
+		}
+	}(evtChan)
+
+	// Check every minute if there are any scheduled events that need to be
+	// sent.
+	go func(evtChan chan *dt.ScheduledEvent) {
+		q := `SELECT id, content, flexid, flexidtype
+		      FROM scheduledevents
+		      WHERE sent=false AND sendat<=$1`
+		t := time.NewTicker(time.Minute)
+		select {
+		case now := <-t.C:
+			evts := []*dt.ScheduledEvent{}
+			if err := db.Select(&evts, q, now); err != nil {
+				log.Info("failed to queue scheduled event", err)
+				return
+			}
+			for _, evt := range evts {
+				// Queue the event for sending
+				evtChan <- evt
+			}
+		}
+	}(evtChan)
+
+	return r, nil
 }
 
 // CompileAssets compresses and merges assets from Abot core and all plugins on

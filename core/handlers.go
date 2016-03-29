@@ -98,7 +98,7 @@ func HMain(w http.ResponseWriter, r *http.Request) {
 	ret, _, err := ProcessText(r)
 	if err != nil {
 		ret = errMsg
-		log.Debug(err)
+		log.Info("failed to process text", err)
 		// TODO notify plugins listening for errors
 	}
 	_, err = fmt.Fprint(w, ret)

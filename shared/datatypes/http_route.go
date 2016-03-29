@@ -15,13 +15,13 @@ type HTTPRoute struct {
 
 // HandlerMap maps HTTPRoutes (the method and URL path) to a echo router
 // handler.
-type HandlerMap map[HTTPRoute]http.Handler
+type HandlerMap map[HTTPRoute]http.HandlerFunc
 
 // RouteHandler is a complete struct containing both an HTTPRoute and a handler.
 type RouteHandler struct {
 	Method  string
 	Path    string
-	Handler http.Handler
+	Handler http.HandlerFunc
 }
 
 // AddRoutes to the router dynamically, enabling drivers to add routes to an
