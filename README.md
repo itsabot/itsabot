@@ -29,7 +29,7 @@ in each release until we hit v1.0. Follow our progress on the
 You can install Abot via Go:
 
 ```
-$ go get github.com/itsabot/abot.git
+$ go get github.com/itsabot/abot
 $ cd $GOPATH/src/github.com/itsabot/abot
 $ cmd/setup.sh
 $ abot server
