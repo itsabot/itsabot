@@ -39,8 +39,8 @@ Then visit Abot at `localhost:4200`.
 
 ## Usage
 
-First configure the plugins you want to import, such as `restaurants` or
-`mechanic`. Add them to your plugin.json like so:
+First configure the plugins you want to import, such as `weather`. Add them
+to your plugin.json like so:
 
 ```json
 {
@@ -48,7 +48,6 @@ First configure the plugins you want to import, such as `restaurants` or
 	"Version": "0.1.0",
 	"Dependencies": {
 		"github.com/itsabot/plugin_onboard": "*",
-		"github.com/itsabot/plugin_restaurants": "*",
 		"github.com/itsabot/plugin_weather": "*"
 	}
 }
