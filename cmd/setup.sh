@@ -51,7 +51,7 @@ sed -i='' -n '/export ABOT_ENV=/!p' $FILE
 sed -i='' -n '/export ABOT_SECRET=/!p' $FILE
 
 # Generate ABOT_SECRET used for validating cookie values
-SECRET=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-64};echo;)
+SECRET=$(< /dev/urandom LC_CTYPE=C tr -dc [:alnum:]][}{,.+-_ | head -c${1:-64};echo;)
 
 # Append environment variables
 cat <<EOT >> $FILE
