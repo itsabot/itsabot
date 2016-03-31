@@ -1,92 +1,149 @@
 #!/usr/bin/env bash
 
-set -e
+PFX='         '
+ERROUT=$(mktemp)
+ABOTPKG='github.com/itsabot/abot'
+DMPKG='github.com/robfig/glock'
+PORT="4200"
+ABOT_ENV="development"
+ABOT_URL="http://localhost:$PORT"
+ABOT_SECRET=$(< /dev/urandom LC_CTYPE=C tr -dc _A-Z-a-z-0-9 | head -c${1:-64})
 
-echo "Verifying PostgreSQL is running... "
-if ! ps ax | grep 'postgres' > /dev/null
-then
-	echo "PostgreSQL not running. Please start Postgres to continue."
-	exit 1
-fi
+# usage: HEADER CMD KIND(0=chk,1=warn,2=err) [MESSAGES...]
+#        $1     $2  $3                       $4...
+#
+# NOTE: this function should not be called directly
+#       instead, use run_chk, run_warn, and run (which act as a run_err)
+#       functions below this one
+#
+# _run will display [?] HEADER, then execute CMD
+# if CMD is successful, the previous HEADER is overwritten with [ok] HEADER
+# if CMD fails:
+#   if KIND is err:
+#     the previous HEADER is overwritten with [err] HEADER
+#     MESSAGES are printed
+#     CMD's stdout/stderr is displayed and the script exits
+#   if KIND is warn:
+#     the previous HEADER is overwritten with [warn] HEADER
+#     MESSAGES are printed
+#     the function returns 1
+#   if KIND is chk"
+#     the previous HEADER is overwritten with [--] HEADER
+#     MESSAGES are printed
+#     the function returns 1
+#
+# finally, bash escaping rules can be tricky for the CMD's passed to this
+# function. have fun
+function _run {
+	local TAG='     \e[1;33m[?]\e[0m'
+	printf "$TAG $1"
+	case "$3" in
+		0) TAG='    \e[1;30m[--]\e[0m'; bash -c "$2 &>/dev/null" ;;
+		1) TAG='  \e[1;33m[warn]\e[0m'; bash -c "$2 &>/dev/null" ;;
+		2) TAG='   \e[1;31m[err]\e[0m'; bash -c "$2 &>$ERROUT" ;;
+	esac
+	if [ "$?" -ne 0 ]; then
+		printf "\r$TAG $1\n"
+		if [ "$3" -eq 0 ]; then
+			for ARG in "${@:4}"; do echo "$PFX$ARG"; done
+			return 1
+		elif [ "$3" -eq 1 ]; then
+			for ARG in "${@:4}"; do echo "$ARG"; done
+			[ "$#" -gt 3 ] && echo ""
+			return 1
+		fi
+		echo -e "\nfailed cmd:\n${PFX}$2\n"
+		for ARG in "${@:4}"; do echo "$ARG"; done
+		[ "$#" -gt 3 ] && echo ""
+		if [ -n "$(cat $ERROUT)" ]; then
+			cat "$ERROUT"
+		fi
+		rm "$ERROUT"
+		exit 1
+	else
+		printf "\r\e[1;32m    [ok]\e[0m $1\n"
+	fi
+}
 
-echo "Confirming Postgres user exists..."
-if ! psql -U postgres postgres -tAc "SELECT '' FROM pg_roles WHERE rolname='postgres'" > /dev/null
-then
-	echo "Please create a PostgreSQL user named postgres to continue. Google \"createuser postgres\""
-fi
+# usage: HEADER CMD [MESSAGES...]
+#        $1     $2  $3...
+function run_chk { _run "$1" "$2" 0 "${@:3}"; }
+function run_warn { _run "$1" "$2" 1 "${@:3}"; }
+function run { _run "$1" "$2" 2 "${@:3}"; }
 
-echo "Creating abot database..."
-if ! createdb -U postgres abot -O postgres &> /dev/null
-then
-	echo "WARN: could not create abot database. If you already created one, you can ignore this message."
-fi
+# begin setup
+run "checking for go binary" "which go" "please make sure 'go' is in your path"
+run "checking GOPATH" "[ -n '$GOPATH' ]" "GOPATH is not set"
+run "installing dependency manager" "go get '$DMPKG'"
+run "syncing dependencies" "glock sync '$ABOTPKG'"
+run "installing glock hook" "glock install '$ABOTPKG'"
+run "installing abot" "go install '$ABOTPKG'"
 
-echo "Creating abot_test database..."
-if ! createdb -U postgres abot_test -O postgres &> /dev/null
-then
-	echo "WARN: could not create abot_test database. If you already created one, you can ignore this message."
-fi
+run "checking for postgres" "ps ax -o comm | grep -q '^postgres'" \
+	"please start postgres to continue"
 
-echo "Migrating databases..."
-if ! cmd/migrateup.sh &> /dev/null
-then
-	echo "WARN: could not migrate db."
-fi
+run "checking for psql binary" "which psql" \
+	"please make sure 'psql' is in your path"
 
-echo "Updating environment variables"
-if [ -f ~/.bash_profile ];
-then
-	FILE=$HOME/.bash_profile
-else
-	FILE=$HOME/.bashrc
-fi
+run "checking for postgres user" \
+	"psql -U postgres -tAc '\du' | grep -q '^postgres|'" \
+	"please create a postgres user named 'postgres'"
 
-# Delete old lines
-sed -i='' -n '/\n\n# Added by Abot via /!p' $FILE
-sed -i='' -n '/\n# Added by Abot via /!p' $FILE
-sed -i='' -n '/# Added by Abot via /!p' $FILE
-sed -i='' -n '/export PORT=/!p' $FILE
-sed -i='' -n '/export ABOT_URL=/!p' $FILE
-sed -i='' -n '/export ABOT_ENV=/!p' $FILE
-sed -i='' -n '/export ABOT_SECRET=/!p' $FILE
+run_chk "checking for abot database" \
+	"psql -U postgres -tAc '\l' | grep -q '^abot|'" \
+	"abot database missing. creating it"
+[ "$?" -ne 0 ] && {
+run "creating abot database" "createdb -U postgres -O postgres abot" \
+	"could not create database"
+}
 
-# Generate ABOT_SECRET used for validating cookie values
-SECRET=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-64};echo;)
+run_chk "checking for abot_test database" \
+	"psql -U postgres -tAc '\l' | grep -q '^abot_test|'" \
+	"abot_test database missing. creating it"
+[ "$?" -ne 0 ] && {
+run "creating abot_test database" "createdb -U postgres -O postgres abot_test" \
+	"could not create database"
+}
 
-# Append environment variables
-cat <<EOT >> $FILE
+MIGCMD='ls db/migrations/up/*.sql | sort | xargs -I{} -- \
+	psql -v ON_ERROR_STOP=1 -U postgres'
+run_warn "running abot migrations" "$MIGCMD -d abot -f {}" \
+	"database migrations failed" \
+	"if the database has already been migrated, you can ignore this message"
 
-# Added by Abot via setup.sh 
-export PORT="4200"
-export ABOT_ENV="development"
-export ABOT_URL="http://localhost:4200"
-export ABOT_SECRET="$SECRET"
-EOT
+run_warn "running abot_test migrations" "$MIGCMD -d abot_test -f {}" \
+	"database migrations failed" \
+	"if the database has already been migrated, you can ignore this message"
 
-# Source new env vars for current terminal
-export PORT="4200"
-export ABOT_ENV="development"
-export ABOT_URL="http://localhost:4200"
-export ABOT_SECRET="$SECRET"
+CITY_CNT=$(wc -l data/cities.csv | awk '{print $1}')
+SEEDA="cat data/cities.csv | psql -U postgres -d"
+SEEDB="COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
 
-echo "Fetching dependencies..."
-go get github.com/robfig/glock &>/dev/null
-glock sync github.com/itsabot/abot &>/dev/null
-glock install github.com/itsabot/abot &>/dev/null
+PG_CNT=$(psql -tAc -U postgres -d abot -c 'select count(*) from cities')
+run_warn "checking if abot database is seeded" \
+	"[ '$PG_CNT' -ge '$CITY_CNT' ] || $SEEDA abot -c \"$SEEDB\"" \
+	"if the database has already been seeded, you can ignore this message"
 
-echo "Installing Abot..."
-go install
-abot plugin install
+PG_CNT=$(psql -tAc -U postgres -d abot_test -c 'select count(*) from cities')
+run_warn "checking if abot_test database is seeded" \
+	"[ \"$PG_CNT\" -ge \"$CITY_CNT\" ] || $SEEDA abot_test -c \"$SEEDB\"" \
+	"if the test database has already been seeded, you can ignore this message"
 
-echo "Seeding database..."
-if ! cat data/cities.csv | psql -U postgres -d abot -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;" &> /dev/null
-then
-	echo "WARN: could not seed abot database. If you already seeded it, you can ignore this message."
-fi
-if ! cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;" &> /dev/null
-then
-	echo "WARN: could not seed abot_test database. If you already seeded it, you can ignore this message."
-fi
+# note: the ';' at the end of this command is important. do not remove.
+run "generating environment file" "echo 'PORT=$PORT
+ABOT_ENV=$ABOT_ENV
+ABOT_URL=$ABOT_URL
+ABOT_SECRET=$ABOT_SECRET' > abot.env;"
 
-echo "To boot Abot, run \"abot server\" and open a web browser to localhost:4200."
-echo "You'll want to sign up to create a user account next."
+run "installing abot plugins" "abot plugin install"
+
+rm "$ERROUT"
+
+printf "\n*\e[1;32m [complete]\e[0m"
+printf " ***********************************************************\n\n"
+
+echo "to boot abot:
+    1. run 'abot server'
+    2. open a web browser to $ABOT_URL
+
+you'll want to sign up to create a user account next"
