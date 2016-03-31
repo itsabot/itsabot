@@ -21,10 +21,10 @@ abot.Signup.controller = function() {
 		return m.request({
 			method: "POST",
 			data: {
-				name: name,
-				email: email,
-				password: pass,
-				fid: flexId
+				Name: name,
+				Email: email,
+				Password: pass,
+				FID: flexId,
 			},
 			url: "/api/signup.json"
 		}).then(function(data) {

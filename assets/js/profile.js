@@ -2,9 +2,12 @@
 abot.Profile = {}
 abot.Profile.controller = function() {
 	var userId = cookie.getItem("id")
-	if (!userId || userId <= 0) {
-		return m.route("/login")
-	}
+	abot.Login.checkAuth(function(loggedIn) {
+		console.log("logged in?", loggedIn)
+		if (!loggedIn) {
+			return m.route("/login")
+		}
+	})
 	var redirect = m.route.param("r")
 	if (!!redirect) {
 		m.route("/" + redirect.substring(1))
@@ -43,7 +46,6 @@ abot.Profile.view = function(ctrl) {
 	])
 }
 abot.Profile.viewFull = function(ctrl) {
-	console.log("hit");
 	return m(".profile", [
 		m("h1", "Profile"),
 		m("h2", "Account Details"),

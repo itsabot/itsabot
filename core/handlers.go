@@ -11,8 +11,10 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,8 @@ var ws = websocket.NewAtomicWebSocketSet()
 // ErrInvalidUserPass reports an invalid username/password combination during
 // login.
 var ErrInvalidUserPass = errors.New("Invalid username/password combination")
+
+var regexNum = regexp.MustCompile(`\D+`)
 
 // newRouter initializes and returns a router.
 func newRouter() *httprouter.Router {
@@ -131,8 +135,12 @@ func HAPILogoutSubmit(w http.ResponseWriter, r *http.Request) {
 // HAPILoginSubmit processes a logout request deleting the session from
 // the server.
 func HAPILoginSubmit(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		writeError(w, err)
+	var req struct {
+		Email    string
+		Password string
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorInternal(w, err)
 		return
 	}
 	var u struct {
@@ -142,40 +150,40 @@ func HAPILoginSubmit(w http.ResponseWriter, r *http.Request) {
 		Admin    bool
 	}
 	q := `SELECT id, password, trainer, admin FROM users WHERE email=$1`
-	err := db.Get(&u, q, r.FormValue("Email"))
+	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
-		writeError(w, ErrInvalidUserPass)
+		writeErrorAuth(w, ErrInvalidUserPass)
 		return
 	} else if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	if u.ID == 0 {
-		writeError(w, ErrInvalidUserPass)
+		writeErrorAuth(w, ErrInvalidUserPass)
 		return
 	}
-	err = bcrypt.CompareHashAndPassword(u.Password, []byte(r.FormValue("Password")))
+	err = bcrypt.CompareHashAndPassword(u.Password, []byte(req.Password))
 	if err == bcrypt.ErrMismatchedHashAndPassword || err == bcrypt.ErrHashTooShort {
-		writeError(w, ErrInvalidUserPass)
+		writeErrorAuth(w, ErrInvalidUserPass)
 		return
 	} else if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	user := &dt.User{
 		ID:      u.ID,
-		Email:   r.FormValue("Email"),
+		Email:   req.Email,
 		Trainer: u.Trainer,
 		Admin:   u.Admin,
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	header, token, err := getAuthToken(user)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	resp := struct {
@@ -199,43 +207,58 @@ func HAPILoginSubmit(w http.ResponseWriter, r *http.Request) {
 // HAPISignupSubmit signs up a user after server-side validation of all
 // passed in values.
 func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		writeError(w, err)
+	var req struct {
+		Name     string
+		Email    string
+		Password string
+		FID      string
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorInternal(w, err)
 		return
 	}
 
-	// validate the request parameters
-	if len(r.FormValue("Name")) == 0 {
+	// Validate the request parameters
+	if len(req.Name) == 0 {
 		writeErrorBadRequest(w, errors.New("You must enter a name."))
 		return
 	}
-	if len(r.FormValue("Email")) == 0 ||
-		!strings.ContainsAny(r.FormValue("Email"), "@") ||
-		!strings.ContainsAny(r.FormValue("Email"), ".") {
+	if len(req.Email) == 0 ||
+		!strings.ContainsAny(req.Email, "@") ||
+		!strings.ContainsAny(req.Email, ".") {
 		writeErrorBadRequest(w, errors.New("You must enter a valid email."))
 		return
 	}
-	if len(r.FormValue("Password")) < 8 {
+	if len(req.Password) < 8 {
 		writeErrorBadRequest(w, errors.New("Your password must be at least 8 characters."))
 		return
 	}
-	// TODO use new SMS interface
-	/*
-		if err := validatePhone(req.FID); err != nil {
-			return JSONError(err)
+	// Remove everything except numbers
+	req.FID = regexNum.ReplaceAllString(req.FID, "")
+	if len(req.FID) < 10 {
+		writeErrorBadRequest(w, errors.New("Your phone number must be at least 10 digits."))
+		return
+	}
+	if req.FID[0] != '1' {
+		if len(req.FID) >= 11 {
+			writeErrorBadRequest(w, errors.New("Invalid country code. Currently only American numbers are supported."))
+			return
 		}
-	*/
+		req.FID = "+1" + req.FID
+	} else {
+		req.FID = "+" + req.FID
+	}
 
 	// TODO format phone number for SMS interface (international format)
 	user := &dt.User{
-		Name:  r.FormValue("Name"),
-		Email: r.FormValue("Email"),
+		Name:  req.Name,
+		Email: req.Email,
 		// Password is hashed in user.Create()
-		Password: r.FormValue("Password"),
+		Password: req.Password,
 		Trainer:  false,
 		Admin:    false,
 	}
-	err := user.Create(db, dt.FlexIDType(2), r.FormValue("FID"))
+	err := user.Create(db, dt.FlexIDType(2), req.FID)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -266,6 +289,7 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 		CSRFToken: csrfToken,
 	}
 	resp.ID = user.ID
+	log.Info("user signed up. id", user.ID)
 	writeBytes(w, resp)
 }
 
@@ -277,10 +301,9 @@ func HAPIProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
 	cookie, err := r.Cookie("id")
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	uid := cookie.Value
@@ -310,7 +333,7 @@ func HAPIProfile(w http.ResponseWriter, r *http.Request) {
 	q := `SELECT name, email FROM users WHERE id=$1`
 	err = db.Get(&user, q, uid)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	q = `SELECT flexid FROM userflexids
@@ -318,7 +341,7 @@ func HAPIProfile(w http.ResponseWriter, r *http.Request) {
 	     LIMIT 10`
 	err = db.Select(&user.Phones, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	q = `SELECT id, cardholdername, last4, expmonth, expyear, brand
@@ -327,7 +350,7 @@ func HAPIProfile(w http.ResponseWriter, r *http.Request) {
 	     LIMIT 10`
 	err = db.Select(&user.Cards, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	q = `SELECT id, name, line1, line2, city, state, country, zip
@@ -336,7 +359,7 @@ func HAPIProfile(w http.ResponseWriter, r *http.Request) {
 	     LIMIT 10`
 	err = db.Select(&user.Addresses, q, uid)
 	if err != nil && err != sql.ErrNoRows {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	writeBytes(w, user)
@@ -392,14 +415,14 @@ Response:
 // HAPIForgotPasswordSubmit asks the server to send the user a "Forgot
 // Password" email with instructions for resetting their password.
 func HAPIForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		writeError(w, err)
+	var req struct{ Email string }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorInternal(w, err)
 		return
 	}
-
 	var user dt.User
 	q := `SELECT id, name, email FROM users WHERE email=$1`
-	err := db.Get(&user, q, r.FormValue("Email"))
+	err := db.Get(&user, q, req.Email)
 	if err == sql.ErrNoRows {
 		writeError(w, errors.New("Sorry, there's no record of that email. Are you sure that's the email you used to sign up with and that you typed it correctly?"))
 		return
@@ -426,11 +449,15 @@ func HAPIForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 // another bcrypt hash after validating on the server that their new password is
 // sufficient.
 func HAPIResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		writeError(w, err)
+	var req struct {
+		Password string
+		Secret   string
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorInternal(w, err)
 		return
 	}
-	if len(r.FormValue("Password")) < 8 {
+	if len(req.Password) < 8 {
 		writeError(w, errors.New("Your password must be at least 8 characters"))
 		return
 	}
@@ -439,7 +466,7 @@ func HAPIResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 	q := `SELECT userid FROM passwordresets
 	      WHERE secret=$1 AND
 	      createdat >= CURRENT_TIMESTAMP - interval '30 minutes'`
-	err := db.Get(&uid, q, r.FormValue("Secret"))
+	err := db.Get(&uid, q, req.Secret)
 	if err == sql.ErrNoRows {
 		writeError(w, errors.New("Sorry, that information doesn't match our records."))
 		return
@@ -449,7 +476,7 @@ func HAPIResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hpw, err := bcrypt.GenerateFromPassword([]byte(r.FormValue("Password")), 10)
+	hpw, err := bcrypt.GenerateFromPassword([]byte(req.Password), 10)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -466,7 +493,7 @@ func HAPIResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q = `DELETE FROM passwordresets WHERE secret=$1`
-	if _, err = tx.Exec(q, r.FormValue("Secret")); err != nil {
+	if _, err = tx.Exec(q, req.Secret); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -646,6 +673,10 @@ func LoggedIn(w http.ResponseWriter, r *http.Request) bool {
 		writeErrorInternal(w, err)
 		return false
 	}
+	if len(cookie.Value) == 0 || cookie.Value == "undefined" {
+		writeErrorAuth(w, errors.New("missing issuedAt"))
+		return false
+	}
 	issuedAt, err := strconv.ParseInt(cookie.Value, 10, 64)
 	if err != nil {
 		writeErrorInternal(w, err)
@@ -685,9 +716,14 @@ func LoggedIn(w http.ResponseWriter, r *http.Request) bool {
 		writeErrorInternal(w, err)
 		return false
 	}
+	email, err := url.QueryUnescape(cookie.Value)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return false
+	}
 	a := Header{
 		ID:       userID,
-		Email:    cookie.Value,
+		Email:    email,
 		Scopes:   scopes,
 		IssuedAt: issuedAt,
 	}

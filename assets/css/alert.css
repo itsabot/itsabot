@@ -1,0 +1,11 @@
+.alert {
+	padding: 1em;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	margin-bottom: 1em;
+}
+.alert.alert-danger {
+	color: #A94442;
+	background-color: #F2DEDE;
+	border-color: #EBCCD1;
+}
