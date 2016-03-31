@@ -2,7 +2,8 @@
 
 set -e
 
-inotifywait -m -r -e modify,attrib,close_write,move,create,delete assets | 
+inotifywait -m -r -e modify assets |
 	while read file; do
-		curl localhost:4200/_/cmd/reload
+		echo reloading...
+		curl localhost:4200/_/cmd/ws/reload
 	done
