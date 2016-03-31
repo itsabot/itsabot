@@ -206,17 +206,17 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 
 	// validate the request parameters
 	if len(r.FormValue("Name")) == 0 {
-		writeError(w, errors.New("You must enter a name."))
+		writeErrorBadRequest(w, errors.New("You must enter a name."))
 		return
 	}
 	if len(r.FormValue("Email")) == 0 ||
 		!strings.ContainsAny(r.FormValue("Email"), "@") ||
 		!strings.ContainsAny(r.FormValue("Email"), ".") {
-		writeError(w, errors.New("You must enter a valid email."))
+		writeErrorBadRequest(w, errors.New("You must enter a valid email."))
 		return
 	}
 	if len(r.FormValue("Password")) < 8 {
-		writeError(w, errors.New("Your password must be at least 8 characters."))
+		writeErrorBadRequest(w, errors.New("Your password must be at least 8 characters."))
 		return
 	}
 	// TODO use new SMS interface
@@ -779,6 +779,11 @@ func writeBytes(w http.ResponseWriter, x interface{}) {
 	if _, err = w.Write(byt); err != nil {
 		writeError(w, err)
 	}
+}
+
+func writeErrorBadRequest(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusBadRequest)
+	writeError(w, err)
 }
 
 func writeErrorInternal(w http.ResponseWriter, err error) {
