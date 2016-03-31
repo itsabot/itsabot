@@ -31,7 +31,7 @@ You can install Abot via Go:
 ```
 $ go get github.com/itsabot/abot
 $ cd $GOPATH/src/github.com/itsabot/abot
-$ cmd/setup.sh
+$ source cmd/setup.sh
 $ abot server
 ```
 
