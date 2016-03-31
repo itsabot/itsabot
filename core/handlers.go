@@ -70,7 +70,7 @@ func newRouter() *httprouter.Router {
 // server-side variables.
 func HIndex(w http.ResponseWriter, r *http.Request) {
 	var err error
-	if os.Getenv("ABOT_ENV") != "development" {
+	if os.Getenv("ABOT_ENV") != "production" {
 		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
 			"itsabot", "abot", "assets", "html", "layout.html")
 		tmplLayout, err = template.ParseFiles(p)
@@ -568,14 +568,14 @@ func initCMDGroup(router *httprouter.Router) {
 
 	go cmder(cmdch, addconnch, delconnch)
 
-	router.GET("/cmd/reload", func(w http.ResponseWriter, r *http.Request,
-		ps httprouter.Params) {
-		cmdch <- "reload"
+	router.GET("/_/cmd/ws/*cmd", func(w http.ResponseWriter,
+		r *http.Request, ps httprouter.Params) {
+		cmdch <- ps.ByName("cmd")[1:]
 		w.WriteHeader(http.StatusOK)
 	})
-	router.Handler("GET", "/ws", w.Handler(func(ws *w.Conn) {
+	router.Handler("GET", "/_/cmd/ws", w.Handler(func(wsc *w.Conn) {
 		respch := make(chan bool)
-		conn := &cmdConn{ws: ws, respch: respch}
+		conn := &cmdConn{ws: wsc, respch: respch}
 		addconnch <- conn
 		<-respch
 		delconnch <- conn
@@ -604,7 +604,6 @@ func cmder(cmdch <-chan string, addconnch, delconnch <-chan *cmdConn) {
 			delete(cmdconns, c.ws)
 		case c := <-cmdch:
 			cmd := fmt.Sprintf(`{"cmd": "%s"}`, c)
-			fmt.Println("sending cmd:", cmd)
 			for ws, respch := range cmdconns {
 				// Error ignored because we close no matter what
 				_ = w.Message.Send(ws, cmd)

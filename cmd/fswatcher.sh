@@ -5,7 +5,7 @@ set -e
 
 ava_reload() {
 	echo reloading...
-	curl localhost:4200/_/cmd/reload
+	curl localhost:4200/_/cmd/ws/reload
 }
 
 export -f ava_reload
