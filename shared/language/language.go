@@ -391,7 +391,7 @@ func No(s string) bool {
 }
 
 // SliceToString converts a slice of strings into a natural-language list with
-// appropriately placed commas and a custom and/or seperator.
+// appropriately placed commas and a custom and/or separator.
 func SliceToString(ss []string, andor string) string {
 	l := len(ss)
 	if l == 0 {
