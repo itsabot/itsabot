@@ -3,3 +3,5 @@
 client_secret.json
 public/*
 Procfile
+plugins.go
+abot.env

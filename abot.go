@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -33,6 +34,10 @@ func main() {
 
 	var err error
 	conf, err = core.LoadConf()
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = loadEnvVars()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -443,4 +448,44 @@ func buildPluginFile(l *log.Logger) *core.PluginJSON {
 	}
 
 	return plugins
+}
+
+func loadEnvVars() error {
+	p := filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath, "abot.env")
+	fi, err := os.Open(p)
+	if err == os.ErrNotExist {
+		// Assume the user has loaded their env variables into their path
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err = fi.Close(); err != nil {
+			log.Info("failed to close file")
+		}
+	}()
+	scn := bufio.NewScanner(fi)
+	for scn.Scan() {
+		line := scn.Text()
+		fields := strings.SplitN(line, "=", 2)
+		if len(fields) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(fields[0])
+		if key == "" {
+			continue
+		}
+		val := strings.TrimSpace(os.Getenv(key))
+		if val == "" {
+			val = strings.TrimSpace(fields[1])
+			if err = os.Setenv(key, val); err != nil {
+				return err
+			}
+		}
+	}
+	if err = scn.Err(); err != nil {
+		return err
+	}
+	return nil
 }
