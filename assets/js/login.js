@@ -55,11 +55,11 @@ abot.Login.view = function(ctrl) {
 	return m(".main", [
 		m.component(abot.Header),
 		m("h1", "Log In"),
-		m("form", [
-			m("div", {
-				id: "err",
-				class: "alert alert-danger hidden"
-			}, ctrl.error()),
+		m("div", {
+			id: "err",
+			class: "alert alert-danger hidden"
+		}, ctrl.error()),
+		m("form", { onsubmit: ctrl.login }, [
 			m("div", [
 				m("input", {
 					type: "email",
@@ -74,22 +74,20 @@ abot.Login.view = function(ctrl) {
 					placeholder: "Password"
 				}),
 			]),
-		]),
-		m("div", [
-			m("a", {
-				href: "/forgot_password",
-				config: m.route
-			}, "Forgot password?")
-		]),
-		m("div", [
-			m("input", {
-				class: "btn btn-sm",
-				id: "btn",
-				type: "submit",
-				onclick: ctrl.login,
-				onsubmit: ctrl.login,
-				value: "Log In"
-			}),
+			m("div", [
+				m("a", {
+					href: "/forgot_password",
+					config: m.route
+				}, "Forgot password?")
+			]),
+			m("div", [
+				m("input", {
+					class: "btn btn-sm",
+					id: "btn",
+					type: "submit",
+					value: "Log In"
+				}),
+			]),
 		]),
 		m("div", [
 			m("span", "No account? "),
@@ -101,8 +99,14 @@ abot.Login.view = function(ctrl) {
 	])
 }
 abot.Login.checkAuth = function(callback) {
-	if (cookie.getItem("id") !== null) {
-		callback(true)
+	var id = cookie.getItem("id")
+	var issuedAt = cookie.getItem("issuedAt")
+	var email = cookie.getItem("email")
+	if (id != null && id !== "undefined" &&
+		issuedAt != null && issuedAt !== "undefined" &&
+		email != null && email !== "undefined") {
+		return callback(true)
 	}
+	return callback(false)
 }
 })(!window.abot ? window.abot={} : window.abot);
