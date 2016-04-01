@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 
 PFX='         '
-ERROUT=$(mktemp)
-if [ -z "$ERROUT" ]; then
-	ERROUT=/tmp/abot.err
-fi
+ERROUT=/tmp/abot.err
 ABOTPKG='github.com/itsabot/abot'
 DMPKG='github.com/robfig/glock'
 PORT="4200"
