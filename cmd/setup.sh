@@ -2,6 +2,9 @@
 
 PFX='         '
 ERROUT=$(mktemp)
+if [ -z "$ERROUT" ]; then
+	ERROUT=/tmp/abot.err
+fi
 ABOTPKG='github.com/itsabot/abot'
 DMPKG='github.com/robfig/glock'
 PORT="4200"
