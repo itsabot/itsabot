@@ -260,17 +260,17 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	err := user.Create(db, dt.FlexIDType(2), req.FID)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	header, token, err := getAuthToken(user)
 	if err != nil {
-		writeError(w, err)
+		writeErrorInternal(w, err)
 		return
 	}
 	resp := struct {
