@@ -669,6 +669,10 @@ func LoggedIn(w http.ResponseWriter, r *http.Request) bool {
 
 	// Ensure the token is still valid
 	cookie, err := r.Cookie("issuedAt")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
@@ -696,12 +700,20 @@ func LoggedIn(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	cookie, err = r.Cookie("scopes")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
 	}
 	scopes := strings.Fields(cookie.Value)
 	cookie, err = r.Cookie("id")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
@@ -712,6 +724,10 @@ func LoggedIn(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	cookie, err = r.Cookie("email")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
@@ -761,12 +777,20 @@ func CSRF(w http.ResponseWriter, r *http.Request) bool {
 	q := `SELECT label FROM sessions
 	      WHERE userid=$1 AND label='csrfToken' AND token=$2`
 	cookie, err := r.Cookie("id")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
 	}
 	uid := cookie.Value
 	cookie, err = r.Cookie("csrfToken")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
@@ -789,6 +813,10 @@ func CSRF(w http.ResponseWriter, r *http.Request) bool {
 func Admin(w http.ResponseWriter, r *http.Request) bool {
 	log.Debug("validating admin")
 	cookie, err := r.Cookie("scopes")
+	if err == http.ErrNoCookie {
+		writeErrorAuth(w, err)
+		return false
+	}
 	if err != nil {
 		writeErrorInternal(w, err)
 		return false
