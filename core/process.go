@@ -33,6 +33,7 @@ func Preprocess(r *http.Request) (*dt.Msg, error) {
 	if err != nil {
 		return nil, err
 	}
+	sendPreProcessingEvent(&req.CMD, u)
 	msg := NewMsg(u, req.CMD)
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
@@ -108,6 +109,12 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 func sendPostReceiveEvent(cmd *string) {
 	for _, p := range AllPlugins {
 		p.Events.PostReceive(cmd)
+	}
+}
+
+func sendPreProcessingEvent(cmd *string, u *dt.User) {
+	for _, p := range AllPlugins {
+		p.Events.PreProcessing(cmd, u)
 	}
 }
 
