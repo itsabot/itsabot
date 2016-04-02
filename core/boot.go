@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/itsabot/abot/core/log"
@@ -192,23 +194,25 @@ func checkRequiredEnvVars() error {
 
 // ConnectDB opens a connection to the database.
 func ConnectDB() (*sqlx.DB, error) {
-	var d *sqlx.DB
-	var err error
-	if os.Getenv("ABOT_ENV") == "production" {
-		d, err = sqlx.Connect("postgres", os.Getenv("ABOT_DATABASE_URL"))
-	} else if os.Getenv("ABOT_ENV") == "test" {
-		d, err = sqlx.Connect("postgres",
-			"user=postgres dbname=abot_test sslmode=disable")
-	} else {
-		d, err = sqlx.Connect("postgres",
-			"user=postgres dbname=abot sslmode=disable")
+	if err := LoadEnvVars(); err != nil {
+		return nil, err
 	}
-	return d, err
+	dbConnStr := os.Getenv("ABOT_DATABASE_URL")
+	if dbConnStr == "" {
+		dbConnStr = "host=127.0.0.1 user=postgres"
+	}
+	dbConnStr += " sslmode=disable dbname=abot"
+	if strings.ToLower(os.Getenv("ABOT_ENV")) == "test" {
+		dbConnStr += "_test"
+	}
+	return sqlx.Connect("postgres", dbConnStr)
 }
 
 // LoadConf plugins.json into a usable struct.
 func LoadConf() (*PluginJSON, error) {
-	contents, err := ioutil.ReadFile("plugins.json")
+	ipath := "github.com/itsabot/abot"
+	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "plugins.json")
+	contents, err := ioutil.ReadFile(p)
 	if err != nil {
 		if err.Error() != "open plugins.json: no such file or directory" {
 			return nil, err
@@ -223,4 +227,46 @@ func LoadConf() (*PluginJSON, error) {
 		return nil, err
 	}
 	return plugins, nil
+}
+
+func LoadEnvVars() error {
+	ipath := "github.com/itsabot/abot"
+	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "abot.env")
+	fi, err := os.Open(p)
+	if os.IsNotExist(err) {
+		// Assume the user has loaded their env variables into their
+		// path
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err = fi.Close(); err != nil {
+			log.Info("failed to close file")
+		}
+	}()
+	scn := bufio.NewScanner(fi)
+	for scn.Scan() {
+		line := scn.Text()
+		fields := strings.SplitN(line, "=", 2)
+		if len(fields) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(fields[0])
+		if key == "" {
+			continue
+		}
+		val := strings.TrimSpace(os.Getenv(key))
+		if val == "" {
+			val = strings.TrimSpace(fields[1])
+			if err = os.Setenv(key, val); err != nil {
+				return err
+			}
+		}
+	}
+	if err = scn.Err(); err != nil {
+		return err
+	}
+	return nil
 }

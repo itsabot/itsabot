@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -37,7 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = loadEnvVars()
+	err = core.LoadEnvVars()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -181,7 +180,7 @@ func outputPluginResults(w io.Writer, byt []byte) error {
 func searchItsAbot(q string) ([]byte, error) {
 	u := fmt.Sprintf("https://www.itsabot.org/api/search.json?q=%s",
 		url.QueryEscape(q))
-	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	client := http.Client{Timeout: 10 * time.Second}
 	res, err := client.Get(u)
 	if err != nil {
 		return nil, err
@@ -212,7 +211,7 @@ func startConsole(c *cli.Context) error {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go func() {
-		for _ = range sig {
+		for range sig {
 			fmt.Printf("\n")
 			os.Exit(0)
 		}
@@ -448,44 +447,4 @@ func buildPluginFile(l *log.Logger) *core.PluginJSON {
 	}
 
 	return plugins
-}
-
-func loadEnvVars() error {
-	p := filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath, "abot.env")
-	fi, err := os.Open(p)
-	if err == os.ErrNotExist {
-		// Assume the user has loaded their env variables into their path
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err = fi.Close(); err != nil {
-			log.Info("failed to close file")
-		}
-	}()
-	scn := bufio.NewScanner(fi)
-	for scn.Scan() {
-		line := scn.Text()
-		fields := strings.SplitN(line, "=", 2)
-		if len(fields) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(fields[0])
-		if key == "" {
-			continue
-		}
-		val := strings.TrimSpace(os.Getenv(key))
-		if val == "" {
-			val = strings.TrimSpace(fields[1])
-			if err = os.Setenv(key, val); err != nil {
-				return err
-			}
-		}
-	}
-	if err = scn.Err(); err != nil {
-		return err
-	}
-	return nil
 }

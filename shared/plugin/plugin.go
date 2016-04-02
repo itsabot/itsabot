@@ -14,7 +14,6 @@ import (
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/nlp"
-	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
 
@@ -54,7 +53,7 @@ func New(url string, trigger *nlp.StructuredInput,
 	if len(c.Name) == 0 {
 		return nil, ErrMissingPluginName
 	}
-	db, err := connectDB()
+	db, err := core.ConnectDB()
 	if err != nil {
 		return nil, err
 	}
@@ -77,23 +76,6 @@ func New(url string, trigger *nlp.StructuredInput,
 		return nil, err
 	}
 	return plg, nil
-}
-
-// connectDB opens a connection to the database.
-func connectDB() (*sqlx.DB, error) {
-	var db *sqlx.DB
-	var err error
-	if os.Getenv("ABOT_ENV") == "production" {
-		db, err = sqlx.Connect("postgres",
-			os.Getenv("ABOT_DATABASE_URL"))
-	} else if os.Getenv("ABOT_ENV") == "test" {
-		db, err = sqlx.Connect("postgres",
-			"user=postgres dbname=abot_test sslmode=disable")
-	} else {
-		db, err = sqlx.Connect("postgres",
-			"user=postgres dbname=abot sslmode=disable")
-	}
-	return db, err
 }
 
 // RegisterPlugin enables Abot to notify plugins when specific StructuredInput

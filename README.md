@@ -26,12 +26,33 @@ in each release until we hit v1.0. Follow our progress on the
 > * [Go](https://golang.org/dl/) >= 1.6
 > * [PostgreSQL](http://www.postgresql.org/download/) >= 9.5
 
-You can install Abot via Go:
+Fetch Abot via `go get`
 
 ```
 $ go get github.com/itsabot/abot
 $ cd $GOPATH/src/github.com/itsabot/abot
-$ cmd/setup.sh
+```
+
+Run the setup script, passing in your Postgres credentials/host if needed.
+
+```
+$ cmd/setup.sh [username[:password]@host[:port]]
+```
+
+If you don't pass anything to the script, the Postgres parameters will default
+to `host = 127.0.0.1`, `port = 5432`, and `username = postgres`.  You may need
+to edit your
+[pg_hba.conf](http://www.postgresql.org/docs/9.5/static/auth-pg-hba-conf.html)
+file if you want to use this password-less default.
+
+During setup, if the `psql` binary is unavailable, the script will skip the
+database setup. To setup the database on an different machine, you can run
+`cmd/dbsetup.sh` on the host that has Postgres / `psql` available. This script
+takes the same arguments as `cmd/setup.sh`.
+
+Once the script completes, launch the server
+
+```
 $ abot server
 ```
 
