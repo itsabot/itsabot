@@ -51,6 +51,7 @@ type PluginConfig struct {
 // Simply overwrite the plugin's function
 type PluginEvents struct {
 	PostReceive    func(cmd *string)
+	PreProcessing  func(cmd *string, u *User)
 	PostProcessing func(in *Msg)
 	PostResponse   func(in *Msg, resp *string)
 }

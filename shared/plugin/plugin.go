@@ -68,6 +68,7 @@ func New(url string, trigger *nlp.StructuredInput,
 		PluginFns: fns,
 		Events: &dt.PluginEvents{
 			PostReceive:    func(cmd *string) {},
+			PreProcessing:  func(cmd *string, u *dt.User) {},
 			PostProcessing: func(in *dt.Msg) {},
 			PostResponse:   func(in *dt.Msg, resp *string) {},
 		},
