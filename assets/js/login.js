@@ -17,7 +17,7 @@ abot.Login.controller = function() {
 		}).then(function(data) {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
-			var secure = true
+			var secure = abot.isProduction()
 			if (window.location.hostname === "localhost") {
 				secure = false
 			}
