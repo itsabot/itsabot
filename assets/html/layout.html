@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, user-scalable=no" />
 	<link rel="stylesheet" href="/public/css/main.css">
 	<script src="/public/js/main.js"></script>
+	<meta name="env-production" content="{{.IsProd}}" />
 {{if not .IsProd}}
 <script>
 (function(url, maxAttempts) {

@@ -10,6 +10,15 @@ abot.fnCopy = function(from, to) {
 		}
 	}
 }
+abot.isProduction = function() {
+	var ms = document.getElementsByTagName("meta")
+	for (var i = 0; i < ms.length; i++) {
+		if (ms[i].getAttribute("name") === "env-production") {
+			return ms[i].getAttribute("content") === "true"
+		}
+	}
+	return false
+}
 abot.signout = function(ev) {
 	ev.preventDefault()
 	abot.request({

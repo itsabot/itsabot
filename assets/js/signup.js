@@ -30,10 +30,7 @@ abot.Signup.controller = function() {
 		}).then(function(data) {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
-			var secure = true
-			if (window.location.hostname === "localhost") {
-				secure = false
-			}
+			var secure = abot.isProduction()
 			cookie.setItem("id", data.ID, exp, null, null, secure)
 			cookie.setItem("email", data.Email, exp, null, null, secure)
 			cookie.setItem("issuedAt", data.IssuedAt, exp, null, null, secure)
