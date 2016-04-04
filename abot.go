@@ -200,7 +200,7 @@ func startConsole(c *cli.Context) error {
 	}
 	var addr, phone string
 	if len(args) == 1 {
-		addr = "localhost:" + os.Getenv("PORT")
+		addr = "http://localhost:" + os.Getenv("PORT")
 		phone = args[0]
 	} else if len(args) == 2 {
 		addr = args[0]
@@ -225,11 +225,10 @@ func startConsole(c *cli.Context) error {
 		FlexID:     phone,
 		FlexIDType: 2,
 	}
-	base := "http://" + addr
 	scanner := bufio.NewScanner(os.Stdin)
 
 	// Test connection
-	req, err := http.NewRequest("GET", base, nil)
+	req, err := http.NewRequest("GET", addr, nil)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -247,7 +246,7 @@ func startConsole(c *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		req, err := http.NewRequest("POST", base, bytes.NewBuffer(byt))
+		req, err := http.NewRequest("POST", addr, bytes.NewBuffer(byt))
 		if err != nil {
 			return err
 		}
