@@ -78,13 +78,14 @@ Then run the following in your terminal to download the plugins:
 
 ```bash
 $ abot plugin install
-Fetching 3 plugins...
+Fetching 2 plugins...
+Installing plugins...
 Success!
 ```
 
-That will download the plugins to the `/plugins` directory. Once you've
-integrated the plugins, recompile and run Abot again: `abot server`. You can
-use the included Abot console to communicate with Abot locally:
+That will download the plugins into your `$GOPATH` and install them into Abot.
+Once you've installed the plugins, run Abot again: `abot server`. You can use
+the included Abot console to communicate with Abot locally:
 
 ```bash
 $ abot console +13105555555
