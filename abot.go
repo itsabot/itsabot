@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -26,6 +27,9 @@ import (
 )
 
 var conf *core.PluginJSON
+
+// PathError is thrown when GOPATH cannot be located
+var PathError = errors.New("GOPATH env variable not set")
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -298,8 +302,12 @@ func installPlugins() {
 			var outB []byte
 			if version != "*" {
 				l.Debug("checking out", url, "at", version)
-				p := filepath.Join(os.Getenv("GOPATH"), "src",
-					url)
+				path := os.Getenv("GOPATH")
+				if path == "" {
+					l.Fatal(PathError)
+				}
+				tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+				p := filepath.Join(tokenizedPath[0], "src", url)
 				c := fmt.Sprintf("git -C %s checkout %s", p, version)
 				outB, err = exec.
 					Command("/bin/sh", "-c", c).
@@ -389,8 +397,13 @@ func updatePlugins() {
 }
 
 func updateGlockfileAndInstall(l *log.Logger) {
+	path := os.Getenv("GOPATH")
+	if path == "" {
+		l.Fatal(PathError)
+	}
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
 	outC, err := exec.
-		Command("/bin/sh", "-c", `pwd | sed "s|$GOPATH/src/||"`).
+		Command("/bin/sh", "-c", `pwd | sed "s|`+tokenizedPath[0]+`/src/||"`).
 		CombinedOutput()
 	if err != nil {
 		l.Info(string(outC))

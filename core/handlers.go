@@ -75,7 +75,9 @@ func newRouter() *httprouter.Router {
 func HIndex(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if os.Getenv("ABOT_ENV") != "production" {
-		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
+		path := os.Getenv("GOPATH")
+		tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+		p := filepath.Join(tokenizedPath[0], "src", "github.com",
 			"itsabot", "abot", "assets", "html", "layout.html")
 		tmplLayout, err = template.ParseFiles(p)
 		if err != nil {
@@ -530,9 +532,11 @@ func HAPIPlugins(w http.ResponseWriter, r *http.Request) {
 	var pJSON struct {
 		Plugins []json.RawMessage
 	}
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
 	for url := range plugins.Dependencies {
 		// Add each plugin.json to array of plugins
-		p := filepath.Join(os.Getenv("GOPATH"), "src", url,
+		p := filepath.Join(tokenizedPath[0], "src", url,
 			"plugin.json")
 		var byt []byte
 		byt, err = ioutil.ReadFile(p)

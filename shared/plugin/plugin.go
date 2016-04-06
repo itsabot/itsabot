@@ -17,6 +17,9 @@ import (
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
 
+// PathError is thrown when GOPATH cannot be located
+var PathError = errors.New("GOPATH env variable not set")
+
 // ErrMissingPluginName is returned when a plugin name is expected, but
 // but a blank name is provided.
 var ErrMissingPluginName = errors.New("missing plugin name")
@@ -41,8 +44,16 @@ func New(url string, trigger *nlp.StructuredInput,
 		return &dt.Plugin{}, ErrMissingPluginFns
 	}
 	// Read plugin.json, unmarshal into struct
-	p := filepath.Join(os.Getenv("GOPATH"), "src", url, "plugin.json")
-	contents, err := ioutil.ReadFile(p)
+	var contents []byte
+	var err error
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	for _, subPath := range tokenizedPath {
+		p := filepath.Join(subPath, "src", url, "plugin.json")
+		if contents, err = ioutil.ReadFile(p); err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

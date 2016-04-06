@@ -27,6 +27,9 @@ var ner Classifier
 var offensive map[string]struct{}
 var smsConn *sms.Conn
 
+// PathError is thrown when GOPATH cannot be located
+var PathError = errors.New("GOPATH env variable not set")
+
 // DB returns a connection to the database.
 func DB() *sqlx.DB {
 	return db
@@ -65,7 +68,9 @@ func NewServer() (r *httprouter.Router, err error) {
 	}
 	var p string
 	if err == nil {
-		p = filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath)
+		path := os.Getenv("GOPATH")
+		tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+		p = filepath.Join(tokenizedPath[0], "src", conf.ImportPath)
 		if err = os.Setenv("ABOT_PATH", p); err != nil {
 			return nil, err
 		}
@@ -156,7 +161,9 @@ func NewServer() (r *httprouter.Router, err error) {
 // boot. In development, this step is repeated on each server HTTP request prior
 // to serving any assets.
 func CompileAssets() error {
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	p := filepath.Join(tokenizedPath[0], "src", "github.com", "itsabot",
 		"abot", "cmd", "compileassets.sh")
 	outC, err := exec.
 		Command("/bin/sh", "-c", p).
@@ -211,7 +218,9 @@ func ConnectDB() (*sqlx.DB, error) {
 // LoadConf plugins.json into a usable struct.
 func LoadConf() (*PluginJSON, error) {
 	ipath := "github.com/itsabot/abot"
-	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "plugins.json")
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	p := filepath.Join(tokenizedPath[0], "src", ipath, "plugins.json")
 	contents, err := ioutil.ReadFile(p)
 	if err != nil {
 		if err.Error() != "open plugins.json: no such file or directory" {
@@ -231,7 +240,12 @@ func LoadConf() (*PluginJSON, error) {
 
 func LoadEnvVars() error {
 	ipath := "github.com/itsabot/abot"
-	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "abot.env")
+	path := os.Getenv("GOPATH")
+	if len(path) == 0 {
+		log.Fatal(PathError)
+	}
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	p := filepath.Join(tokenizedPath[0], "src", ipath, "abot.env")
 	fi, err := os.Open(p)
 	if os.IsNotExist(err) {
 		// Assume the user has loaded their env variables into their

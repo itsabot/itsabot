@@ -45,7 +45,9 @@ func (c Classifier) ClassifyTokens(tokens []string) *nlp.StructuredInput {
 // context in the sentence.
 func buildClassifier() (Classifier, error) {
 	ner := Classifier{}
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	p := filepath.Join(tokenizedPath[0], "src", "github.com", "itsabot",
 		"abot", "data", "ner")
 	fi, err := os.Open(filepath.Join(p, "nouns.txt"))
 	if err != nil {
@@ -104,7 +106,9 @@ func buildClassifier() (Classifier, error) {
 // before any human ever sees them.
 func buildOffensiveMap() (map[string]struct{}, error) {
 	o := map[string]struct{}{}
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+	path := os.Getenv("GOPATH")
+	tokenizedPath := strings.Split(path, string(os.PathListSeparator))
+	p := filepath.Join(tokenizedPath[0], "src", "github.com", "itsabot",
 		"abot", "data", "offensive.txt")
 	fi, err := os.Open(p)
 	if err != nil {
