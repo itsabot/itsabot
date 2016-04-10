@@ -22,7 +22,7 @@ func TestSearch(t *testing.T) {
 	var err error
 	if testing.Short() {
 		log.Info("stubbing plugin search results in short mode.")
-		byt = []byte(`[{"Name":"plugin_weather"}]`)
+		byt = []byte(`[{"Name":{"String":"Weather","Valid":true}}]`)
 	} else {
 		byt, err = searchItsAbot(query)
 		if err != nil {
@@ -38,7 +38,7 @@ func TestSearch(t *testing.T) {
 	if !strings.Contains(tmp, "NAME") {
 		t.Fatal(err)
 	}
-	if !strings.Contains(tmp, "plugin_weather") {
+	if !strings.Contains(tmp, "Weather") {
 		t.Fatal(err)
 	}
 }
