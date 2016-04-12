@@ -284,7 +284,10 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 // key that does not exist.
 func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
 	q := `DELETE FROM states WHERE userid=$1 AND pluginname=$2 AND key=$3`
-	sm.db.Exec(q, in.User.ID, sm.pluginName, k)
+	_, err := sm.db.Exec(q, in.User.ID, sm.pluginName, k)
+	if err != nil {
+		sm.logger.Debug("could not delete memory for key", k, ":", err)
+	}
 }
 
 // HasMemory is a helper function to simply a common use-case, determing if some
