@@ -280,6 +280,16 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 	return Memory{Key: k, Val: buf, logger: sm.logger}
 }
 
+// DeleteMemory deletes a memory for a given key. It is not an error to delete a
+// key that does not exist.
+func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
+	q := `DELETE FROM states WHERE userid=$1 AND pluginname=$2 AND key=$3`
+	_, err := sm.db.Exec(q, in.User.ID, sm.pluginName, k)
+	if err != nil {
+		sm.logger.Debug("could not delete memory for key", k, ":", err)
+	}
+}
+
 // HasMemory is a helper function to simply a common use-case, determing if some
 // key/value has been set in Ava, i.e. if the memory exists.
 func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
