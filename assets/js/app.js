@@ -25,34 +25,34 @@ abot.signout = function(ev) {
 		url: "/api/logout.json",
 		method: "POST",
 	}).then(function() {
-		cookie.removeItem("id")
-		cookie.removeItem("email")
-		cookie.removeItem("issuedAt")
-		cookie.removeItem("scopes")
-		cookie.removeItem("csrfToken")
-		cookie.removeItem("authToken")
+		Cookies.expire("id")
+		Cookies.expire("email")
+		Cookies.expire("issuedAt")
+		Cookies.expire("scopes")
+		Cookies.expire("csrfToken")
+		Cookies.expire("authToken")
 		m.route("/login")
 	}, function(err) {
 		console.error(err)
 	})
 }
 abot.isLoggedIn = function() {
-	if (cookie.getItem("id") != null &&
-		cookie.getItem("email") != null &&
-		cookie.getItem("issuedAt") != null &&
-	    cookie.getItem("authToken") != null) {
+	if (Cookies.get("id") != null &&
+		Cookies.get("email") != null &&
+		Cookies.get("issuedAt") != null &&
+	    Cookies.get("authToken") != null) {
 		return true
 	}
 	// If the user isn't logged in, ensure we clean out all cookies.
-	cookie.setItem("id", null)
-	cookie.setItem("email", null)
-	cookie.setItem("issuedAt", null)
-	cookie.setItem("scopes", null)
-	cookie.setItem("authToken", null)
+	Cookies.expire("id", null)
+	Cookies.expire("email", null)
+	Cookies.expire("issuedAt", null)
+	Cookies.expire("scopes", null)
+	Cookies.expire("authToken", null)
 	return false
 }
 abot.isAdmin = function() {
-	var scopes = cookie.getItem("scopes")
+	var scopes = Cookies.get("scopes")
 	if (scopes == null) {
 		return false
 	}
@@ -66,8 +66,8 @@ abot.isAdmin = function() {
 }
 abot.request = function(opts) {
 	opts.config = function(xhr) {
-		xhr.setRequestHeader("Authorization", "Bearer " + cookie.getItem("authToken"))
-		xhr.setRequestHeader("X-CSRF-Token", cookie.getItem("csrfToken"))
+		xhr.setRequestHeader("Authorization", "Bearer " + Cookies.get("authToken"))
+		xhr.setRequestHeader("X-CSRF-Token", Cookies.get("csrfToken"))
 	}
 	return m.request(opts)
 }
