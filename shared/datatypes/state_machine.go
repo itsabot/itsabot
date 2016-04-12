@@ -188,6 +188,7 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 			done, _ := h.Complete(in)
 			if done {
 				sm.logger.Debug("state was complete. moving on")
+		                sm.state++
 				return sm.Next(in)
 			}
 		}
