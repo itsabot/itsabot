@@ -210,8 +210,8 @@ func ConnectDB() (*sqlx.DB, error) {
 
 // LoadConf plugins.json into a usable struct.
 func LoadConf() (*PluginJSON, error) {
-	ipath := "github.com/itsabot/abot"
-	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "plugins.json")
+	p := filepath.Join(os.Getenv("GOPATH"), "src",
+		"github.com/itsabot/abot", "plugins.json")
 	contents, err := ioutil.ReadFile(p)
 	if err != nil {
 		if err.Error() != "open plugins.json: no such file or directory" {
@@ -229,9 +229,17 @@ func LoadConf() (*PluginJSON, error) {
 	return plugins, nil
 }
 
+// LoadEnvVars from abot.env into memory
 func LoadEnvVars() error {
-	ipath := "github.com/itsabot/abot"
-	p := filepath.Join(os.Getenv("GOPATH"), "src", ipath, "abot.env")
+	if len(os.Getenv("ITSABOT_URL")) == 0 {
+		log.Info("ITSABOT_URL not set")
+		err := os.Setenv("ITSABOT_URL", "https://www.itsabot.org")
+		if err != nil {
+			return err
+		}
+	}
+	p := filepath.Join(os.Getenv("GOPATH"), "src",
+		"github.com/itsabot/abot", "abot.env")
 	fi, err := os.Open(p)
 	if os.IsNotExist(err) {
 		// Assume the user has loaded their env variables into their

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,10 +20,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	_ "github.com/lib/pq" // Postgres driver
 )
 
 var conf *core.PluginJSON
@@ -65,8 +69,9 @@ func main() {
 			Usage:   "manage and install plugins from plugins.json",
 			Subcommands: []cli.Command{
 				{
-					Name:  "install",
-					Usage: "download and install plugins listed in plugins.json",
+					Name:    "install",
+					Aliases: []string{"i"},
+					Usage:   "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
 						installPlugins()
 					},
@@ -95,6 +100,22 @@ func main() {
 						updatePlugins()
 					},
 				},
+				{
+					Name:    "publish",
+					Aliases: []string{"p"},
+					Usage:   "publish a plugin to itsabot.org",
+					Action: func(c *cli.Context) {
+						publishPlugin(c)
+					},
+				},
+			},
+		},
+		{
+			Name:    "login",
+			Aliases: []string{"l"},
+			Usage:   "log into itsabot.org to enable publishing plugins",
+			Action: func(c *cli.Context) {
+				login()
 			},
 		},
 		{
@@ -146,11 +167,9 @@ func searchPlugins(query string) error {
 func outputPluginResults(w io.Writer, byt []byte) error {
 	var results []struct {
 		ID            uint64
-		Name          string
-		Username      string
-		Description   string
+		Name          sql.NullString
+		Description   sql.NullString
 		Path          string
-		Readme        string
 		DownloadCount uint64
 		Similarity    float64
 	}
@@ -159,17 +178,17 @@ func outputPluginResults(w io.Writer, byt []byte) error {
 	}
 	writer := tabwriter.Writer{}
 	writer.Init(w, 0, 8, 1, '\t', 0)
-	_, err := writer.Write([]byte("NAME\tDESCRIPTION\tUSERNAME\tDOWNLOADS\n"))
+	_, err := writer.Write([]byte("NAME\tDESCRIPTION\tDOWNLOADS\n"))
 	if err != nil {
 		return err
 	}
 	for _, result := range results {
 		d := result.Description
-		if len(result.Description) >= 30 {
-			d = d[:27] + "..."
+		if len(result.Description.String) >= 30 {
+			d.String = d.String[:27] + "..."
 		}
-		_, err = writer.Write([]byte(fmt.Sprintf("%s\t%s\t%s\t%d\n",
-			result.Name, d, result.Username, result.DownloadCount)))
+		_, err = writer.Write([]byte(fmt.Sprintf("%s\t%s\t%d\n",
+			result.Name.String, d.String, result.DownloadCount)))
 		if err != nil {
 			return err
 		}
@@ -178,7 +197,7 @@ func outputPluginResults(w io.Writer, byt []byte) error {
 }
 
 func searchItsAbot(q string) ([]byte, error) {
-	u := fmt.Sprintf("https://www.itsabot.org/api/search.json?q=%s",
+	u := fmt.Sprintf("%s/api/plugins/search/%s", os.Getenv("ITSABOT_URL"),
 		url.QueryEscape(q))
 	client := http.Client{Timeout: 10 * time.Second}
 	res, err := client.Get(u)
@@ -321,11 +340,7 @@ func installPlugins() {
 				return
 			}
 			var u string
-			if len(os.Getenv("ITSABOT_URL")) > 0 {
-				u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
-			} else {
-				u = "https://www.itsabot.org/api/plugins.json"
-			}
+			u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
 			resp, errB := http.Post(u, "application/json",
 				bytes.NewBuffer(outB))
 			if errB != nil {
@@ -446,4 +461,155 @@ func buildPluginFile(l *log.Logger) *core.PluginJSON {
 	}
 
 	return plugins
+}
+
+func login() {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Email: ")
+	email, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Print("Password: ")
+	pass, err := terminal.ReadPassword(0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	email = email[:len(email)-1]
+	req := struct {
+		Email    string
+		Password string
+	}{
+		Email:    email,
+		Password: string(pass),
+	}
+	fmt.Println()
+	byt, err := json.Marshal(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	u := os.Getenv("ITSABOT_URL") + "/api/users/login.json"
+	resp, err := http.Post(u, "application/json", bytes.NewBuffer(byt))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	var data struct {
+		ID        uint64
+		Email     string
+		Scopes    []string
+		AuthToken string
+		IssuedAt  uint64
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		log.Fatal(err)
+	}
+	if resp.StatusCode == 401 {
+		log.Fatal(errors.New("invalid email/password combination"))
+	}
+
+	// Create abot.conf file, truncate if exists
+	fi, err := os.Create(filepath.Join(os.Getenv("HOME"), ".abot.conf"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err = fi.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// Insert auth data
+	s := fmt.Sprintf("%d\n%s\n%s\n%d", data.ID, data.Email, data.AuthToken,
+		data.IssuedAt)
+	_, err = fi.WriteString(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Info("Success!")
+}
+
+func publishPlugin(c *cli.Context) {
+	p := filepath.Join(os.Getenv("HOME"), ".abot.conf")
+	fi, err := os.Open(p)
+	if err != nil {
+		fmt.Sprintln(err.Error())
+		if err.Error() == fmt.Sprintf("open %s: no such file or directory", p) {
+			login()
+			publishPlugin(c)
+			return
+		} else {
+			log.Fatal(err)
+		}
+	}
+	defer func() {
+		if err = fi.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	// Prepare request
+	if len(c.Args().First()) == 0 {
+		log.Fatal("missing plugin's `go get` path")
+	}
+	reqData := struct{ Path string }{Path: c.Args().First()}
+	byt, err := json.Marshal(reqData)
+	if err != nil {
+		log.Fatal(err)
+	}
+	u := os.Getenv("ITSABOT_URL") + "/api/plugins.json"
+	req, err := http.NewRequest("POST", u, bytes.NewBuffer(byt))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Populate req with login credentials from ~/.abot.conf
+	scn := bufio.NewScanner(fi)
+	var lineNum int
+	for scn.Scan() {
+		line := scn.Text()
+		cookie := &http.Cookie{}
+		switch lineNum {
+		case 0:
+			cookie.Name = "id"
+		case 1:
+			cookie.Name = "email"
+		case 2:
+			req.Header.Set("Authorization", "Bearer "+line)
+		case 3:
+			cookie.Name = "issuedAt"
+		default:
+			log.Fatal("unknown line in abot.conf")
+		}
+		if lineNum != 2 {
+			cookie.Value = url.QueryEscape(line)
+			req.AddCookie(cookie)
+		}
+		lineNum++
+	}
+	if err = scn.Err(); err != nil {
+		log.Fatal(err)
+	}
+	cookie := &http.Cookie{}
+	cookie.Name = "scopes"
+	req.AddCookie(cookie)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}()
+	if resp.StatusCode != 202 {
+		log.Fatal("something went wrong", resp.StatusCode)
+	}
+	log.Info("Success! Published plugin to itsabot.org. View it here: https://www.itsabot.org/profile")
 }

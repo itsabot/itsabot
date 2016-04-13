@@ -30,5 +30,6 @@ install:
 script:
         - export PORT=4200
         - export ABOT_URL=http://localhost
+        - export ITSABOT_URL=https://www.itsabot.org
         - go test ./...
         - go test -short ./...
