@@ -28,6 +28,11 @@ type User struct {
 	LastAuthenticated        *time.Time
 	Admin                    bool
 
+	// FlexID and FlexIDType are particularly useful when a user has not
+	// yet registered.
+	FlexID     string
+	FlexIDType FlexIDType
+
 	// Trainer determines whether the user has access to the training
 	// interface and will be notified via email when new training is
 	// required
@@ -42,9 +47,6 @@ const (
 	fidtEmail FlexIDType = iota + 1 // 1
 	fidtPhone                       // 2
 )
-
-// ErrMissingUser is returned when a user expected, but none found.
-var ErrMissingUser = errors.New("missing user")
 
 // ErrMissingFlexIDType is returned when a FlexIDType is expected, but
 // none found.
@@ -61,6 +63,9 @@ var ErrInvalidFlexIDType = errors.New("invalid flexid type")
 
 // GetUser from an HTTP request.
 func GetUser(db *sqlx.DB, req *Request) (*User, error) {
+	u := &User{}
+	u.FlexID = req.FlexID
+	u.FlexIDType = req.FlexIDType
 	if req.UserID == 0 {
 		if req.FlexID == "" {
 			return nil, ErrMissingFlexID
@@ -78,7 +83,7 @@ func GetUser(db *sqlx.DB, req *Request) (*User, error) {
 		      ORDER BY createdat DESC`
 		err := db.Get(&req.UserID, q, req.FlexID, req.FlexIDType)
 		if err == sql.ErrNoRows {
-			return nil, ErrMissingUser
+			return u, nil
 		}
 		log.Debug("got uid", req.UserID)
 		if err != nil {
@@ -88,10 +93,9 @@ func GetUser(db *sqlx.DB, req *Request) (*User, error) {
 	q := `SELECT id, name, email, lastauthenticated, paymentserviceid
 	      FROM users
 	      WHERE id=$1`
-	u := &User{}
 	if err := db.Get(u, q, req.UserID); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, ErrMissingUser
+			return u, nil
 		}
 		return nil, err
 	}
@@ -106,6 +110,12 @@ func (u *User) GetName() string {
 // GetEmail satisfies the Contactable interface
 func (u *User) GetEmail() string {
 	return u.Email
+}
+
+// Registered checks whether the current user has signed up or associated his
+// flexID with this user account.
+func (u *User) Registered() bool {
+	return u.ID > 0
 }
 
 // Create a new user in the database.

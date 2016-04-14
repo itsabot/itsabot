@@ -56,10 +56,11 @@ func (m *Msg) Update(db *sqlx.DB) error {
 // Save a message to the database, updating the message ID.
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
-	      (userid, sentence, plugin, route, abotsent, needstraining)
-	      VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	      (userid, sentence, plugin, route, abotsent, needstraining, flexid,
+		flexidtype)
+	      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Plugin, m.Route,
-		m.AbotSent, m.NeedsTraining)
+		m.AbotSent, m.NeedsTraining, m.User.FlexID, m.User.FlexIDType)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}

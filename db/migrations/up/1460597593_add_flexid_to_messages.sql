@@ -1,0 +1,2 @@
+ALTER TABLE messages ADD COLUMN flexid VARCHAR(255);
+ALTER TABLE messages ADD COLUMN flexidtype INTEGER;
