@@ -332,7 +332,7 @@ func installPlugins() {
 			// Anonymously increment the plugin's download count
 			// at itsabot.org
 			l.Debug("incrementing download count", url)
-			p := struct{ URL string }{URL: url}
+			p := struct{ Path string }{Path: url}
 			outB, err = json.Marshal(p)
 			if err != nil {
 				l.Info("failed to build itsabot.org JSON.", err)
@@ -341,8 +341,14 @@ func installPlugins() {
 			}
 			var u string
 			u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
-			resp, errB := http.Post(u, "application/json",
-				bytes.NewBuffer(outB))
+			req, errB := http.NewRequest("PUT", u, bytes.NewBuffer(outB))
+			if errB != nil {
+				l.Info("failed to build request to itsabot.org.", errB)
+				wg.Done()
+				return
+			}
+			client := &http.Client{Timeout: 10 * time.Second}
+			resp, errB := client.Do(req)
 			if errB != nil {
 				l.Info("failed to update itsabot.org.", errB)
 				wg.Done()
@@ -537,7 +543,6 @@ func publishPlugin(c *cli.Context) {
 	p := filepath.Join(os.Getenv("HOME"), ".abot.conf")
 	fi, err := os.Open(p)
 	if err != nil {
-		fmt.Sprintln(err.Error())
 		if err.Error() == fmt.Sprintf("open %s: no such file or directory", p) {
 			login()
 			publishPlugin(c)
