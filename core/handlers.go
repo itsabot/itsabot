@@ -96,7 +96,7 @@ func HIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // HMain is the endpoint to hit when you want a direct response via JSON.
-// The Abot console (abotc) uses this endpoint.
+// The Abot console uses this endpoint.
 func HMain(w http.ResponseWriter, r *http.Request) {
 	errMsg := "Something went wrong with my wiring... I'll get that fixed up soon."
 	ret, _, err := ProcessText(r)
