@@ -1,8 +1,12 @@
 package language
 
 import (
-	"database/sql"
 	"encoding/xml"
+	"errors"
+	"github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/helpers/address"
+	"github.com/jmoiron/sqlx"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -10,85 +14,62 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/helpers/address"
-	"github.com/itsabot/abot/core/log"
-	"github.com/jmoiron/sqlx"
 )
 
 var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
 var regexNum = regexp.MustCompile(`\d+`)
 var regexNonWords = regexp.MustCompile(`[^\w\s]`)
 
-// ExtractCurrency returns a pointer to a string to allow a user a simple check
-// to see if currency text was found. If the response is nil, no currency was
-// found. This API design also maintains consistency when we want to extract and
-// return a struct (which should be returned as a pointer).
-func ExtractCurrency(s string) sql.NullInt64 {
+// ErrNotFound is thrown when the requested type cannot be found in the string
+var ErrNotFound error = errors.New("couldn't extract requested type from string")
+
+// ExtractCurrency returns an int64 if a currency is found, and throws an
+// error if one isn't.
+func ExtractCurrency(s string) (int64, error) {
 	log.Debug("extracting currency")
-	n := sql.NullInt64{
-		Int64: 0,
-		Valid: false,
-	}
 	s = regexCurrency.FindString(s)
 	if len(s) == 0 {
-		return n
+		return 0, ErrNotFound
 	}
 	val, err := strconv.ParseFloat(s, 64)
 	if err != nil {
-		return n
+		return 0, err
 	}
 	log.Debug("found value", val)
-	n.Int64 = int64(val * 100)
-	n.Valid = true
-	return n
+	// convert parsed float into an int64 with precision of 2 decimal places
+	return int64(val * 100), nil
 }
 
-// ExtractYesNo determines whether a string (typically a sentence sent by a
-// user to Abot) contains a Yes or No response. This is useful for plugins to
-// determine a user's answer to a Yes/No question.
-//
-// TODO should be converted to return a *bool for consistency with the rest of
-// the Extract API.
-func ExtractYesNo(s string) sql.NullBool {
+// ExtractYesNo determines whether a string contains a Yes or No response.
+// This is useful for plugins to determine a user's answer to a Yes/No question.
+func ExtractYesNo(s string) (bool, error) {
 	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
 		w = strings.TrimRight(w, " .,;:!?'\"")
 		if yes[w] {
-			return sql.NullBool{
-				Bool:  true,
-				Valid: true,
-			}
+			return true, nil
 		}
 		if no[w] {
-			return sql.NullBool{
-				Bool:  false,
-				Valid: true,
-			}
+			return false, nil
 		}
 	}
-	return sql.NullBool{
-		Bool:  false,
-		Valid: false,
-	}
+	return false, ErrNotFound
 }
 
 // ExtractAddress will return an address from a user's message, whether it's a
 // labeled address (e.g. "home", "office"), or a full U.S. address (e.g. 100
 // Penn St., CA 90000)
-func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
-	error) {
+func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool, error) {
 	addr, err := address.Parse(s)
 	if err != nil {
-		// check DB for historical information associated with that user
-		log.Debug("fetching historical address")
-		addr, err = u.GetAddress(db, s)
-		if err != nil {
-			return nil, false, err
+		// check if user's address is in DB already
+		log.Debug("Checking if user address already in DB...")
+		if addr, err = u.GetAddress(db, s); err == nil {
+			return addr, true, nil
 		}
-		return addr, true, nil
+		return nil, false, err
 	}
+
 	type addr2S struct {
 		XMLName  xml.Name `xml:"Address"`
 		ID       string   `xml:"ID,attr"`
@@ -173,26 +154,17 @@ func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool,
 // ExtractCount returns a number from a user's message, useful in situations
 // like:
 //	Ava>  How many would you like to buy?
-//	User> Order 5.
-//
-// TODO this should return an *int64 to maintain consistency with the Extract
-// API.
-func ExtractCount(s string) sql.NullInt64 {
-	n := sql.NullInt64{
-		Int64: 0,
-		Valid: false,
-	}
+//	User> Order 5
+func ExtractCount(s string) (int64, error) {
 	s = regexNum.FindString(s)
 	if len(s) == 0 {
-		return n
+		return 0, ErrNotFound
 	}
-	val, err := strconv.ParseUint(s, 10, 64)
+	val, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return n
+		return 0, err
 	}
-	n.Int64 = int64(val)
-	n.Valid = true
-	return n
+	return val, nil
 }
 
 // ExtractCities efficiently from a user's message.
