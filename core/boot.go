@@ -16,6 +16,7 @@ import (
 
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/interface/email"
 	"github.com/itsabot/abot/shared/interface/sms"
 	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
@@ -26,6 +27,7 @@ var db *sqlx.DB
 var ner Classifier
 var offensive map[string]struct{}
 var smsConn *sms.Conn
+var emailConn *email.Conn
 
 // DB returns a connection to the database.
 func DB() *sqlx.DB {
@@ -104,6 +106,18 @@ func NewServer() (r *httprouter.Router, err error) {
 		}
 	} else {
 		log.Debug("no sms drivers imported")
+	}
+
+	// Open a connection to an email service
+	if len(email.Drivers()) > 0 {
+		drv := email.Drivers()[0]
+		emailConn, err = email.Open(drv, r)
+		if err != nil {
+			log.Info("failed to open email driver connection", drv,
+				err)
+		}
+	} else {
+		log.Debug("no email drivers imported")
 	}
 
 	// Listen for events that need to be sent.
