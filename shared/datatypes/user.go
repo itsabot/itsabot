@@ -145,6 +145,11 @@ func (u *User) Create(db *sqlx.DB, fidT FlexIDType, fid string) error {
 	}
 	q = `INSERT INTO userflexids (userid, flexid, flexidtype)
 	     VALUES ($1, $2, $3)`
+	_, err = tx.Exec(q, uid, u.Email, 1)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
 	_, err = tx.Exec(q, uid, fid, 2)
 	if err != nil {
 		_ = tx.Rollback()
