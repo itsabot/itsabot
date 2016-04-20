@@ -3,7 +3,7 @@ abot.Header = {}
 abot.Header.view = function() {
 	var tour = null
 	var profileOrLogin
-	if (cookie.getItem("id") !== null) {
+	if (Cookies.get("id") !== null) {
 		profileOrLogin = [
 			m("a[href=/profile]", {
 				config: m.route

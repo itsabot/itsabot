@@ -1,7 +1,7 @@
 (function(abot) {
 abot.Profile = {}
 abot.Profile.controller = function() {
-	var userId = cookie.getItem("id")
+	var userId = Cookies.get("id")
 	abot.Login.checkAuth(function(loggedIn) {
 		console.log("logged in?", loggedIn)
 		if (!loggedIn) {

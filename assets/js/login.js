@@ -22,12 +22,12 @@ abot.Login.controller = function() {
 				secure = false
 			}
 			console.log(data)
-			cookie.setItem("id", data.ID, exp, null, null, secure)
-			cookie.setItem("email", data.Email, exp, null, null, secure)
-			cookie.setItem("issuedAt", data.IssuedAt, exp, null, null, secure)
-			cookie.setItem("authToken", data.AuthToken, exp, null, null, secure)
-			cookie.setItem("csrfToken", data.CSRFToken, exp, null, null, secure)
-			cookie.setItem("scopes", data.Scopes, exp, null, null, secure)
+			Cookies.set("id", data.ID, exp, null, null, secure)
+			Cookies.set("email", data.Email, exp, null, null, secure)
+			Cookies.set("issuedAt", data.IssuedAt, exp, null, null, secure)
+			Cookies.set("authToken", data.AuthToken, exp, null, null, secure)
+			Cookies.set("csrfToken", data.CSRFToken, exp, null, null, secure)
+			Cookies.set("scopes", data.Scopes, exp, null, null, secure)
 			if (m.route.param("r") == null) {
 				return m.route("/profile")
 			}
@@ -99,9 +99,9 @@ abot.Login.view = function(ctrl) {
 	])
 }
 abot.Login.checkAuth = function(callback) {
-	var id = cookie.getItem("id")
-	var issuedAt = cookie.getItem("issuedAt")
-	var email = cookie.getItem("email")
+	var id = Cookies.get("id")
+	var issuedAt = Cookies.get("issuedAt")
+	var email = Cookies.get("email")
 	if (id != null && id !== "undefined" &&
 		issuedAt != null && issuedAt !== "undefined" &&
 		email != null && email !== "undefined") {

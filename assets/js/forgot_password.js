@@ -19,7 +19,7 @@ abot.ForgotPassword.controller = function() {
 		})
 	},
 	ctrl.checkAuth = function(callback) {
-		if (cookie.getItem("id") !== null) {
+		if (Cookies.get("id") !== null) {
 			callback(true)
 		}
 	}
