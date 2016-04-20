@@ -1,7 +1,7 @@
 *.sw*
 .DS_Store
 client_secret.json
-public/*
-Procfile
 plugins.go
 abot.env
+public/js/main.js
+public/css/main.css

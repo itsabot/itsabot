@@ -3,9 +3,9 @@
 package plugin
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,19 +35,47 @@ func New(url string, trigger *nlp.StructuredInput,
 	fns *dt.PluginFns) (*dt.Plugin, error) {
 
 	if trigger == nil {
-		return &dt.Plugin{}, ErrMissingTrigger
+		return nil, ErrMissingTrigger
 	}
 	if fns == nil || fns.Run == nil || fns.FollowUp == nil {
-		return &dt.Plugin{}, ErrMissingPluginFns
+		return nil, ErrMissingPluginFns
 	}
-	// Read plugin.json, unmarshal into struct
-	p := filepath.Join(os.Getenv("GOPATH"), "src", url, "plugin.json")
-	contents, err := ioutil.ReadFile(p)
+
+	// Read plugin.json data from within plugins.go, unmarshal into struct
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "plugins.go")
+	fi, err := os.Open(p)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := fi.Close(); err != nil {
+			log.Info("failed to close file", fi.Name())
+			return
+		}
+	}()
+	var found bool
+	var data string
+	scn := bufio.NewScanner(fi)
+	for scn.Scan() {
+		t := scn.Text()
+		if !found && t != url {
+			continue
+		} else if t == url {
+			found = true
+			continue
+		} else if len(t) >= 1 && t[0] == '}' {
+			data += t
+			break
+		}
+		data += t
+	}
+	if err := scn.Err(); err != nil {
+		return nil, err
+	}
+
 	c := dt.PluginConfig{}
-	if err = json.Unmarshal(contents, &c); err != nil {
+	if err = json.Unmarshal([]byte(data), &c); err != nil {
 		return nil, err
 	}
 	if len(c.Name) == 0 {
