@@ -60,9 +60,9 @@ func NewServer() (r *httprouter.Router, err error) {
 		return nil, err
 	}
 
-	// Get ImportPath from plugins.json
 	conf, err := LoadConf()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
+		log.Info("failed loading conf", err)
 		return nil, err
 	}
 	var p string
@@ -73,11 +73,13 @@ func NewServer() (r *httprouter.Router, err error) {
 		}
 	}
 
-	if os.Getenv("ABOT_ENV") != "test" {
-		if err = CompileAssets(); err != nil {
-			return nil, err
+	/*
+		if os.Getenv("ABOT_ENV") != "test" {
+			if err = CompileAssets(); err != nil {
+				return nil, err
+			}
 		}
-	}
+	*/
 	ner, err = buildClassifier()
 	if err != nil {
 		log.Debug("could not build classifier", err)
@@ -86,11 +88,10 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err != nil {
 		log.Debug("could not build offensive map", err)
 	}
-	if len(p) > 0 {
-		p = filepath.Join(p, "assets", "html", "layout.html")
-		if err = loadHTMLTemplate(p); err != nil {
-			return nil, err
-		}
+	p2 := filepath.Join("assets", "html", "layout.html")
+	if err = loadHTMLTemplate(p, p2); err != nil {
+		log.Info("failed loading HTML template", err)
+		return nil, err
 	}
 
 	// Initialize a router with routes
@@ -182,9 +183,12 @@ func CompileAssets() error {
 	return nil
 }
 
-func loadHTMLTemplate(p string) error {
+func loadHTMLTemplate(p, p2 string) error {
 	var err error
-	tmplLayout, err = template.ParseFiles(p)
+	tmplLayout, err = template.ParseFiles(filepath.Join(p, p2))
+	if tmplLayout == nil {
+		tmplLayout, err = template.ParseFiles(p2)
+	}
 	return err
 }
 
@@ -208,25 +212,22 @@ func checkRequiredEnvVars() error {
 
 // ConnectDB opens a connection to the database.
 func ConnectDB() (*sqlx.DB, error) {
-	if err := LoadEnvVars(); err != nil {
-		return nil, err
-	}
 	dbConnStr := os.Getenv("ABOT_DATABASE_URL")
 	if dbConnStr == "" {
 		dbConnStr = "host=127.0.0.1 user=postgres"
 	}
-	dbConnStr += " sslmode=disable dbname=abot"
-	if strings.ToLower(os.Getenv("ABOT_ENV")) == "test" {
-		dbConnStr += "_test"
+	if len(dbConnStr) <= 11 || dbConnStr[:11] != "postgres://" {
+		dbConnStr += " sslmode=disable dbname=abot"
+		if strings.ToLower(os.Getenv("ABOT_ENV")) == "test" {
+			dbConnStr += "_test"
+		}
 	}
 	return sqlx.Connect("postgres", dbConnStr)
 }
 
 // LoadConf plugins.json into a usable struct.
 func LoadConf() (*PluginJSON, error) {
-	p := filepath.Join(os.Getenv("GOPATH"), "src",
-		"github.com/itsabot/abot", "plugins.json")
-	contents, err := ioutil.ReadFile(p)
+	contents, err := ioutil.ReadFile("plugins.json")
 	if err != nil {
 		if err.Error() != "open plugins.json: no such file or directory" {
 			return nil, err
@@ -246,14 +247,14 @@ func LoadConf() (*PluginJSON, error) {
 // LoadEnvVars from abot.env into memory
 func LoadEnvVars() error {
 	if len(os.Getenv("ITSABOT_URL")) == 0 {
-		log.Info("ITSABOT_URL not set")
+		log.Debug("ITSABOT_URL not set, using https://www.itsabot.org")
 		err := os.Setenv("ITSABOT_URL", "https://www.itsabot.org")
 		if err != nil {
 			return err
 		}
 	}
-	p := filepath.Join(os.Getenv("GOPATH"), "src",
-		"github.com/itsabot/abot", "abot.env")
+	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
+		"abot", "abot.env")
 	fi, err := os.Open(p)
 	if os.IsNotExist(err) {
 		// Assume the user has loaded their env variables into their

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="201px" height="270px" viewBox="0 0 201 270" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:sketch="http://www.bohemiancoding.com/sketch/ns">
+    <!-- Generator: Sketch 3.5.2 (25235) - http://www.bohemiancoding.com/sketch -->
+    <title>abot logo</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd" sketch:type="MSPage">
+        <path d="M45.5,12 L149.5,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45.5,60 L149.5,60" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M98,60.8950268 L98,80" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150.019226,80 L44.9952391,80" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150.019226,80 L150.019226,158.006165" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M132,158.006165 L150.019226,158.006165" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M113,142 L126,155" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M120,131 L112,139" id="Line" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M107,117 L120,131" id="Line" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45.0192261,80 L45.0192261,158.006165" id="Line-Copy-5" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M45,158.006165 L63.0192261,158.006165" id="Line-Copy-4" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M69,143 L82,156" id="Line-Copy-3" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(75.500000, 149.500000) scale(-1, 1) translate(-75.500000, -149.500000) "></path>
+        <path d="M82,131 L74,139" id="Line-Copy-2" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(78.000000, 135.000000) scale(-1, 1) translate(-78.000000, -135.000000) "></path>
+        <path d="M75,116 L88,130" id="Line-Copy" stroke="#000000" stroke-width="6" stroke-linecap="square" sketch:type="MSShapeGroup" transform="translate(81.500000, 123.000000) scale(-1, 1) translate(-81.500000, -123.000000) "></path>
+        <path d="M45,60 L45,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <path d="M150,60 L150,12" id="Line" stroke="#000000" stroke-width="12" stroke-linecap="square" sketch:type="MSShapeGroup"></path>
+        <circle id="Oval-1" fill="#000000" sketch:type="MSShapeGroup" cx="76.5" cy="34.5" r="6.5"></circle>
+        <circle id="Oval-1" fill="#000000" sketch:type="MSShapeGroup" cx="118.5" cy="34.5" r="6.5"></circle>
+        <rect id="Rectangle-1" fill="#000000" sketch:type="MSShapeGroup" x="89" y="122" width="16" height="16"></rect>
+        <path d="M43.52,240.36 L48.88,253 L58.96,253 L34.48,197 L24.8,197 L0.08,253 L9.92,253 L15.28,240.36 L43.52,240.36 Z M39.92,231.96 L18.8,231.96 L29.36,207.08 L39.92,231.96 Z M90.32,210.12 C83.68,210.12 78.56,212.84 75.44,217.8 L75.44,193.64 L66.24,193.64 L66.24,253 L75.44,253 L75.44,245.64 C78.56,250.6 83.68,253.32 90.48,253.32 C102.64,253.32 110.64,244.6 110.64,231.88 C110.64,218.92 102.4,210.12 90.32,210.12 L90.32,210.12 Z M88.4,245.48 C80.8,245.48 75.44,239.8 75.44,231.56 C75.44,223.56 80.8,217.8 88.4,217.8 C96,217.8 101.36,223.64 101.36,231.56 C101.36,239.72 96,245.48 88.4,245.48 L88.4,245.48 Z M138.48,210.12 C125.28,210.12 116.24,218.84 116.24,231.72 C116.24,244.52 125.28,253.32 138.48,253.32 C151.6,253.32 160.64,244.52 160.64,231.72 C160.64,218.84 151.6,210.12 138.48,210.12 L138.48,210.12 Z M138.48,218.04 C146.08,218.04 151.44,223.64 151.44,231.8 C151.44,240.04 146.08,245.64 138.48,245.64 C130.8,245.64 125.44,240.04 125.44,231.8 C125.44,223.64 130.8,218.04 138.48,218.04 L138.48,218.04 Z M192,243.24 C189.52,244.44 187.52,245.08 185.6,245.08 C182.72,245.08 181.04,243.72 181.04,239.32 L181.04,218.92 L193.6,218.92 L193.6,212.04 L181.04,212.04 L181.04,200.36 L171.92,200.36 L171.92,212.04 L165.92,212.04 L165.92,218.92 L171.92,218.92 L171.92,241 C171.92,249.72 177.44,253.4 183.84,253.4 C187.44,253.4 190.96,252.28 194.32,250.28 L192,243.24 Z" id="Abot" fill="#000000" sketch:type="MSShapeGroup"></path>
+    </g>
+</svg>
