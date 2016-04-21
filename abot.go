@@ -305,7 +305,10 @@ func installPlugins() {
 		CombinedOutput()
 	if err != nil {
 		l.Info(string(outC))
-		l.Fatal(err)
+		if err.Error() == "exit status 1" {
+			l.Info("Is a plugin trying to import a non-existent package?")
+		}
+		l.Fatal("Failed to install plugins.", err)
 	}
 
 	// Sync each of them to get dependencies
