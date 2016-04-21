@@ -66,9 +66,8 @@ to your plugin.json like so:
 ```json
 {
 	"Name": "abot",
-	"Version": "0.1.0",
+	"Version": "0.2.0-alpha",
 	"Dependencies": {
-		"github.com/itsabot/plugin_onboard": "*",
 		"github.com/itsabot/plugin_weather": "*"
 	}
 }
@@ -78,8 +77,8 @@ Then run the following in your terminal to download the plugins:
 
 ```bash
 $ abot plugin install
-Fetching 2 plugins...
-Installing plugins...
+Fetching 1 plugin...
+Installing plugin...
 Success!
 ```
 
