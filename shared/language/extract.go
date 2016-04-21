@@ -3,10 +3,6 @@ package language
 import (
 	"encoding/xml"
 	"errors"
-	"github.com/itsabot/abot/core/log"
-	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/helpers/address"
-	"github.com/jmoiron/sqlx"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -14,6 +10,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/itsabot/abot/core/log"
+	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/helpers/address"
+	"github.com/jmoiron/sqlx"
 )
 
 var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
@@ -186,7 +187,7 @@ func ExtractCities(db *sqlx.DB, in *dt.Msg) ([]dt.City, error) {
 
 	// Prepare sentence for iteration
 	tmp := regexNonWords.ReplaceAllString(in.Sentence, "")
-	words := strings.Fields(tmp)
+	words := strings.Fields(strings.Title(tmp))
 
 	// Iterate through words and bigrams to assemble a DB query
 	for i := start; i < len(words); i++ {
