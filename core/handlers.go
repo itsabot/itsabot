@@ -68,6 +68,11 @@ func newRouter() *httprouter.Router {
 
 	// API routes (restricted to admins)
 	router.HandlerFunc("GET", "/api/admin/plugins.json", HAPIPlugins)
+	router.HandlerFunc("GET", "/api/admins.json", HAPIAdmins)
+	router.HandlerFunc("PUT", "/api/admins.json", HAPIAdminsUpdate)
+	router.HandlerFunc("GET", "/api/admin/remote_tokens.json", HAPIRemoteTokens)
+	router.HandlerFunc("POST", "/api/admin/remote_tokens.json", HAPIRemoteTokensSubmit)
+	router.HandlerFunc("DELETE", "/api/admin/remote_tokens.json", HAPIRemoteTokensDelete)
 	return router
 }
 
@@ -88,8 +93,12 @@ func HIndex(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	data := struct{ IsProd bool }{
-		IsProd: os.Getenv("ABOT_ENV") == "production",
+	data := struct {
+		IsProd     bool
+		ItsAbotURL string
+	}{
+		IsProd:     os.Getenv("ABOT_ENV") == "production",
+		ItsAbotURL: os.Getenv("ITSABOT_URL"),
 	}
 	if err = tmplLayout.Execute(w, data); err != nil {
 		writeErrorInternal(w, err)
@@ -526,34 +535,253 @@ func HAPIPlugins(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Read plugins.json, unmarshal into struct
-	contents, err := ioutil.ReadFile("./plugins.json")
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	var plugins PluginJSON
-	if err = json.Unmarshal(contents, &plugins); err != nil {
-		writeError(w, err)
-		return
-	}
+	writeBytes(w, pluginsGo)
+}
 
-	var pJSON struct {
-		Plugins []json.RawMessage
-	}
-	for url := range plugins.Dependencies {
-		// Add each plugin.json to array of plugins
-		p := filepath.Join(os.Getenv("GOPATH"), "src", url,
-			"plugin.json")
-		var byt []byte
-		byt, err = ioutil.ReadFile(p)
-		if err != nil {
-			writeError(w, err)
+// HAPIAdmins returns a list of all admins with the training and manage team
+// permissions.
+func HAPIAdmins(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
 			return
 		}
-		pJSON.Plugins = append(pJSON.Plugins, byt)
+		if !LoggedIn(w, r) {
+			return
+		}
 	}
-	writeBytes(w, pJSON)
+	var admins []struct {
+		ID    uint64
+		Name  string
+		Email string
+	}
+	q := `SELECT id, name, email FROM users WHERE admin=TRUE`
+	err := db.Select(&admins, q)
+	if err != nil && err != sql.ErrNoRows {
+		writeErrorInternal(w, err)
+		return
+	}
+	b, err := json.Marshal(admins)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(b)
+	if err != nil {
+		log.Info("failed to write response.", err)
+	}
+}
+
+// HAPIRemoteLoginSubmit logs into the ITSABOT_URL service and returns auth
+// credentials to be used in future requests. This is only available to local
+// admins.
+func HAPIRemoteLoginSubmit(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	u := os.Getenv("ITSABOT_URL") + "/api/users/login.json"
+	rq, err := http.NewRequest("POST", u, r.Body)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(rq)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Info("failed to close ")
+		}
+	}()
+	if resp.StatusCode != 200 {
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Info("failed to read body", err)
+		}
+		err = fmt.Errorf("failed remote login %d: %s", resp.StatusCode,
+			string(body))
+		writeErrorBadRequest(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// HAPIAdminsUpdate adds or removes admin permission from a given user.
+func HAPIAdminsUpdate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var req struct {
+		ID    uint64
+		Email string
+		Admin bool
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	// This is a clever way to update the user using EITHER email or ID
+	// (whatever the client had available). Then we return the ID of the
+	// updated entry to send back to the client for faster future requests.
+	if req.ID > 0 && len(req.Email) > 0 {
+		writeErrorBadRequest(w, errors.New("only one value allowed: ID or Email"))
+		return
+	}
+	q := `UPDATE users SET admin=$1 WHERE id=$2 OR email=$3 RETURNING id`
+	err := db.QueryRow(q, req.Admin, req.ID, req.Email).Scan(&req.ID)
+	if err == sql.ErrNoRows {
+		// This error is frequently user-facing.
+		writeErrorBadRequest(w, errors.New("User not found."))
+		return
+	}
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	var user struct {
+		ID    uint64
+		Email string
+		Name  string
+	}
+	q = `SELECT id, email, name FROM users WHERE id=$1`
+	if err = db.Get(&user, q, req.ID); err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	byt, err := json.Marshal(user)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(byt)
+	if err != nil {
+		log.Info("failed to write response.", err)
+	}
+}
+
+// HAPIRemoteTokens returns the final six bytes of each auth token used to
+// authenticate to the remote service and when.
+func HAPIRemoteTokens(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+
+	// We initialize the variable here because we want empty slices to
+	// marshal to [], not null
+	auths := []struct {
+		Token     string
+		Email     string
+		PluginID  uint64
+		CreatedAt time.Time
+	}{}
+	q := `SELECT token, email, pluginid, createdat
+	      FROM remotetokens`
+	err := db.Select(&auths, q)
+	if err != nil && err != sql.ErrNoRows {
+		writeErrorInternal(w, err)
+		return
+	}
+	byt, err := json.Marshal(auths)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(byt)
+	if err != nil {
+		log.Info("failed to write response.", err)
+	}
+}
+
+// HAPIRemoteTokensSubmit adds a remote token for modifying ITSABOT_URL's
+// plugin training data.
+func HAPIRemoteTokensSubmit(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var req struct {
+		Token    string
+		PluginID uint64
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	cookie, err := r.Cookie("email")
+	if err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	q := `INSERT INTO remotetokens (token, email, pluginid)
+	      VALUES ($1, $2, $3)`
+	_, err = db.Exec(q, req.Token, cookie.Value, req.PluginID)
+	if err != nil {
+		if err.Error() == `pq: duplicate key value violates unique constraint "remotetokens_pkey"` {
+			writeErrorBadRequest(w, errors.New("Token has already been added."))
+			return
+		}
+		writeErrorInternal(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// HAPIRemoteTokensDelete removes a remote token from the DB and responds with
+// 200 OK.
+func HAPIRemoteTokensDelete(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var req struct {
+		Token string
+		Email string
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	q := `DELETE FROM remotetokens WHERE token=$1`
+	res, err := db.Exec(q, req.Token)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	if rows == 0 {
+		writeErrorBadRequest(w, errors.New("invalid token or email"))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // createCSRFToken creates a new token, invalidating any existing token.
@@ -835,6 +1063,28 @@ func Admin(w http.ResponseWriter, r *http.Request) bool {
 	scopes := strings.Fields(cookie.Value)
 	for _, scope := range scopes {
 		if scope == "admin" {
+			// Confirm the admin permission has not been deleted
+			// since the cookie was created by retrieving the
+			// current value from the DB.
+			cookie, err = r.Cookie("id")
+			if err == http.ErrNoCookie {
+				writeErrorAuth(w, err)
+				return false
+			}
+			if err != nil {
+				writeErrorInternal(w, err)
+				return false
+			}
+			var admin bool
+			q := `SELECT admin FROM users WHERE id=$1`
+			if err = db.Get(&admin, q, cookie.Value); err != nil {
+				writeErrorInternal(w, err)
+				return false
+			}
+			if !admin {
+				writeErrorAuth(w, err)
+				return false
+			}
 			log.Debug("validated admin")
 			return true
 		}

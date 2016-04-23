@@ -1,0 +1,9 @@
+.content {
+	padding: 1em;
+}
+.content h3 {
+	margin-top: 1.5em;
+}
+.content h3.top-el {
+	margin-top: 0;
+}

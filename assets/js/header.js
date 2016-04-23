@@ -3,7 +3,7 @@ abot.Header = {}
 abot.Header.view = function() {
 	var tour = null
 	var profileOrLogin
-	if (Cookies.get("id") !== null) {
+	if (abot.isLoggedIn()) {
 		profileOrLogin = [
 			m("a[href=/profile]", {
 				config: m.route
@@ -22,22 +22,13 @@ abot.Header.view = function() {
 			}, "Sign up"),
 		]
 	}
-	var admin
-	if (abot.isAdmin()) {
-		admin = m("a[href=/admin]", { config: m.route }, "Admin")
-	}
 	return m("header", [
 		m("div", [
 			m(".links", [
-				m("a", {
-					href: "/",
-					config: m.route
-				}, "Home"),
-				admin,
 				profileOrLogin
 			]),
 			m(".logo", [
-				m("a", {
+				m("a.logo", {
 					href: "/",
 					config: m.route
 				}, "Abot")

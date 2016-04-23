@@ -11,13 +11,17 @@ abot.fnCopy = function(from, to) {
 	}
 }
 abot.isProduction = function() {
+	var val = abot.getMetaTag("env-production")
+	return val === "true"
+}
+abot.getMetaTag = function(name) {
 	var ms = document.getElementsByTagName("meta")
 	for (var i = 0; i < ms.length; i++) {
-		if (ms[i].getAttribute("name") === "env-production") {
-			return ms[i].getAttribute("content") === "true"
+		if (ms[i].getAttribute("name") === name) {
+			return ms[i].getAttribute("content")
 		}
 	}
-	return false
+	return null
 }
 abot.signout = function(ev) {
 	ev.preventDefault()
@@ -37,10 +41,12 @@ abot.signout = function(ev) {
 	})
 }
 abot.isLoggedIn = function() {
-	if (Cookies.get("id") != null &&
-		Cookies.get("email") != null &&
-		Cookies.get("issuedAt") != null &&
-	    Cookies.get("authToken") != null) {
+	var id = Cookies.get("id")
+	var issuedAt = Cookies.get("issuedAt")
+	var email = Cookies.get("email")
+	if (id != null && id !== "null" &&
+		issuedAt != null && issuedAt !== "null" &&
+		email != null && email !== "null") {
 		return true
 	}
 	// If the user isn't logged in, ensure we clean out all cookies.
@@ -71,6 +77,19 @@ abot.request = function(opts) {
 	}
 	return m.request(opts)
 }
+abot.externalRequest = function(opts) {
+	opts.config = function(xhr) {
+		var tokens = ""
+		var t = abot.state.authTokens()
+		for (var i = 0; i < t.length; i++) {
+			tokens = tokens + "," + t[i].Token
+		}
+		tokens = tokens.substring(1)
+		xhr.setRequestHeader("X-Auth-Tokens", tokens)
+		xhr.setRequestHeader("X-Auth-Plugin-ID", opts.remotePluginID)
+	}
+	return m.request(opts)
+}
 abot.prettyDate = function(time) {
     var date = new Date((time || "").replace(/-/g, "/").replace(/[TZ]/g, " ")),
         diff = (((new Date()).getTime() - date.getTime()) / 1000),
@@ -96,6 +115,16 @@ abot.loadJS = function(url, cb) {
 	s.onload = cb
 	document.head.appendChild(s)
 }
+abot.itsAbotURL = function() {
+	var u = abot.getMetaTag("itsabot-url")
+	if (u == null) {
+		console.warn("no itsabotURL set")
+	}
+	return u || ""
+}
+abot.state = {
+	authTokens: m.prop([]),
+}
 window.addEventListener('load', function() {
 	m.route.mode = "pathname"
 	m.route(document.body, "/", {
@@ -106,6 +135,10 @@ window.addEventListener('load', function() {
 		"/reset_password": abot.ResetPassword,
 		"/profile": abot.Profile,
 		"/admin": abot.Admin,
+		"/training": abot.Training,
+		"/manage_team": abot.ManageTeam,
+		"/account_connect": abot.AccountConnect,
+		"/:any...": abot.NotFound,
 	})
 })
 })(!window.abot ? window.abot={} : window.abot);

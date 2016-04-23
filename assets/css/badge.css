@@ -1,0 +1,35 @@
+.badge-container {
+	margin-top: 1em;
+	overflow-x: hidden;
+}
+.badge-container input {
+	width: 85%;
+	max-width: 300px;
+	display: inline;
+	margin-left: 1em;
+	margin-right: -2em;
+	font-size: 16px;
+}
+.badge-container.badge-container-right {
+	margin-top: 0.5em;
+	margin-left: 2.5em;
+}
+.badge {
+	padding: 0.1em 0.5em;
+	border: 1px solid #AAA;
+	border-radius: 4px;
+	color: #888;
+	width: 50px;
+	text-align: center;
+	font-size: 13px;
+	display: inline-block;
+	-webkit-transition: background 0.1s linear;
+	-moz-transition: background 0.1s linear;
+	-ms-transition: background 0.1s linear;
+	-o-transition: background 0.1s linear;
+	transition: background 0.1s linear;
+}
+.badge-highlighted {
+	background-color: rgba(52, 152, 219, 0.2);
+	color: #666;
+}

@@ -20,6 +20,9 @@ type PluginJSON struct {
 	Dependencies map[string]string
 }
 
+// PluginsGoJSON holds the plugins.go structure.
+type PluginsGoJSON []dt.PluginConfig
+
 // RegPlugins initializes a pkgMap and holds it in global memory, which works OK
 // given pkgMap is an atomic, thread-safe map.
 var RegPlugins = pkgMap{

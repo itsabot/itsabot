@@ -5,17 +5,13 @@ abot.PluginIcon.controller = function(attrs) {
 	ctrl.loadDefault = function(ev) {
 		ev.target.setAttribute("src", "/public/images/icon_missing.svg")
 	}
-	ctrl.iconName = function(name) {
-		name = name.toLowerCase()
-		return name.replace(" ", "_")
-	}
 }
 abot.PluginIcon.view = function(ctrl, attrs) {
 	attrs.Icon = attrs.Icon || "/public/images/icon_missing.svg"
 	var img = m("div", [
 		m("img", {
 			alt: attrs.Name + " icon",
-			src: "/public/images/icon_" + ctrl.iconName(attrs.Name) + ".svg",
+			src: attrs.Icon,
 			onerror: ctrl.loadDefault,
 		}),
 		m(".name", attrs.Name),

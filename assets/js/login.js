@@ -18,10 +18,6 @@ abot.Login.controller = function() {
 			var date = new Date()
 			var exp = date.setDate(date + 30)
 			var secure = abot.isProduction()
-			if (window.location.hostname === "localhost") {
-				secure = false
-			}
-			console.log(data)
 			Cookies.set("id", data.ID, exp, null, null, secure)
 			Cookies.set("email", data.Email, exp, null, null, secure)
 			Cookies.set("issuedAt", data.IssuedAt, exp, null, null, secure)
@@ -52,49 +48,42 @@ abot.Login.controller = function() {
 	ctrl.error = m.prop("")
 }
 abot.Login.view = function(ctrl) {
-	return m(".main", [
+	return m(".container", [
 		m.component(abot.Header),
-		m("h1", "Log In"),
-		m("div", {
-			id: "err",
-			class: "alert alert-danger hidden"
-		}, ctrl.error()),
-		m("form", { onsubmit: ctrl.login }, [
-			m("div", [
-				m("input", {
-					type: "email",
-					id: "email",
-					placeholder: "Email"
-				}),
+		m(".main-no-sidebar", [
+			m(".centered.content", [
+				m("h1", "Log In"),
+				m(".well.well-form", [
+					m("div", {
+						id: "err",
+						"class": "alert alert-danger alert-margin hidden",
+					}, ctrl.error()),
+					m("form", { onsubmit: ctrl.login }, [
+						m(".form-el", [
+							m("input#email[type=email]", {
+								placeholder: "Email"
+							}),
+						]),
+						m(".form-el", [
+							m("input#password[type=password]", {
+								placeholder: "Password"
+							}),
+						]),
+						m("small", [
+							m("a[href=/forgot_password]", {
+								config: m.route,
+							}, "Forgot password?")
+						]),
+						m(".form-el", [
+							m("input.btn#btn[type=submit]", { value: "Log In" }),
+						]),
+					]),
+					m("small", [
+						m("span", "No account? "),
+						m("a[href=/signup]", { config: m.route }, "Sign Up"),
+					]),
+				]),
 			]),
-			m("div", [
-				m("input", {
-					type: "password",
-					id: "password",
-					placeholder: "Password"
-				}),
-			]),
-			m("div", [
-				m("a", {
-					href: "/forgot_password",
-					config: m.route
-				}, "Forgot password?")
-			]),
-			m("div", [
-				m("input", {
-					class: "btn btn-sm",
-					id: "btn",
-					type: "submit",
-					value: "Log In"
-				}),
-			]),
-		]),
-		m("div", [
-			m("span", "No account? "),
-			m("a", {
-				href: "/signup",
-				config: m.route
-			}, "Sign Up"),
 		]),
 	])
 }
