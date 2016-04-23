@@ -1,0 +1,17 @@
+.topbar {
+	width: 100%;
+	padding: 1em 1.5em 1em 1em;
+	box-sizing: border-box;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.topbar .topbar-inline {
+	display: inline;
+}
+.topbar .topbar-right {
+	float: right;
+}
+.topbar .topbar-right a {
+	margin-left: 1.5em;
+	color: #2980B9;
+	text-decoration: none;
+}

@@ -1,0 +1,20 @@
+input {
+	font-size: 16px;
+	padding: 0.5em 0.5em;
+	margin: 0.25em 0;
+	border: 1px solid #aaa;
+	border-radius: 4px;
+	background-color: inherit;
+}
+input.input-clear {
+	border: none;
+	border-bottom: 2px solid #DDD;
+	padding: 0.5em;
+	box-sizing: border-box;
+}
+input.input-full {
+	width: 100%;
+}
+.input-changed {
+	background-color: #FFFFE0;
+}

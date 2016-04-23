@@ -11,7 +11,7 @@ abot.Phones.controller = function() {
 }
 abot.Phones.view = function(ctrl, props) {
 	return m('div', [
-		m("h2", "Phone numbers"),
+		m("h3", "Phone numbers"),
 		m("table", [
 			m("thead", m("tr", m("th", "Number"))),
 			m("tbody", props.map(function(phone) {

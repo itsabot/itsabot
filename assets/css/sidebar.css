@@ -1,0 +1,30 @@
+.sidebar {
+	float: left;
+	display: inline-block;
+	width: 15%;
+	height: auto;
+	min-height: 100%;
+	overflow-x: hidden;
+	background-color: #F3F3F3;
+}
+.sidebar ul {
+	list-style-type: none;
+	padding-left: 0;
+}
+.sidebar ul li a {
+	display: block;
+	padding: 0.5em;
+	text-decoration: none;
+	color: #444;
+}
+.sidebar ul li a:hover {
+	background-color: #DDD;
+}
+.sidebar ul li a.active {
+	background-color: rgba(52, 152, 219, 0.3);
+	color: #2980B9;
+}
+.sidebar ul li a.active:hover {
+	background-color: rgba(52, 152, 219, 0.2);
+	color: #2980B9;
+}

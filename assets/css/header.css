@@ -1,13 +1,27 @@
 header {
-	height: 2em;
-	width: 100%;
+	padding: 0.75em;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+	background-color: #2980B9;
+}
+header .logo {
+	color: white;
+	font-size: 20px;
+	font-weight: 600;
 }
 header .links {
 	float: right;
 	display: inline-block;
 }
+header a {
+	font-size: 16px;
+	text-decoration: none;
+}
 header .links a {
-	margin-right: 1em;
+	padding: 1.5em 1em;
+	color: rgba(255, 255, 255, 0.7);
+}
+header .links a:hover {
+	color: rgba(255, 255, 255, 1);
 }
 header .logo {
 	display: inline-block;

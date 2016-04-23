@@ -8,14 +8,32 @@ th {
 	width: 100%;
 }
 .table tr {
-	border-bottom: 1px solid #ccc;
+	border-bottom: 1px solid #CCC;
 }
 .table tr:hover {
-	background-color: #eee;
+	background-color: #EEE;
 }
 .table td {
 	padding: 1em 0.5em;
 }
 .table td.right {
 	text-align: right;
+}
+table.table-compact td.x {
+	width: 1px;
+}
+table.table-compact {
+	width: 100%;
+	font-size: 16px;
+	margin-top: 1.5em;
+}
+table.table-compact thead, table.table-compact tr {
+	border-bottom: 1px solid #DDD;
+}
+table.table-compact td, table.table-compact th {
+	padding: 0.25em 0.5em;
+}
+table td.subtle {
+	font-style: italic;
+	color: #AAA;
 }
