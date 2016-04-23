@@ -84,16 +84,6 @@ func CallPlugin(p *dt.Plugin, in *dt.Msg, followup bool) string {
 // ErrMissingPlugin. The bool value return indicates whether this plugin is
 // different from the last plugin used by the user.
 func GetPlugin(db *sqlx.DB, m *dt.Msg) (*dt.Plugin, string, bool, error) {
-	// First check if the user is missing. AKA, needs to be onboarded
-	if m.User == nil {
-		p := RegPlugins.Get("onboard_onboard")
-		if p == nil {
-			log.Debug("missing required onboard plugin")
-			return nil, "onboard_onboard", false, ErrMissingPlugin
-		}
-		return p, "onboard_onboard", true, nil
-	}
-
 	// First we look for a previously used route. we have to do this in
 	// any case to check if the users pkg/route has changed, so why not now?
 	log.Debug("getting last route")
