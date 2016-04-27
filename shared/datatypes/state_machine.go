@@ -188,7 +188,7 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 			done, _ := h.Complete(in)
 			if done {
 				sm.logger.Debug("state was complete. moving on")
-		                sm.state++
+				sm.state++
 				return sm.Next(in)
 			}
 		}
@@ -239,7 +239,7 @@ func (sm *StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.state].OnInput(in)
 }
 
-// SetMemory saves to some key to some value in Ava's memory, which can be
+// SetMemory saves to some key to some value in Abot's memory, which can be
 // accessed by any state or plugin. Memories are stored in a key-value format,
 // and any marshalable/unmarshalable datatype can be stored and retrieved.
 // Note that Ava's memory is global, peristed across plugins. This enables
@@ -254,10 +254,12 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 			k, ":", err)
 		return
 	}
-	q := `INSERT INTO states (key, value, pluginname, userid)
+	q := `INSERT INTO states (key, value, pluginname, userid, flexid, flexidtype)
 	      VALUES ($1, $2, $3, $4)
-	      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2`
-	_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID)
+	      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2
+	      ON CONFLICT (flexid, flexidtype, pluginname, key) DO UPDATE SET value=$2`
+	_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID, in.User.FlexID,
+		in.User.FlexIDType)
 	if err != nil {
 		sm.logger.Debug("could not set memory at", k, "to", v, ":", err)
 		return
@@ -267,9 +269,12 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 // GetMemory retrieves a memory for a given key. Accessing that Memory's value
 // is described in itsabot.org/abot/shared/datatypes/memory.go.
 func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
-	q := `SELECT value FROM states WHERE userid=$1 AND pluginname=$2 AND key=$3`
+	q := `SELECT value FROM states
+	      WHERE (userid=$1 OR (flexid=$2 AND flexidtype=$3))
+	      AND pluginname=$3 AND key=$4`
 	var buf []byte
-	err := sm.db.Get(&buf, q, in.User.ID, sm.pluginName, k)
+	err := sm.db.Get(&buf, q, in.User.ID, in.User.FlexID,
+		in.User.FlexIDType, sm.pluginName, k)
 	if err == sql.ErrNoRows {
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
@@ -283,8 +288,11 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 // DeleteMemory deletes a memory for a given key. It is not an error to delete a
 // key that does not exist.
 func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
-	q := `DELETE FROM states WHERE userid=$1 AND pluginname=$2 AND key=$3`
-	_, err := sm.db.Exec(q, in.User.ID, sm.pluginName, k)
+	q := `DELETE FROM states
+	      WHERE (userid=$1 OR (flexid=$2 AND flexidtype=$3))
+	      AND pluginname=$4 AND key=$5`
+	_, err := sm.db.Exec(q, in.User.ID, in.User.FlexID, in.User.FlexIDType,
+		sm.pluginName, k)
 	if err != nil {
 		sm.logger.Debug("could not delete memory for key", k, ":", err)
 	}
