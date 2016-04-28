@@ -46,6 +46,11 @@ type FlexIDType int
 const (
 	fidtEmail FlexIDType = iota + 1 // 1
 	fidtPhone                       // 2
+
+	// fidtSession is used to track a user's session where no other
+	// information like email or phone is obtained, e.g. communicating to
+	// Abot via a website.
+	fidtSession // 3
 )
 
 // ErrMissingFlexIDType is returned when a FlexIDType is expected, but
@@ -71,7 +76,7 @@ func GetUser(db *sqlx.DB, req *Request) (*User, error) {
 			return nil, ErrMissingFlexID
 		}
 		switch req.FlexIDType {
-		case fidtEmail, fidtPhone:
+		case fidtEmail, fidtPhone, fidtSession:
 			// Do nothing
 		default:
 			return nil, ErrInvalidFlexIDType
