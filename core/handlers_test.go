@@ -18,15 +18,16 @@ import (
 var router *httprouter.Router
 
 func TestMain(m *testing.M) {
+	if err := LoadEnvVars(); err != nil {
+		log.Info("failed to load env vars", err)
+	}
 	if err := os.Setenv("ABOT_ENV", "test"); err != nil {
-		log.Info("failed to set ABOT_ENV", err)
-		os.Exit(1)
+		log.Fatal("failed to set ABOT_ENV", err)
 	}
 	var err error
 	router, err = NewServer()
 	if err != nil {
-		log.Info("failed to start server", err)
-		os.Exit(1)
+		log.Fatal("failed to start server", err)
 	}
 	os.Exit(m.Run())
 }

@@ -6,10 +6,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
 )
 
 func TestMain(m *testing.M) {
+	if err := core.LoadEnvVars(); err != nil {
+		log.Info("failed to load env vars", err)
+	}
 	if err := os.Setenv("ABOT_ENV", "test"); err != nil {
 		log.Fatal(err)
 	}
