@@ -13,7 +13,7 @@ import (
 type Msg struct {
 	ID              uint64
 	FlexID          string
-	FlexIDType      int
+	FlexIDType      FlexIDType
 	Sentence        string
 	User            *User
 	StructuredInput *nlp.StructuredInput
@@ -21,7 +21,7 @@ type Msg struct {
 	Plugin          string
 	State           map[string]interface{}
 	CreatedAt       *time.Time
-	// AbotSent determines if msg is from the user or Ava
+	// AbotSent determines if msg is from the user or Abot
 	AbotSent      bool
 	NeedsTraining bool
 	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
