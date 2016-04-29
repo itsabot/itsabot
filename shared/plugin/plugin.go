@@ -44,7 +44,7 @@ func New(url string, trigger *nlp.StructuredInput,
 	// Read plugin.json data from within plugins.go, unmarshal into struct
 	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
 		"abot", "plugins.go")
-	fi, err := os.Open(p)
+	fi, err := os.OpenFile(p, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
