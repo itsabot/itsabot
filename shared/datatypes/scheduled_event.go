@@ -10,6 +10,7 @@ import (
 // time.Time is necessary in this struct because it's only created when it's
 // known to be time to send. See core/boot:NewServer().
 type ScheduledEvent struct {
+	ID         uint64
 	Content    string
 	FlexID     string
 	FlexIDType FlexIDType
