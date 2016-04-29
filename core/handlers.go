@@ -50,6 +50,7 @@ func newRouter() *httprouter.Router {
 	// Web routes
 	router.HandlerFunc("GET", "/", HIndex)
 	router.HandlerFunc("POST", "/", HMain)
+	router.HandlerFunc("OPTIONS", "/", HOptions)
 
 	// Route any unknown request to our single page app front-end
 	router.NotFound = http.HandlerFunc(HIndex)
@@ -105,10 +106,20 @@ func HMain(w http.ResponseWriter, r *http.Request) {
 		log.Info("failed to process text", err)
 		// TODO notify plugins listening for errors
 	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Access-Control-Allow-Origin")
 	_, err = fmt.Fprint(w, ret)
 	if err != nil {
 		writeErrorInternal(w, err)
 	}
+}
+
+// HOptions sets appropriate response headers in cases like browser-based
+// communication with Abot.
+func HOptions(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Access-Control-Allow-Origin")
+	w.WriteHeader(http.StatusOK)
 }
 
 // HAPILogoutSubmit processes a logout request deleting the session from
