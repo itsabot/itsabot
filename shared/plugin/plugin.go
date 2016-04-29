@@ -73,25 +73,8 @@ func New(url string, trigger *nlp.StructuredInput,
 	if err := scn.Err(); err != nil {
 		return nil, err
 	}
-
-	c := dt.PluginConfig{}
-	if err = json.Unmarshal([]byte(data), &c); err != nil {
-		return nil, err
-	}
-	if len(c.Name) == 0 {
-		return nil, ErrMissingPluginName
-	}
-	db, err := core.ConnectDB()
-	if err != nil {
-		return nil, err
-	}
-	l := log.New(c.Name)
-	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 	plg := &dt.Plugin{
-		Config:    c,
 		Trigger:   trigger,
-		DB:        db,
-		Log:       log.New(c.Name),
 		PluginFns: fns,
 		Events: &dt.PluginEvents{
 			PostReceive:    func(cmd *string) {},
@@ -100,6 +83,25 @@ func New(url string, trigger *nlp.StructuredInput,
 			PostResponse:   func(in *dt.Msg, resp *string) {},
 		},
 	}
+	c := dt.PluginConfig{}
+	if len(data) > 0 {
+		if err = json.Unmarshal([]byte(data), &c); err != nil {
+			log.Info("error here!")
+			return nil, err
+		}
+		if len(c.Name) == 0 {
+			return nil, ErrMissingPluginName
+		}
+	}
+	plg.Config = c
+	db, err := core.ConnectDB()
+	if err != nil {
+		return nil, err
+	}
+	plg.DB = db
+	l := log.New(c.Name)
+	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+	plg.Log = l
 	if err = RegisterPlugin(plg); err != nil {
 		return nil, err
 	}
