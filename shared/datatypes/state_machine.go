@@ -124,13 +124,26 @@ func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
 // a given user and plugin, the stateMachine will load it. If not, the
 // stateMachine will insert a starting state into the database.
 func (sm *StateMachine) LoadState(in *Msg) {
-	q := `INSERT INTO states
-	      (key, userid, value, pluginname) VALUES ($1, $2, $3, $4)
-	      ON CONFLICT (userid, key, pluginname) DO UPDATE SET value=$5
-	      RETURNING value`
+	var err error
 	var val []byte
-	err := sm.db.QueryRowx(q, stateKey, in.User.ID, 0, sm.pluginName,
-		sm.state).Scan(&val)
+	if in.User.ID > 0 {
+		q := `INSERT INTO states
+		      (key, userid, value, pluginname) VALUES ($1, $2, 0, $3)
+		      ON CONFLICT (userid, key, pluginname)
+		      DO UPDATE SET value=$4
+		      RETURNING value`
+		err = sm.db.QueryRowx(q, stateKey, in.User.ID, sm.pluginName,
+			sm.state).Scan(&val)
+	} else {
+		q := `INSERT INTO states
+		      (key, flexid, flexidtype, value, pluginname)
+		      VALUES ($1, $2, $3, 0, $4)
+		      ON CONFLICT (flexid, flexidtype, key, pluginname)
+		      DO UPDATE SET value=$5
+		      RETURNING value`
+		err = sm.db.QueryRowx(q, stateKey, in.User.FlexID,
+			in.User.FlexIDType, sm.pluginName, sm.state).Scan(&val)
+	}
 	if err != nil && err != sql.ErrNoRows {
 		sm.logger.Debug("could not fetch value from states", err)
 		sm.state = 0
@@ -257,12 +270,15 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	if in.User.ID > 0 {
 		q := `INSERT INTO states (key, value, pluginname, userid)
 		      VALUES ($1, $2, $3, $4)
-		      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2`
+		      ON CONFLICT (userid, pluginname, key)
+		      DO UPDATE SET value=$2`
 		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID)
 	} else {
-		q := `INSERT INTO states (key, value, pluginname, flexid, flexidtype)
+		q := `INSERT INTO states
+		      (key, value, pluginname, flexid, flexidtype)
 		      VALUES ($1, $2, $3, $4, $5)
-		      ON CONFLICT (flexid, flexidtype, pluginname, key) DO UPDATE SET value=$2`
+		      ON CONFLICT (flexid, flexidtype, pluginname, key)
+		      DO UPDATE SET value=$2`
 		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.FlexID,
 			in.User.FlexIDType)
 	}
