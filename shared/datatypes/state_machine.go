@@ -178,11 +178,11 @@ func (sm *StateMachine) GetDBConn() *sqlx.DB {
 // returns the next response of the stateMachine, whether that's the Complete()
 // failed string or the OnEntry() string.
 func (sm *StateMachine) Next(in *Msg) (response string) {
-	h := sm.Handlers[sm.state]
 	if sm.state >= len(sm.Handlers) {
 		sm.logger.Debug("state is >= len(handlers)")
 		return ""
 	}
+	h := sm.Handlers[sm.state]
 	if !sm.stateEntered {
 		if h.SkipIfComplete {
 			done, _ := h.Complete(in)
@@ -202,7 +202,7 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 	done, str := h.Complete(in)
 	if done {
 		sm.logger.Debug("state is done. going to next")
-		if sm.state+1 >= len(sm.Handlers) {
+		if sm.state+1 >= len(sm.Handlers)-1 {
 			sm.logger.Debug("finished states, nothing to do")
 			return ""
 		}
@@ -210,7 +210,7 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 		b := make([]byte, 8) // space for int64
 		binary.LittleEndian.PutUint64(b, uint64(sm.state))
 		if _, err := sm.db.Exec(q, b, stateKey); err != nil {
-			sm.logger.Debug("could not update state", err)
+			sm.logger.Info("could not update state", err)
 		}
 		sm.state++
 		sm.setEntered(in)
@@ -250,18 +250,24 @@ func (sm *StateMachine) OnInput(in *Msg) {
 func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		sm.logger.Debug("could not marshal memory interface to json at",
+		sm.logger.Info("could not marshal memory interface to json at",
 			k, ":", err)
 		return
 	}
-	q := `INSERT INTO states (key, value, pluginname, userid, flexid, flexidtype)
-	      VALUES ($1, $2, $3, $4)
-	      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2
-	      ON CONFLICT (flexid, flexidtype, pluginname, key) DO UPDATE SET value=$2`
-	_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID, in.User.FlexID,
-		in.User.FlexIDType)
+	if in.User.ID > 0 {
+		q := `INSERT INTO states (key, value, pluginname, userid)
+		      VALUES ($1, $2, $3, $4)
+		      ON CONFLICT (userid, pluginname, key) DO UPDATE SET value=$2`
+		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID)
+	} else {
+		q := `INSERT INTO states (key, value, pluginname, flexid, flexidtype)
+		      VALUES ($1, $2, $3, $4, $5)
+		      ON CONFLICT (flexid, flexidtype, pluginname, key) DO UPDATE SET value=$2`
+		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.FlexID,
+			in.User.FlexIDType)
+	}
 	if err != nil {
-		sm.logger.Debug("could not set memory at", k, "to", v, ":", err)
+		sm.logger.Info("could not set memory at", k, "to", v, ":", err)
 		return
 	}
 }
@@ -269,17 +275,25 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 // GetMemory retrieves a memory for a given key. Accessing that Memory's value
 // is described in itsabot.org/abot/shared/datatypes/memory.go.
 func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
-	q := `SELECT value FROM states
-	      WHERE (userid=$1 OR (flexid=$2 AND flexidtype=$3))
-	      AND pluginname=$3 AND key=$4`
 	var buf []byte
-	err := sm.db.Get(&buf, q, in.User.ID, in.User.FlexID,
-		in.User.FlexIDType, sm.pluginName, k)
+	var err error
+	if in.User.ID > 0 {
+		q := `SELECT value FROM states
+		      WHERE userid=$1
+		      AND pluginname=$2 AND key=$3`
+		err = sm.db.Get(&buf, q, in.User.ID, sm.pluginName, k)
+	} else {
+		q := `SELECT value FROM states
+		      WHERE flexid=$1 AND flexidtype=$2
+		      AND pluginname=$3 AND key=$4`
+		err = sm.db.Get(&buf, q, in.User.FlexID, in.User.FlexIDType,
+			sm.pluginName, k)
+	}
 	if err == sql.ErrNoRows {
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	if err != nil {
-		sm.logger.Debug("could not get memory for key", k, ":", err)
+		sm.logger.Info("could not get memory for key", k, ":", err)
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	return Memory{Key: k, Val: buf, logger: sm.logger}
@@ -288,13 +302,20 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 // DeleteMemory deletes a memory for a given key. It is not an error to delete a
 // key that does not exist.
 func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
-	q := `DELETE FROM states
-	      WHERE (userid=$1 OR (flexid=$2 AND flexidtype=$3))
-	      AND pluginname=$4 AND key=$5`
-	_, err := sm.db.Exec(q, in.User.ID, in.User.FlexID, in.User.FlexIDType,
-		sm.pluginName, k)
+	var err error
+	if in.User.ID > 0 {
+		q := `DELETE FROM states
+		      WHERE userid=$1 AND pluginname=$2 AND key=$3`
+		_, err = sm.db.Exec(q, in.User.ID, sm.pluginName, k)
+	} else {
+		q := `DELETE FROM states
+		      WHERE flexid=$1 AND flexidtype=$2 AND pluginname=$3
+		      AND key=$4`
+		_, err = sm.db.Exec(q, in.User.FlexID, in.User.FlexIDType,
+			sm.pluginName, k)
+	}
 	if err != nil {
-		sm.logger.Debug("could not delete memory for key", k, ":", err)
+		sm.logger.Info("could not delete memory for key", k, ":", err)
 	}
 }
 
