@@ -199,13 +199,20 @@ func ExtractCities(db *sqlx.DB, in *dt.Msg) ([]dt.City, error) {
 	}
 
 	cities := []dt.City{}
-	q := `SELECT name, countrycode FROM cities WHERE countrycode='US' AND name IN (?) ORDER BY LENGTH(name) DESC`
+	q := `SELECT name, countrycode FROM cities
+	      WHERE countrycode='US' AND name IN (?)
+	      ORDER BY LENGTH(name) DESC`
 	query, arguments, err := sqlx.In(q, args)
 	query = db.Rebind(query)
 	rows, err := db.Query(query, arguments...)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err = rows.Close(); err != nil {
+			log.Info("failed to close db rows.", err)
+		}
+	}()
 	for rows.Next() {
 		city := dt.City{}
 		if err = rows.Scan(&city.Name, &city.CountryCode); err != nil {
@@ -213,8 +220,11 @@ func ExtractCities(db *sqlx.DB, in *dt.Msg) ([]dt.City, error) {
 		}
 		cities = append(cities, city)
 	}
-	if err = rows.Close(); err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+	if len(cities) == 0 {
+		return nil, ErrNotFound
 	}
 	return cities, nil
 }
