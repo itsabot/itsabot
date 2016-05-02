@@ -39,8 +39,19 @@ func TokenizeSentence(sent string) []string {
 		found := []int{}
 		for i, r := range w {
 			switch r {
-			case '\'', '"', ',', '.', ':', ';', '!', '?':
+			case '\'', '"', ':', ';', '!', '?':
 				found = append(found, i)
+
+			// Handle case of currencies and fractional percents.
+			case '.', ',':
+				if i+1 < len(w) {
+					switch w[i+1] {
+					case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+						continue
+					}
+				}
+				found = append(found, i)
+				i++
 			}
 		}
 		if len(found) == 0 {
@@ -48,10 +59,24 @@ func TokenizeSentence(sent string) []string {
 			continue
 		}
 		for i, j := range found {
+			// If the token marker is not the first character in the
+			// sentence, then include all characters leading up to
+			// the prior found token.
 			if j > 0 {
-				tokens = append(tokens, w[:j])
+				if i == 0 {
+					tokens = append(tokens, w[:j])
+				} else if i-1 < len(found) {
+					// Handle case where multiple tokens are
+					// found in the same word.
+					tokens = append(tokens, w[found[i-1]+1:j])
+				}
 			}
+
+			// Append the token marker itself
 			tokens = append(tokens, string(w[j]))
+
+			// If we're on the last token marker, append all
+			// remaining parts of the word.
 			if i+1 == len(found) {
 				tokens = append(tokens, w[j+1:])
 			}
