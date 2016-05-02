@@ -27,7 +27,6 @@ var ErrNotFound error = errors.New("couldn't extract requested type from string"
 // ExtractCurrency returns an int64 if a currency is found, and throws an
 // error if one isn't.
 func ExtractCurrency(s string) (int64, error) {
-	log.Debug("extracting currency")
 	s = regexCurrency.FindString(s)
 	if len(s) == 0 {
 		return 0, ErrNotFound
@@ -37,7 +36,7 @@ func ExtractCurrency(s string) (int64, error) {
 		return 0, err
 	}
 	log.Debug("found value", val)
-	// convert parsed float into an int64 with precision of 2 decimal places
+	// Convert parsed float into an int64 with precision of 2 decimal places
 	return int64(val * 100), nil
 }
 
