@@ -1,0 +1,29 @@
+.well {
+	margin: 1em 0 1em;
+	padding: 1em;
+	width: 60%;
+	min-width: 300px;
+	border: 1px solid #DDD;
+	border-radius: 4px;
+}
+.well.well-no-border {
+	margin-top: 3em;
+	width: inherit;
+	min-width: inherit;
+	border: none;
+	padding: 0;
+}
+.well.well-form {
+	display: block;
+	margin: 0 auto;
+	max-width: 300px;
+	min-width: 270px;
+	border-bottom: 2px solid #DDD;
+	background-color: white;
+}
+.well.well-form input[type=text],
+.well.well-form input[type=email],
+.well.well-form input[type=password],
+.well.well-form input[type=tel] {
+	width: 80%;
+}
