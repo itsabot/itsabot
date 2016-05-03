@@ -2,9 +2,7 @@ package dt
 
 import (
 	"database/sql"
-	"encoding/binary"
 	"encoding/json"
-	"strconv"
 
 	"github.com/itsabot/abot/core/log"
 	"github.com/jmoiron/sqlx"
@@ -124,46 +122,59 @@ func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
 // a given user and plugin, the stateMachine will load it. If not, the
 // stateMachine will insert a starting state into the database.
 func (sm *StateMachine) LoadState(in *Msg) {
-	var err error
-	var val []byte
-	if in.User.ID > 0 {
-		q := `INSERT INTO states
-		      (key, userid, value, pluginname) VALUES ($1, $2, 0, $3)
-		      ON CONFLICT (userid, key, pluginname)
-		      DO UPDATE SET value=$4
-		      RETURNING value`
-		err = sm.db.QueryRowx(q, stateKey, in.User.ID, sm.pluginName,
-			sm.state).Scan(&val)
-	} else {
-		q := `INSERT INTO states
-		      (key, flexid, flexidtype, value, pluginname)
-		      VALUES ($1, $2, $3, 0, $4)
-		      ON CONFLICT (flexid, flexidtype, key, pluginname)
-		      DO UPDATE SET value=$5
-		      RETURNING value`
-		err = sm.db.QueryRowx(q, stateKey, in.User.FlexID,
-			in.User.FlexIDType, sm.pluginName, sm.state).Scan(&val)
-	}
-	if err != nil && err != sql.ErrNoRows {
-		sm.logger.Debug("could not fetch value from states", err)
-		sm.state = 0
+	tmp, err := json.Marshal(sm.state)
+	if err != nil {
+		sm.logger.Info("failed to marshal state for db.", err)
 		return
 	}
 
-	// The []byte->string->int conversion is highly inefficient and
-	// should be replaced by something faster. There's talk of such
-	// []byte->int functions being added to the stdlib.
-	//
-	// https://github.com/golang/go/issues/2632
-	tmp, err := strconv.ParseInt(string(val), 10, 64)
+	// Using upsert to either insert and return a value or on conflict to
+	// update and return a value doesn't work, leading to this longer form.
+	// Could it be a Postgres bug? This can and should be optimized.
+	if in.User.ID > 0 {
+		q := `INSERT INTO states
+		      (key, userid, value, pluginname) VALUES ($1, $2, $3, $4)`
+		err = sm.db.QueryRowx(q, stateKey, in.User.ID, tmp,
+			sm.pluginName).Scan(&tmp)
+	} else {
+		q := `INSERT INTO states
+		      (key, flexid, flexidtype, value, pluginname) VALUES ($1, $2, $3, $4, $5)`
+		err = sm.db.QueryRowx(q, stateKey, in.User.FlexID,
+			in.User.FlexIDType, tmp, sm.pluginName).Scan(&tmp)
+	}
 	if err != nil {
-		if err.Error() == `strconv.ParseInt: parsing "": invalid syntax` {
+		if err.Error() != `pq: duplicate key value violates unique constraint "states_userid_pkgname_key_key"` &&
+			err.Error() != `pq: duplicate key value violates unique constraint "states_flexid_flexidtype_pluginname_key_key"` {
+			sm.logger.Info("could not fetch value from states.", err)
 			sm.state = 0
 			return
 		}
-		sm.logger.Debug("could not parse state", err)
+		if in.User.ID > 0 {
+			q := `SELECT value FROM states
+			      WHERE userid=$1 AND key=$2 AND pluginname=$3`
+			err = sm.db.Get(&tmp, q, in.User.ID, stateKey,
+				sm.pluginName)
+		} else {
+			q := `SELECT value FROM states
+			      WHERE flexid=$1 AND flexidtype=$2 AND key=$3 AND pluginname=$4`
+			err = sm.db.Get(&tmp, q, in.User.FlexID,
+				in.User.FlexIDType, stateKey, sm.pluginName)
+		}
+		if err != nil {
+			sm.logger.Info("failed to get value from state.", err)
+			return
+		}
+		sm.logger.Debug("retrieved state from db")
+	} else {
+		sm.logger.Debug("added state to db")
 	}
-	sm.state = int(tmp)
+	var val int
+	if err = json.Unmarshal(tmp, &val); err != nil {
+		sm.logger.Info("failed unmarshaling state from db.", err)
+		return
+	}
+	sm.state = val
+
 	// Have we already entered a state?
 	sm.stateEntered = sm.GetMemory(in, stateEnteredKey).Bool()
 	sm.logger.Debug("set state to", sm.state)
@@ -191,10 +202,14 @@ func (sm *StateMachine) GetDBConn() *sqlx.DB {
 // returns the next response of the stateMachine, whether that's the Complete()
 // failed string or the OnEntry() string.
 func (sm *StateMachine) Next(in *Msg) (response string) {
+	// This check prevents a panic when a plugin has been modified to remove
+	// one or more states.
 	if sm.state >= len(sm.Handlers) {
 		sm.logger.Debug("state is >= len(handlers)")
 		return ""
 	}
+
+	// Ensure the state has not been entered, yet
 	h := sm.Handlers[sm.state]
 	if !sm.stateEntered {
 		if h.SkipIfComplete {
@@ -211,23 +226,39 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 	}
 	sm.logger.Debug("state was already entered")
 	h.OnInput(in)
-	// Check completion of current state
+
+	// State was already entered, so check for completion
 	done, str := h.Complete(in)
 	if done {
 		sm.logger.Debug("state is done. going to next")
-		if sm.state+1 >= len(sm.Handlers)-1 {
-			sm.logger.Debug("finished states, nothing to do")
+		if sm.state+1 >= len(sm.Handlers) {
+			sm.logger.Debug("finished states")
 			return ""
-		}
-		q := `UPDATE states SET value=$1 WHERE key=$2`
-		b := make([]byte, 8) // space for int64
-		binary.LittleEndian.PutUint64(b, uint64(sm.state))
-		if _, err := sm.db.Exec(q, b, stateKey); err != nil {
-			sm.logger.Info("could not update state", err)
 		}
 		sm.state++
 		sm.setEntered(in)
-		return sm.Handlers[sm.state].OnEntry(in)
+		sm.logger.Debug("set state to", sm.state)
+		sm.logger.Debug("set state entered to true")
+		byt, err := json.Marshal(sm.state)
+		if err != nil {
+			sm.logger.Info("failed to marshal state.", err)
+		}
+		if in.User.ID > 0 {
+			q := `UPDATE states SET value=$1
+			      WHERE key=$2 AND userid=$3`
+			_, err = sm.db.Exec(q, byt, stateKey, in.User.ID)
+		} else {
+			q := `UPDATE states SET value=$1
+			      WHERE key=$2 AND flexid=$3 AND flexidtype=$4`
+			_, err = sm.db.Exec(q, byt, stateKey, in.User.FlexID,
+				in.User.FlexIDType)
+		}
+		if err != nil {
+			sm.logger.Info("could not update state.", err)
+		}
+		str = sm.Handlers[sm.state].OnEntry(in)
+		sm.logger.Debug("going to next state", sm.state)
+		return str
 	} else if len(str) > 0 {
 		sm.logger.Debug("incomplete with message")
 		return str
@@ -247,7 +278,7 @@ func (sm *StateMachine) setEntered(in *Msg) {
 // OnInput runs the stateMachine's current OnInput function. Most of the time
 // this is not used directly, since Next() will automatically run this function
 // when appropriate. It's an exported function to provide users more control
-// over their
+// over their plugins.
 func (sm *StateMachine) OnInput(in *Msg) {
 	sm.Handlers[sm.state].OnInput(in)
 }
@@ -263,10 +294,11 @@ func (sm *StateMachine) OnInput(in *Msg) {
 func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 	b, err := json.Marshal(v)
 	if err != nil {
-		sm.logger.Info("could not marshal memory interface to json at",
-			k, ":", err)
+		sm.logger.Infof("could not marshal memory interface to json at %s. %s",
+			k, err.Error())
 		return
 	}
+	sm.logger.Debug("setting memory for", k, "to", string(b))
 	if in.User.ID > 0 {
 		q := `INSERT INTO states (key, value, pluginname, userid)
 		      VALUES ($1, $2, $3, $4)
@@ -283,7 +315,8 @@ func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
 			in.User.FlexIDType)
 	}
 	if err != nil {
-		sm.logger.Info("could not set memory at", k, "to", v, ":", err)
+		sm.logger.Infof("could not set memory at %s to %s. %s", k, v,
+			err.Error())
 		return
 	}
 }
@@ -309,7 +342,8 @@ func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	if err != nil {
-		sm.logger.Info("could not get memory for key", k, ":", err)
+		sm.logger.Infof("could not get memory for key %s. %s", k,
+			err.Error())
 		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
 	}
 	return Memory{Key: k, Val: buf, logger: sm.logger}
@@ -331,7 +365,8 @@ func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
 			sm.pluginName, k)
 	}
 	if err != nil {
-		sm.logger.Info("could not delete memory for key", k, ":", err)
+		sm.logger.Infof("could not delete memory for key %s. %s", k,
+			err.Error())
 	}
 }
 

@@ -71,10 +71,18 @@ func (m *Msg) Save(db *sqlx.DB) error {
 // no new trigger is detected.
 func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
 	var route string
-	q := `SELECT route FROM messages
-	      WHERE userid=$1 AND abotsent IS FALSE
-	      ORDER BY createdat DESC`
-	err := db.Get(&route, q, m.User.ID)
+	var err error
+	if m.User.ID > 0 {
+		q := `SELECT route FROM messages
+		      WHERE userid=$1 AND abotsent IS FALSE
+		      ORDER BY createdat DESC`
+		err = db.Get(&route, q, m.User.ID)
+	} else {
+		q := `SELECT route FROM messages
+		      WHERE flexid=$1 AND flexidtype=$2 AND abotsent IS FALSE
+		      ORDER BY createdat DESC`
+		err = db.Get(&route, q, m.User.FlexID, m.User.FlexIDType)
+	}
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
