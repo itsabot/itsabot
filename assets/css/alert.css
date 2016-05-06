@@ -1,11 +1,24 @@
 .alert {
+	text-align: left;
 	padding: 1em;
 	border: 1px solid transparent;
 	border-radius: 4px;
-	margin-bottom: 1em;
+}
+.alert.alert-warn {
+	color: #8A6D3B;
+	background-color: #FCF8E3;
+	border-color: #FAEBCC;
 }
 .alert.alert-danger {
 	color: #A94442;
 	background-color: #F2DEDE;
 	border-color: #EBCCD1;
+}
+.alert.alert-success {
+	color: #3C763D;
+	background-color: #DFF0D8;
+	border-color: #D6E9C6;
+}
+.alert.alert-margin {
+	margin-bottom: 1em;
 }

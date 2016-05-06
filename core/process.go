@@ -53,6 +53,7 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 	log.Debug("processed input into message...")
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
+	log.Debug(" intents:", msg.StructuredInput.Intents)
 	plugin, route, followup, pluginErr := GetPlugin(DB(), msg)
 	if pluginErr != nil && pluginErr != ErrMissingPlugin {
 		return "", msg.User.ID, pluginErr

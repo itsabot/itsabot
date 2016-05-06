@@ -42,9 +42,12 @@ type PluginConfig struct {
 	// plugin.json.
 	Icon string
 
-	// Type specifies the type of plugin and can be either "action" or
-	// "driver". It's defined in plugin.json.
-	Type string
+	// Maintainer is the owner/publisher of the plugin.
+	Maintainer string
+
+	// ID is the remote ID of the plugin. This is pulled automatically at
+	// time of plugin install from ITSABOT_URL.
+	ID uint64
 }
 
 // PluginEvents allow plugins to listen to events as they happen in Abot core.

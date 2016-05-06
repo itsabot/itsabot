@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +20,8 @@ import (
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/interface/email"
 	"github.com/itsabot/abot/shared/interface/sms"
+	"github.com/itsabot/abot/shared/nlp"
+	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq" // Postgres driver
@@ -26,20 +30,45 @@ import (
 var db *sqlx.DB
 var ner Classifier
 var offensive map[string]struct{}
+var conf *PluginJSON = &PluginJSON{}
+var pluginsGo *PluginsGoJSON = &PluginsGoJSON{}
 var smsConn *sms.Conn
 var emailConn *email.Conn
+
+// bClassifiers holds the trained bayesian classifiers for our plugins. The key
+// is the plugin ID to which the trained classifier belongs.
+var bClassifiers = map[uint64]*bayesian.Classifier{}
+
+// pluginIntents holds the intents for which each plugin has been trained. The
+// outer map divides the intents for each plugin by plugin ID.
+var pluginIntents = map[uint64][]bayesian.Class{}
+
+// tSentence is a training sentence retrieved from a remote source (defaults to
+// itsabot.org). To change the default source, set the ITSABOT_URL environment
+// variable.
+type tSentence struct {
+	ID       uint64
+	Sentence string
+	Intent   string
+	PluginID uint64
+}
 
 // DB returns a connection to the database.
 func DB() *sqlx.DB {
 	return db
 }
 
-// NER returns the classifiers used for named entity recognition.
+// Conf returns Abot's plugins.json configuration.
+func Conf() *PluginJSON {
+	return conf
+}
+
+// NER returns a Named Entity Recognition classifier.
 func NER() Classifier {
 	return ner
 }
 
-// Offensive returns a map of offensive words that Abot should ignore.
+// Offensive returns a set of offensive words.
 func Offensive() map[string]struct{} {
 	return offensive
 }
@@ -60,7 +89,7 @@ func NewServer() (r *httprouter.Router, err error) {
 		return nil, err
 	}
 
-	conf, err := LoadConf()
+	err = LoadConf()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
 		log.Info("failed loading conf", err)
 		return nil, err
@@ -72,17 +101,18 @@ func NewServer() (r *httprouter.Router, err error) {
 			return nil, err
 		}
 	}
-
-	/*
-		if os.Getenv("ABOT_ENV") != "test" {
-			if err = CompileAssets(); err != nil {
-				return nil, err
-			}
-		}
-	*/
+	err = loadPluginsGo()
+	if err != nil && os.Getenv("ABOT_ENV") != "test" {
+		log.Info("failed loading plugins.go", err)
+		return nil, err
+	}
 	ner, err = buildClassifier()
 	if err != nil {
 		log.Debug("could not build classifier", err)
+	}
+	log.Info("training classifiers")
+	if err = trainClassifiers(); err != nil {
+		log.Info("could not train classifiers", err)
 	}
 	offensive, err = buildOffensiveMap()
 	if err != nil {
@@ -226,22 +256,18 @@ func ConnectDB() (*sqlx.DB, error) {
 }
 
 // LoadConf plugins.json into a usable struct.
-func LoadConf() (*PluginJSON, error) {
+func LoadConf() error {
 	contents, err := ioutil.ReadFile("plugins.json")
 	if err != nil {
 		if err.Error() != "open plugins.json: no such file or directory" {
-			return nil, err
+			return err
 		}
 		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.json"))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	plugins := &PluginJSON{}
-	if err = json.Unmarshal(contents, plugins); err != nil {
-		return nil, err
-	}
-	return plugins, nil
+	return json.Unmarshal(contents, conf)
 }
 
 // LoadEnvVars from abot.env into memory
@@ -292,4 +318,117 @@ func LoadEnvVars() error {
 		return err
 	}
 	return nil
+}
+
+// loadPluginsGo loads the plugins.go file into memory.
+func loadPluginsGo() error {
+	contents, err := ioutil.ReadFile("plugins.go")
+	if err != nil {
+		if err.Error() != "open plugins.go: no such file or directory" {
+			return err
+		}
+		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.go"))
+		if err != nil {
+			return err
+		}
+	}
+	var val []byte
+	var foundStart bool
+	for _, b := range contents {
+		switch b {
+		case '{':
+			foundStart = true
+		case '}':
+			val = append(val, b)
+			val = append(val, []byte(",")...)
+			foundStart = false
+		}
+		if !foundStart {
+			continue
+		}
+		val = append(val, b)
+	}
+	val = append([]byte("["), val...)
+	val = append(val[:len(val)-1], []byte("]")...)
+	return json.Unmarshal(val, pluginsGo)
+}
+
+// trainClassifiers trains classifiers for each plugin.
+func trainClassifiers() error {
+	for path := range conf.Dependencies {
+		ss, err := fetchTrainingSentences(path)
+		if err != nil {
+			return err
+		}
+
+		// Assemble list of Bayesian classes from all trained intents
+		// for this plugin. m is used to keep track of the classes
+		// already taught to each classifier.
+		m := map[string]struct{}{}
+		for _, s := range ss {
+			_, ok := m[s.Intent]
+			if ok {
+				continue
+			}
+			log.Debug("learning intent", s.Intent)
+			m[s.Intent] = struct{}{}
+			pluginIntents[s.PluginID] = append(pluginIntents[s.PluginID],
+				bayesian.Class(s.Intent))
+		}
+
+		// Build classifier from complete sets of intents
+		for _, s := range ss {
+			intents := pluginIntents[s.PluginID]
+			if len(intents) < 2 {
+				// Calling bayesian.NewClassifier() with 0 or 1
+				// classes causes a panic.
+				continue
+			}
+			c := bayesian.NewClassifier(intents...)
+			bClassifiers[s.PluginID] = c
+		}
+
+		// With classifiers initialized, train each of them on a
+		// sentence's stems.
+		for _, s := range ss {
+			tokens := nlp.TokenizeSentence(s.Sentence)
+			stems := nlp.StemTokens(tokens)
+			c, exists := bClassifiers[s.PluginID]
+			if exists {
+				c.Learn(stems, bayesian.Class(s.Intent))
+			}
+		}
+	}
+	return nil
+}
+
+// fetchTrainingSentences retrieves training sentences from a remote source
+// (defaults to itsabot.org).
+func fetchTrainingSentences(name string) ([]tSentence, error) {
+	c := &http.Client{Timeout: 10 * time.Second}
+	u := os.Getenv("ITSABOT_URL") + "/api/plugins/train/" +
+		url.QueryEscape(name)
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err = resp.Body.Close(); err != nil {
+			log.Info("failed to close response body.", err)
+		}
+	}()
+	ss := []tSentence{}
+
+	// This occurs when the plugin has not been published, which we should
+	// ignore on boot.
+	if resp.StatusCode == http.StatusBadRequest {
+		log.Infof("warn: plugin %s has not been published", name)
+		return ss, nil
+	}
+	err = json.NewDecoder(resp.Body).Decode(&ss)
+	return ss, err
 }
