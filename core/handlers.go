@@ -688,11 +688,10 @@ func HAPIRemoteTokens(w http.ResponseWriter, r *http.Request) {
 	auths := []struct {
 		Token     string
 		Email     string
-		PluginID  uint64
 		CreatedAt time.Time
+		PluginIDs dt.Uint64Slice
 	}{}
-	q := `SELECT token, email, pluginid, createdat
-	      FROM remotetokens`
+	q := `SELECT token, email, pluginids, createdat FROM remotetokens`
 	err := db.Select(&auths, q)
 	if err != nil && err != sql.ErrNoRows {
 		writeErrorInternal(w, err)
@@ -721,8 +720,8 @@ func HAPIRemoteTokensSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var req struct {
-		Token    string
-		PluginID uint64
+		Token     string
+		PluginIDs dt.Uint64Slice
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErrorBadRequest(w, err)
@@ -733,11 +732,11 @@ func HAPIRemoteTokensSubmit(w http.ResponseWriter, r *http.Request) {
 		writeErrorBadRequest(w, err)
 		return
 	}
-	q := `INSERT INTO remotetokens (token, email, pluginid)
+	q := `INSERT INTO remotetokens (token, email, pluginids)
 	      VALUES ($1, $2, $3)`
-	_, err = db.Exec(q, req.Token, cookie.Value, req.PluginID)
+	_, err = db.Exec(q, req.Token, cookie.Value, req.PluginIDs)
 	if err != nil {
-		if err.Error() == `pq: duplicate key value violates unique constraint "remotetokens_pkey"` {
+		if err.Error() == `pq: duplicate key value violates unique constraint "remotetokens_token_key"` {
 			writeErrorBadRequest(w, errors.New("Token has already been added."))
 			return
 		}

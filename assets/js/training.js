@@ -16,15 +16,15 @@ abot.Training.controller = function() {
 		}).then(function(resp) {
 			ctrl.props.published(true)
 			var at = abot.state.authTokens()
-			console.log(at)
 			var trainable = false
 			for (var i = 0; i < at.length; i++) {
-				if (at[i].PluginID === id) {
-					trainable = true
-					break
+				for (var j = 0; j < at[i].PluginIDs.length; j++) {
+					if (at[i].PluginIDs[j] === id) {
+						trainable = true
+						break
+					}
 				}
 			}
-			console.log(trainable)
 			ctrl.props.trainable(trainable)
 			ctrl.props.sentences(resp)
 			document.querySelector(".content").classList.remove("hidden")
@@ -39,7 +39,6 @@ abot.Training.controller = function() {
 		if (changed.length === 0) {
 			return
 		}
-		console.log(ctrl.props.plugins()[ctrl.props.pluginIdx()].ID)
 		abot.externalRequest({
 			url: abot.itsAbotURL() + "/api/plugins/train.json",
 			method: "PUT",

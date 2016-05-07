@@ -8,7 +8,6 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,10 +29,10 @@ import (
 var db *sqlx.DB
 var ner Classifier
 var offensive map[string]struct{}
-var conf *PluginJSON = &PluginJSON{}
-var pluginsGo *PluginsGoJSON = &PluginsGoJSON{}
 var smsConn *sms.Conn
 var emailConn *email.Conn
+var conf = &PluginJSON{}
+var pluginsGo = []dt.PluginConfig{}
 
 // bClassifiers holds the trained bayesian classifiers for our plugins. The key
 // is the plugin ID to which the trained classifier belongs.
@@ -350,13 +349,13 @@ func loadPluginsGo() error {
 	}
 	val = append([]byte("["), val...)
 	val = append(val[:len(val)-1], []byte("]")...)
-	return json.Unmarshal(val, pluginsGo)
+	return json.Unmarshal(val, &pluginsGo)
 }
 
 // trainClassifiers trains classifiers for each plugin.
 func trainClassifiers() error {
-	for path := range conf.Dependencies {
-		ss, err := fetchTrainingSentences(path)
+	for _, pconf := range pluginsGo {
+		ss, err := fetchTrainingSentences(pconf.ID, pconf.Name)
 		if err != nil {
 			return err
 		}
@@ -403,11 +402,11 @@ func trainClassifiers() error {
 }
 
 // fetchTrainingSentences retrieves training sentences from a remote source
-// (defaults to itsabot.org).
-func fetchTrainingSentences(name string) ([]tSentence, error) {
+// (via ITSABOT_URL, which defaults to itsabot.org).
+func fetchTrainingSentences(pluginID uint64, name string) ([]tSentence, error) {
 	c := &http.Client{Timeout: 10 * time.Second}
-	u := os.Getenv("ITSABOT_URL") + "/api/plugins/train/" +
-		url.QueryEscape(name)
+	pid := strconv.FormatUint(pluginID, 10)
+	u := os.Getenv("ITSABOT_URL") + "/api/plugins/train/" + pid
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, err

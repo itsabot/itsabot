@@ -11,18 +11,16 @@ abot.AccountConnect.controller = function() {
 		ev.preventDefault()
 		ctrl.props.success("")
 		ctrl.props.error("")
-		ctrl.testAuthToken(function(valid, plugin) {
+		ctrl.testAuthToken(function(valid, plugins) {
 			if (!valid) {
 				return
 			}
-			console.log(plugin)
 			abot.request({
 				url: "/api/admin/remote_tokens.json",
 				method: "POST",
 				data: {
 					Token: ctrl.props.token(),
-					PluginID: plugin.ID,
-					PluginName: plugin.Name,
+					PluginIDs: plugins,
 				},
 			}).then(function(resp) {
 				var token = {
@@ -48,18 +46,6 @@ abot.AccountConnect.controller = function() {
 			ctrl.props.success("")
 			ctrl.props.error(err.Msg)
 			cb(false)
-		})
-	}
-	ctrl.deleteAuthToken = function(ev) {
-		ev.preventDefault()
-		abot.request({
-			url: "/api/admin/remote_tokens.json",
-			method: "DELETE",
-			data: { Token: "TESTTOKEN--REPLACE" },
-		}).then(function(resp) {
-			console.log(resp)
-		}, function(err) {
-			ctrl.showError(err.Msg)
 		})
 	}
 	ctrl.fetchAuthTokens = function() {
