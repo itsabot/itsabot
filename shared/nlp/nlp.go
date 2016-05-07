@@ -119,7 +119,7 @@ var QuoteEscapeRegex = regexp.MustCompile(`([^\\]([\\]{2})*)\\"`)
 func (s *StringSlice) Scan(src interface{}) error {
 	asBytes, ok := src.([]byte)
 	if !ok {
-		return error(errors.New("scan source was not []bytes"))
+		return errors.New("scan source was not []bytes")
 	}
 	str := string(asBytes)
 	str = QuoteEscapeRegex.ReplaceAllString(str, `$1""`)
