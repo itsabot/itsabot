@@ -31,6 +31,11 @@ import (
 	_ "github.com/lib/pq" // Postgres driver
 )
 
+type ErrMessage struct {
+	message string
+	err     error
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
@@ -62,7 +67,15 @@ func main() {
 					Aliases: []string{"i"},
 					Usage:   "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
-						installPlugins()
+						if err := installPlugins(); err != nil {
+							l := log.New("")
+							l.SetFlags(0)
+							// Plugins install failed remove incomplete plugins.go file
+							if errR := os.Remove("plugins.go"); errR != nil {
+								l.Infof("could not remove plugins.go file\n%s", err, errR)
+							}
+							l.Fatalf("could not install plugins\n%s", err)
+						}
 					},
 				},
 				{
@@ -283,7 +296,7 @@ func startConsole(c *cli.Context) error {
 	return nil
 }
 
-func installPlugins() {
+func installPlugins() error {
 	l := log.New("")
 	l.SetFlags(0)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
@@ -304,14 +317,17 @@ func installPlugins() {
 		if err.Error() == "exit status 1" {
 			l.Info("Is a plugin trying to import a non-existent package?")
 		}
-		l.Fatal("Failed to install plugins.", err)
+		return err
 	}
 
 	// Sync each of them to get dependencies
-	var wg sync.WaitGroup
-	wg.Add(len(plugins.Dependencies))
+	var wg = &sync.WaitGroup{}
+	errChan := make(chan ErrMessage)
+	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
+		wg.Add(1)
 		go func(url, version string) {
+			defer wg.Done()
 			// Check out specific commit
 			var outB []byte
 			var errB error
@@ -325,7 +341,8 @@ func installPlugins() {
 					CombinedOutput()
 				if errB != nil {
 					l.Debug(string(outB))
-					l.Fatal(errB)
+					errChan <- ErrMessage{message: "", err: errB}
+					return
 				}
 			}
 
@@ -335,39 +352,46 @@ func installPlugins() {
 			p := struct{ Path string }{Path: url}
 			outB, errB = json.Marshal(p)
 			if errB != nil {
-				l.Info("failed to build itsabot.org JSON.", errB)
-				wg.Done()
+				errChan <- ErrMessage{message: "failed to build itsabot.org JSON.", err: errB}
 				return
 			}
 			var u string
 			u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
 			req, errB := http.NewRequest("PUT", u, bytes.NewBuffer(outB))
 			if errB != nil {
-				l.Info("failed to build request to itsabot.org.", errB)
-				wg.Done()
+				errChan <- ErrMessage{message: "failed to build request to itsabot.org.", err: errB}
 				return
 			}
 			client := &http.Client{Timeout: 10 * time.Second}
 			resp, errB := client.Do(req)
 			if errB != nil {
-				l.Info("failed to update itsabot.org.", errB)
-				wg.Done()
+				errChan <- ErrMessage{message: "failed to update itsabot.org.", err: errB}
 				return
 			}
 			defer func() {
 				if errB = resp.Body.Close(); errB != nil {
-					l.Fatal(errB)
+					errChan <- ErrMessage{message: "", err: errB}
 				}
 			}()
 			if resp.StatusCode != 200 {
 				l.Infof("WARN: %d - %s\n", resp.StatusCode,
 					resp.Status)
 			}
-			wg.Done()
 		}(url, version)
 	}
+	// Continuously wait for errors in the error channel.
+	go func() {
+		for {
+			select {
+			// If  the error channel has recieved an error and its message log them both.
+			case errC := <-errChan:
+				l.Info(errC.message, errC.err)
+			default:
+				// Don't block.
+			}
+		}
+	}()
 	wg.Wait()
-
 	// Ensure dependencies are still there with the latest checked out
 	// versions, and install the plugins
 	l.Info("Installing plugins...")
@@ -376,12 +400,13 @@ func installPlugins() {
 		CombinedOutput()
 	if err != nil {
 		l.Info(string(outC))
-		l.Fatal(err)
+		return err
 	}
 
 	embedPluginConfs(plugins, l)
 	updateGlockfileAndInstall(l)
 	l.Info("Success!")
+	return nil
 }
 
 func updatePlugins() {
