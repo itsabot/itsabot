@@ -5,7 +5,7 @@ import "github.com/itsabot/abot/shared/datatypes"
 // getCalendar asks the user to connect their Google calendar via a secure web
 // interface (user profile). Eventually this will support adding additional
 // calendar services beyond just Google's.
-func getCalendar(sm *dt.StateMachine, label string) []dt.State {
+func getCalendar(p *dt.Plugin, label string) []dt.State {
 	return []dt.State{
 		{
 			OnEntry: func(in *dt.Msg) string {

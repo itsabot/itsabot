@@ -26,14 +26,14 @@ const (
 
 // New returns a slice of States for inclusion into a StateMachine.SetStates()
 // call.
-func New(sm *dt.StateMachine, t Type, label string) []dt.State {
+func New(p *dt.Plugin, t Type, label string) []dt.State {
 	switch t {
 	case RequestAddress:
-		return getAddress(sm, label)
+		return getAddress(p, label)
 	case RequestCalendar:
-		return getCalendar(sm, label)
+		return getCalendar(p, label)
 	case RequestSignup:
-		return requestSignup(sm, label)
+		return requestSignup(p, label)
 	}
 	return []dt.State{}
 }

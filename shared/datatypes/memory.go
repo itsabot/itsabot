@@ -13,9 +13,9 @@ import (
 // datatype, and it's up to the plugin developer to recall which memories
 // correspond to which datatypes.
 type Memory struct {
-	Key    string
-	Val    []byte
-	logger *log.Logger
+	Key string
+	Val []byte
+	log *log.Logger
 }
 
 // String is a helper method making it easier to perform a common use-case,
@@ -30,7 +30,7 @@ func (m Memory) String() string {
 func (m Memory) Int64() int64 {
 	i, err := strconv.ParseInt(string(m.Val), 10, 64)
 	if err != nil && err.Error() != "strconv.ParseInt: parsing \"\"\"\": invalid syntax converting memory to int64" {
-		m.logger.Debugf("could not convert memory to int64 %s (%s, %s)",
+		m.log.Debugf("could not convert memory to int64 %s (%s, %s)",
 			err, m.Key, string(m.Val))
 	}
 	return i
@@ -42,7 +42,7 @@ func (m Memory) Int64() int64 {
 func (m Memory) Bool() bool {
 	b, err := strconv.ParseBool(string(m.Val))
 	if err != nil {
-		m.logger.Debugf("could not convert memory to bool %s (%s, %s)",
+		m.log.Debugf("could not convert memory to bool %s (%s, %s)",
 			err, m.Key, string(m.Val))
 	}
 	return b

@@ -29,7 +29,7 @@ func Preprocess(r *http.Request) (*dt.Msg, error) {
 		return nil, err
 	}
 	sendPostReceiveEvent(&req.CMD)
-	u, err := dt.GetUser(DB(), req)
+	u, err := dt.GetUser(db, req)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 	log.Debug("commands:", msg.StructuredInput.Commands)
 	log.Debug(" objects:", msg.StructuredInput.Objects)
 	log.Debug(" intents:", msg.StructuredInput.Intents)
-	plugin, route, followup, pluginErr := GetPlugin(DB(), msg)
+	plugin, route, directRoute, followup, pluginErr := GetPlugin(db, msg)
 	if pluginErr != nil && pluginErr != ErrMissingPlugin {
 		return "", msg.User.ID, pluginErr
 	}
@@ -64,7 +64,7 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 	} else {
 		msg.Plugin = plugin.Config.Name
 	}
-	if err = msg.Save(DB()); err != nil {
+	if err = msg.Save(db); err != nil {
 		return "", msg.User.ID, err
 	}
 	sendPostProcessingEvent(msg)
@@ -72,30 +72,43 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 	if len(ret) > 0 {
 		return ret, msg.User.ID, nil
 	}
-	if pluginErr != ErrMissingPlugin {
-		if followup {
-			log.Debug("message is a followup")
-		}
-		ret = CallPlugin(plugin, msg, followup)
-	}
-	responseNeeded := true
 	if len(ret) == 0 {
-		responseNeeded, ret = RespondWithNicety(msg)
-	}
-	if !responseNeeded {
-		return "", msg.User.ID, nil
+		ret = RespondWithNicety(msg)
 	}
 	m := &dt.Msg{}
 	m.AbotSent = true
 	m.User = msg.User
+	if len(ret) > 0 {
+		m.Sentence = ret
+		if err = m.Save(db); err != nil {
+			return "", m.User.ID, err
+		}
+		return ret, msg.User.ID, nil
+	}
+	var smAnswered bool
+	if pluginErr != ErrMissingPlugin {
+		if followup {
+			log.Debug("message is a followup")
+		}
+		ret, smAnswered = dt.CallPlugin(plugin, msg, followup)
+	}
 	if len(ret) == 0 {
 		m.Sentence = ConfusedLang()
 		msg.NeedsTraining = true
-		if err = msg.Update(DB()); err != nil {
+		if err = msg.Update(db); err != nil {
 			return "", m.User.ID, err
 		}
 	} else {
-		m.Sentence = ret
+		state := plugin.GetMemory(m, dt.StateKey).Int64()
+		if plugin != nil && state == 0 && !directRoute && smAnswered {
+			m.Sentence = ConfusedLang()
+			msg.NeedsTraining = true
+			if err = msg.Update(db); err != nil {
+				return "", m.User.ID, err
+			}
+		} else {
+			m.Sentence = ret
+		}
 	}
 	if plugin != nil {
 		m.Plugin = plugin.Config.Name

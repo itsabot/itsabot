@@ -119,24 +119,23 @@ func buildOffensiveMap() (map[string]struct{}, error) {
 
 // RespondWithNicety replies to niceties that humans use, but Abot can ignore.
 // Words like "Thank you" are not necessary for a robot, but it's important Abot
-// respond correctly nonetheless. The returned bool specifies whether a response
-// is necessary, and the returned string is the response, if any.
-func RespondWithNicety(in *dt.Msg) (responseNecessary bool, response string) {
+// respond correctly nonetheless.
+func RespondWithNicety(in *dt.Msg) string {
 	for _, w := range in.Stems {
 		// Since these are stems, some of them look incorrectly spelled.
 		// Needless to say, these are the correct Porter2 Snowball stems
 		switch w {
 		case "thank":
-			return true, "You're welcome!"
+			return "You're welcome!"
 		case "cool", "sweet", "awesom", "neat", "perfect":
-			return false, ""
+			return "I know!"
 		case "sorri":
-			return true, "That's OK. I forgive you."
+			return "That's OK. I forgive you."
 		case "hi", "hello":
-			return true, "Hi there. :)"
+			return "Hi there. :)"
 		}
 	}
-	return true, ""
+	return ""
 }
 
 // RespondWithOffense is a one-off function to respond to rude user language by

@@ -17,7 +17,7 @@ func NewMsg(u *dt.User, cmd string) *dt.Msg {
 		scores, idx, _ := c.ProbScores(stems)
 		log.Debug("intent score", pluginIntents[pluginID][idx],
 			scores[idx])
-		if idx > 0 && scores[idx] > 0.7 {
+		if scores[idx] > 0.7 {
 			si.Intents = append(si.Intents,
 				string(pluginIntents[pluginID][idx]))
 		}
