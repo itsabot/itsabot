@@ -326,10 +326,6 @@ func loadPluginsGo() error {
 		if err.Error() != "open plugins.go: no such file or directory" {
 			return err
 		}
-		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.go"))
-		if err != nil {
-			return err
-		}
 	}
 	var val []byte
 	var foundStart bool
@@ -346,6 +342,9 @@ func loadPluginsGo() error {
 			continue
 		}
 		val = append(val, b)
+	}
+	if len(val) == 0 {
+		return nil
 	}
 	val = append([]byte("["), val...)
 	val = append(val[:len(val)-1], []byte("]")...)
