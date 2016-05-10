@@ -2,12 +2,9 @@
 abot.Profile = {}
 abot.Profile.controller = function() {
 	var userId = Cookies.get("id")
-	abot.Login.checkAuth(function(loggedIn) {
-		console.log("logged in?", loggedIn)
-		if (!loggedIn) {
-			return m.route("/login")
-		}
-	})
+	if (!abot.isLoggedIn()) {
+		return m.route("/login")
+	}
 	var redirect = m.route.param("r")
 	if (!!redirect) {
 		m.route("/" + redirect.substring(1))

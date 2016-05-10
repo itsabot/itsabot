@@ -1,6 +1,9 @@
 (function(abot) {
 abot.ForgotPassword = {}
 abot.ForgotPassword.controller = function() {
+	if (!abot.isLoggedIn()) {
+		return m.route("/profile", null, true)
+	}
 	var ctrl = this
 	ctrl.submit = function(ev) {
 		ev.preventDefault()
@@ -17,17 +20,7 @@ abot.ForgotPassword.controller = function() {
 			console.log("Error!")
 			ctrl.showError(err.Msg)
 		})
-	},
-	ctrl.checkAuth = function(callback) {
-		if (Cookies.get("id") !== null) {
-			callback(true)
-		}
 	}
-	ctrl.checkAuth(function(loggedIn) {
-		if (loggedIn) {
-			return m.route("/profile")
-		}
-	})
 	ctrl.error = m.prop("")
 	ctrl.success = m.prop("")
 	ctrl.hideError = function() {

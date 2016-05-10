@@ -25,4 +25,11 @@ header .links a:hover {
 }
 header .logo {
 	display: inline-block;
+	height: 1em;
+}
+header .logo img {
+	height: 100%;
+	vertical-align: middle;
+	position: relative;
+	bottom: 3px;
 }
