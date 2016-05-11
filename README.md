@@ -1,9 +1,11 @@
-# Abot [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/itsabot/abot) [![Travis CI](https://img.shields.io/travis/itsabot/abot.svg?style=flat-square)](https://travis-ci.org/itsabot/abot)
+![Abot](http://i.imgur.com/WBACSyP.png)
 
 [Website](https://www.itsabot.org) |
 [Getting Started](https://github.com/itsabot/abot/wiki/Getting-Started) |
 [Contributing](https://github.com/itsabot/abot/wiki/How-to-Contribute) |
 [Mailing List](https://groups.google.com/forum/#!forum/abot-discussion)
+
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/itsabot/abot) [![Travis CI](https://img.shields.io/travis/itsabot/abot.svg?style=flat-square)](https://travis-ci.org/itsabot/abot)
  
 Abot (pronounced *Eh-Bot*, like the Canadians) is a digital assistant framework
 that enables anyone to easily build a digital assistant similar to Apple's Siri,
@@ -121,10 +123,6 @@ get involved with our
 ## License
 
 MIT, a copy of which you can find in the repo.
-
-The Abot logo is courtesy of
-[Edward Boatman](https://thenounproject.com/edward/) via TheNounProject and
-licensed via Creative Commons Attribution v3.
 
 The default plugin icon (puzzle piece) is courtesy of
 [Arthur Shlain](https://thenounproject.com/ArtZ91/) via TheNounProject and
