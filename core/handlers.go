@@ -167,10 +167,9 @@ func HAPILoginSubmit(w http.ResponseWriter, r *http.Request) {
 	var u struct {
 		ID       uint64
 		Password []byte
-		Trainer  bool
 		Admin    bool
 	}
-	q := `SELECT id, password, trainer, admin FROM users WHERE email=$1`
+	q := `SELECT id, password, admin FROM users WHERE email=$1`
 	err := db.Get(&u, q, req.Email)
 	if err == sql.ErrNoRows {
 		writeErrorAuth(w, ErrInvalidUserPass)
@@ -192,10 +191,9 @@ func HAPILoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := &dt.User{
-		ID:      u.ID,
-		Email:   req.Email,
-		Trainer: u.Trainer,
-		Admin:   u.Admin,
+		ID:    u.ID,
+		Email: req.Email,
+		Admin: u.Admin,
 	}
 	csrfToken, err := createCSRFToken(user)
 	if err != nil {
@@ -233,6 +231,12 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 		Email    string
 		Password string
 		FID      string
+
+		// Admin is only used to check whether existing users are in
+		// the DB. Only the first user in the DB can become an admin by
+		// signing up. Additional admins must be added in the admin
+		// panel under Manage Team.
+		Admin bool
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeErrorInternal(w, err)
@@ -270,6 +274,21 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 		req.FID = "+" + req.FID
 	}
 
+	var admin bool
+	if req.Admin {
+		var count int
+		q := `SELECT COUNT(*) FROM users WHERE admin=TRUE`
+		if err := db.Get(&count, q); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+		if count > 0 {
+			writeErrorBadRequest(w, errors.New("invalid param Admin"))
+			return
+		}
+		admin = true
+	}
+
 	// TODO format phone number for SMS interface (international format)
 	user := &dt.User{
 		Name:  req.Name,
@@ -277,7 +296,7 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 		// Password is hashed in user.Create()
 		Password: req.Password,
 		Trainer:  false,
-		Admin:    false,
+		Admin:    admin,
 	}
 	err := user.Create(db, dt.FlexIDType(2), req.FID)
 	if err != nil {
@@ -304,7 +323,7 @@ func HAPISignupSubmit(w http.ResponseWriter, r *http.Request) {
 	}{
 		ID:        user.ID,
 		Email:     user.Email,
-		Scopes:    []string{},
+		Scopes:    header.Scopes,
 		AuthToken: token,
 		IssuedAt:  header.IssuedAt,
 		CSRFToken: csrfToken,
@@ -822,9 +841,6 @@ func getAuthToken(u *dt.User) (header *Header, authToken string, err error) {
 	if u.Admin {
 		scopes = append(scopes, "admin")
 	}
-	if u.Trainer {
-		scopes = append(scopes, "trainer")
-	}
 	header = &Header{
 		ID:       u.ID,
 		Email:    u.Email,
@@ -1101,7 +1117,7 @@ func Admin(w http.ResponseWriter, r *http.Request) bool {
 				return false
 			}
 			if !admin {
-				writeErrorAuth(w, err)
+				writeErrorAuth(w, errors.New("User is not an admin"))
 				return false
 			}
 			log.Debug("validated admin")

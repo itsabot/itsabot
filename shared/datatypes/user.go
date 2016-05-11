@@ -134,11 +134,11 @@ func (u *User) Create(db *sqlx.DB, fidT FlexIDType, fid string) error {
 	if err != nil {
 		return err
 	}
-	q := `INSERT INTO users (name, email, password, locationid)
-	      VALUES ($1, $2, $3, 0)
+	q := `INSERT INTO users (name, email, password, locationid, admin)
+	      VALUES ($1, $2, $3, 0, $4)
 	      RETURNING id`
 	var uid uint64
-	err = tx.QueryRowx(q, u.Name, u.Email, hpw).Scan(&uid)
+	err = tx.QueryRowx(q, u.Name, u.Email, hpw, u.Admin).Scan(&uid)
 	if err != nil && err.Error() ==
 		`pq: duplicate key value violates unique constraint "users_email_key"` {
 		_ = tx.Rollback()
