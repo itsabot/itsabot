@@ -1,12 +1,10 @@
 (function(abot) {
 abot.Signup = {}
 abot.Signup.controller = function() {
+	if (abot.isLoggedIn()) {
+		return m.route("/profile", null, true)
+	}
 	var ctrl = this
-	abot.Login.checkAuth(function(cb) {
-		if (cb) {
-			return m.route("/profile")
-		}
-	})
 	ctrl.props = {
 		userName: m.prop(m.route.param("name") || ""),
 		phone: m.prop(m.route.param("fid") || ""),

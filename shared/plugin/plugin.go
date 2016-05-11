@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/dchest/stemmer/porter2"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/language"
 	"github.com/itsabot/abot/shared/nlp"
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
@@ -25,25 +27,11 @@ var ErrMissingPluginName = errors.New("missing plugin name")
 // were found.
 var ErrMissingTrigger = errors.New("missing plugin trigger")
 
-// ErrMissingPluginFns is returned when plugin functions are expected but none
-// were found.
-var ErrMissingPluginFns = errors.New("missing plugin functions")
-
 // New builds a Plugin with its trigger, RPC, and configuration settings from
 // its plugin.json.
-func New(url string, trigger *nlp.StructuredInput,
-	fns *dt.PluginFns) (*dt.Plugin, error) {
-
-	if trigger == nil {
-		return nil, ErrMissingTrigger
-	}
-	if fns == nil || fns.Run == nil || fns.FollowUp == nil {
-		return nil, ErrMissingPluginFns
-	}
-
+func New(url string) (*dt.Plugin, error) {
 	// Read plugin.json data from within plugins.go, unmarshal into struct
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "plugins.go")
+	p := filepath.Join("plugins.go")
 	fi, err := os.OpenFile(p, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -73,15 +61,9 @@ func New(url string, trigger *nlp.StructuredInput,
 	if err := scn.Err(); err != nil {
 		return nil, err
 	}
-	plg := &dt.Plugin{
-		Trigger:   trigger,
-		PluginFns: fns,
-		Events: &dt.PluginEvents{
-			PostReceive:    func(cmd *string) {},
-			PreProcessing:  func(cmd *string, u *dt.User) {},
-			PostProcessing: func(in *dt.Msg) {},
-			PostResponse:   func(in *dt.Msg, resp *string) {},
-		},
+	db, err := core.ConnectDB()
+	if err != nil {
+		return nil, err
 	}
 	c := dt.PluginConfig{}
 	if len(data) > 0 {
@@ -93,38 +75,123 @@ func New(url string, trigger *nlp.StructuredInput,
 			return nil, ErrMissingPluginName
 		}
 	}
-	plg.Config = c
-	db, err := core.ConnectDB()
-	if err != nil {
-		return nil, err
-	}
-	plg.DB = db
 	l := log.New(c.Name)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-	plg.Log = l
-	if err = RegisterPlugin(plg); err != nil {
-		return nil, err
+	plg := &dt.Plugin{
+		Trigger:     &nlp.StructuredInput{},
+		SetBranches: func(in *dt.Msg) [][]dt.State { return nil },
+		Events: &dt.PluginEvents{
+			PostReceive:    func(cmd *string) {},
+			PreProcessing:  func(cmd *string, u *dt.User) {},
+			PostProcessing: func(in *dt.Msg) {},
+			PostResponse:   func(in *dt.Msg, resp *string) {},
+		},
+		Config: c,
+		DB:     db,
+		Log:    l,
 	}
+	plg.SM = dt.NewStateMachine(plg)
 	return plg, nil
 }
 
-// RegisterPlugin enables Abot to notify plugins when specific StructuredInput
-// is encountered matching triggers set in the plugins themselves. Note that
-// plugins will only listen when ALL criteria are met and that there's no
-// support currently for duplicate routes (e.g. "find_restaurant" leading to
-// either one of two plugins).
-func RegisterPlugin(p *dt.Plugin) error {
+// Register enables Abot to notify plugins when specific StructuredInput is
+// encountered matching triggers set in the plugins themselves. Note that
+// plugins will only listen when (Command and Object) or (Intent) criteria are
+// met. There's no support currently for duplicate routes, e.g.
+// "find_restaurant" leading to either one of two plugins.
+func Register(p *dt.Plugin) error {
 	log.Debug("registering", p.Config.Name)
+	for _, i := range p.Trigger.Intents {
+		s := "__intent_" + strings.ToLower(i)
+		oldPlg := core.RegPlugins.Get(s)
+		if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
+			log.Infof("found duplicate plugin or trigger %s on %s",
+				p.Config.Name, s)
+		}
+		core.RegPlugins.Set(s, p)
+	}
 	for _, c := range p.Trigger.Commands {
 		for _, o := range p.Trigger.Objects {
 			s := strings.ToLower(c + "_" + o)
-			if core.RegPlugins.Get(s) != nil {
+			oldPlg := core.RegPlugins.Get(s)
+			if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
 				log.Info("found duplicate plugin or trigger",
 					p.Config.Name, "on", s)
 			}
 			core.RegPlugins.Set(s, p)
 		}
 	}
+
+	// registerPlugin is called whenever Keywords or Triggers are changed,
+	// but we don't want to append duplicate entries to our
+	// core.AllPlugins.
+	for _, plg := range core.AllPlugins {
+		if plg.Config.Name == p.Config.Name {
+			return nil
+		}
+	}
 	core.AllPlugins = append(core.AllPlugins, p)
+	p.SM.SetStates(p.States)
 	return nil
+}
+
+// SetKeywords processes and registers keywords with Abot's core for routing.
+func SetKeywords(p *dt.Plugin, khs ...dt.KeywordHandler) {
+	k := dt.Keywords{
+		Commands: map[string]struct{}{},
+		Objects:  map[string]struct{}{},
+		Intents:  map[string]struct{}{},
+		Dict:     map[string]dt.KeywordFn{},
+	}
+	eng := porter2.Stemmer
+	for _, kh := range khs {
+		for _, intent := range kh.Trigger.Intents {
+			k.Dict[intent] = kh.Fn
+			k.Intents[intent] = struct{}{}
+			if !language.Contains(p.Trigger.Intents, intent) {
+				p.Trigger.Intents = append(p.Trigger.Intents, intent)
+			}
+		}
+		for _, cmd := range kh.Trigger.Commands {
+			k.Dict[cmd] = kh.Fn
+			cmd = eng.Stem(cmd)
+			k.Commands[cmd] = struct{}{}
+			if !language.Contains(p.Trigger.Commands, cmd) {
+				p.Trigger.Commands = append(p.Trigger.Commands, cmd)
+			}
+		}
+		for _, obj := range kh.Trigger.Objects {
+			k.Dict[obj] = kh.Fn
+			obj = eng.Stem(obj)
+			k.Objects[obj] = struct{}{}
+			if !language.Contains(p.Trigger.Objects, obj) {
+				p.Trigger.Objects = append(p.Trigger.Objects, obj)
+			}
+		}
+	}
+	p.Keywords = &k
+}
+
+// SetStates is a convenience function provided to match the API of NewKeywords
+// and AppendTrigger.
+func SetStates(p *dt.Plugin, states [][]dt.State) {
+	p.States = states
+}
+
+// AppendTrigger appends the StructuredInput's modified contents to a plugin.
+// All Commands and Objects stemmed using the Porter2 Snowball algorithm.
+func AppendTrigger(p *dt.Plugin, t *nlp.StructuredInput) {
+	eng := porter2.Stemmer
+	for _, cmd := range t.Commands {
+		cmd = eng.Stem(cmd)
+		if !language.Contains(p.Trigger.Commands, cmd) {
+			p.Trigger.Commands = append(p.Trigger.Commands, cmd)
+		}
+	}
+	for _, obj := range t.Objects {
+		obj = eng.Stem(obj)
+		if !language.Contains(p.Trigger.Objects, obj) {
+			p.Trigger.Objects = append(p.Trigger.Objects, obj)
+		}
+	}
 }

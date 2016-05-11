@@ -19,7 +19,6 @@ type Msg struct {
 	StructuredInput *nlp.StructuredInput
 	Stems           []string
 	Plugin          string
-	State           map[string]interface{}
 	CreatedAt       *time.Time
 	// AbotSent determines if msg is from the user or Abot
 	AbotSent      bool

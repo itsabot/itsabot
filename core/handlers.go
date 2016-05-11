@@ -61,6 +61,7 @@ func newRouter() *httprouter.Router {
 	router.HandlerFunc("POST", "/api/signup.json", HAPISignupSubmit)
 	router.HandlerFunc("POST", "/api/forgot_password.json", HAPIForgotPasswordSubmit)
 	router.HandlerFunc("POST", "/api/reset_password.json", HAPIResetPasswordSubmit)
+	router.HandlerFunc("GET", "/api/admin_exists.json", HAPIAdminExists)
 
 	// API routes (restricted by login)
 	router.HandlerFunc("GET", "/api/user/profile.json", HAPIProfile)
@@ -522,6 +523,25 @@ func HAPIResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// HAPIAdminExists checks if an admin exists in the database.
+func HAPIAdminExists(w http.ResponseWriter, r *http.Request) {
+	var count int
+	q := `SELECT COUNT(*) FROM users WHERE admin=TRUE LIMIT 1`
+	if err := db.Get(&count, q); err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	byt, err := json.Marshal(count > 0)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(byt)
+	if err != nil {
+		log.Info("failed writing response header.", err)
+	}
 }
 
 // HAPIPlugins responds with all of the server's installed plugin

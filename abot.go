@@ -310,7 +310,6 @@ func installPlugins() {
 	// Sync each of them to get dependencies
 	var wg sync.WaitGroup
 	wg.Add(len(plugins.Dependencies))
-	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
 		go func(url, version string) {
 			// Check out specific commit
