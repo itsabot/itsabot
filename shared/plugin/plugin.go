@@ -68,7 +68,6 @@ func New(url string) (*dt.Plugin, error) {
 	c := dt.PluginConfig{}
 	if len(data) > 0 {
 		if err = json.Unmarshal([]byte(data), &c); err != nil {
-			log.Info("error here!")
 			return nil, err
 		}
 		if len(c.Name) == 0 {
@@ -100,12 +99,12 @@ func New(url string) (*dt.Plugin, error) {
 // met. There's no support currently for duplicate routes, e.g.
 // "find_restaurant" leading to either one of two plugins.
 func Register(p *dt.Plugin) error {
-	log.Debug("registering", p.Config.Name)
+	p.Log.Debug("registering", p.Config.Name)
 	for _, i := range p.Trigger.Intents {
 		s := "__intent_" + strings.ToLower(i)
 		oldPlg := core.RegPlugins.Get(s)
 		if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
-			log.Infof("found duplicate plugin or trigger %s on %s",
+			p.Log.Infof("found duplicate plugin or trigger %s on %s",
 				p.Config.Name, s)
 		}
 		core.RegPlugins.Set(s, p)
@@ -115,7 +114,7 @@ func Register(p *dt.Plugin) error {
 			s := strings.ToLower(c + "_" + o)
 			oldPlg := core.RegPlugins.Get(s)
 			if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
-				log.Info("found duplicate plugin or trigger",
+				p.Log.Info("found duplicate plugin or trigger",
 					p.Config.Name, "on", s)
 			}
 			core.RegPlugins.Set(s, p)

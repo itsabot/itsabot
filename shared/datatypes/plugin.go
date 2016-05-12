@@ -120,13 +120,31 @@ func CallPlugin(p *Plugin, in *Msg, followup bool) (resp string,
 func (p *Plugin) GetMemory(in *Msg, k string) Memory {
 	var buf []byte
 	var err error
+
+	// Only retrieve state-related values of that specific plugin.
+	// Otherwise fetch the memory from any plugin.
 	if in.User.ID > 0 {
-		q := `SELECT value FROM states WHERE userid=$1 AND key=$2`
-		err = p.DB.Get(&buf, q, in.User.ID, k)
+		if k == StateKey || k == stateEnteredKey {
+			q := `SELECT value FROM states
+			      WHERE userid=$1 AND key=$2 AND pluginname=$3`
+			err = p.DB.Get(&buf, q, in.User.ID, k, p.Config.Name)
+		} else {
+			q := `SELECT value FROM states
+			      WHERE userid=$1 AND key=$2`
+			err = p.DB.Get(&buf, q, in.User.ID, k)
+		}
 	} else {
-		q := `SELECT value FROM states
-		      WHERE flexid=$1 AND flexidtype=$2 AND key=$3`
-		err = p.DB.Get(&buf, q, in.User.FlexID, in.User.FlexIDType, k)
+		if k == StateKey || k == stateEnteredKey {
+			q := `SELECT value FROM states
+			      WHERE flexid=$1 AND flexidtype=$2 AND key=$3 AND pluginname=$4`
+			err = p.DB.Get(&buf, q, in.User.FlexID,
+				in.User.FlexIDType, k, p.Config.Name)
+		} else {
+			q := `SELECT value FROM states
+			      WHERE flexid=$1 AND flexidtype=$2 AND key=$3`
+			err = p.DB.Get(&buf, q, in.User.FlexID,
+				in.User.FlexIDType, k)
+		}
 	}
 	if err == sql.ErrNoRows {
 		return Memory{Key: k, Val: json.RawMessage{}, log: p.Log}

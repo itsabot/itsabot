@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dchest/stemmer/porter2"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/jmoiron/sqlx"
@@ -77,9 +78,11 @@ func GetPlugin(db *sqlx.DB, m *dt.Msg) (p *dt.Plugin, route string, directroute,
 
 	// Iterate over all command/object pairs and see if any plugin has been
 	// registered for the resulting route
+	eng := porter2.Stemmer
 	for _, c := range m.StructuredInput.Commands {
+		c = eng.Stem(c)
 		for _, o := range m.StructuredInput.Objects {
-			route := strings.ToLower(c + "_" + o)
+			route := strings.ToLower(c + "_" + eng.Stem(o))
 			log.Debug("searching for route", route)
 			if p = RegPlugins.Get(route); p != nil {
 				// Found route. Return it

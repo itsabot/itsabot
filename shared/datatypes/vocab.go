@@ -29,13 +29,17 @@ type KeywordFn func(in *Msg) (response string)
 
 // handle runs the first matching KeywordFn in the sentence.
 func (k *Keywords) handle(m *Msg) string {
+	if k == nil {
+		return ""
+	}
 	var resp string
 	for _, w := range m.Stems {
-		if k.Dict[w] == nil {
+		fn, ok := k.Dict[w]
+		if !ok {
 			continue
 		}
-		log.Debug("found fn in stems", w, k.Dict[w])
-		resp = (k.Dict[w])(m)
+		log.Debug("found fn in stems", w, fn)
+		resp = fn(m)
 		break
 	}
 	return resp
