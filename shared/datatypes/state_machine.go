@@ -119,18 +119,18 @@ func (sm *StateMachine) LoadState(in *Msg) {
 	if in.User.ID > 0 {
 		q := `INSERT INTO states
 		      (key, userid, value, pluginname) VALUES ($1, $2, $3, $4)`
-		err = sm.plugin.DB.QueryRowx(q, StateKey, in.User.ID, tmp,
-			sm.plugin.Config.Name).Scan(&tmp)
+		_, err = sm.plugin.DB.Exec(q, StateKey, in.User.ID, tmp,
+			sm.plugin.Config.Name)
 	} else {
 		q := `INSERT INTO states
 		      (key, flexid, flexidtype, value, pluginname) VALUES ($1, $2, $3, $4, $5)`
-		err = sm.plugin.DB.QueryRowx(q, StateKey, in.User.FlexID,
-			in.User.FlexIDType, tmp, sm.plugin.Config.Name).Scan(&tmp)
+		_, err = sm.plugin.DB.Exec(q, StateKey, in.User.FlexID,
+			in.User.FlexIDType, tmp, sm.plugin.Config.Name)
 	}
 	if err != nil {
 		if err.Error() != `pq: duplicate key value violates unique constraint "states_userid_pkgname_key_key"` &&
 			err.Error() != `pq: duplicate key value violates unique constraint "states_flexid_flexidtype_pluginname_key_key"` {
-			sm.plugin.Log.Info("could not fetch value from states.", err)
+			sm.plugin.Log.Info("could not insert value into states.", err)
 			sm.state = 0
 			return
 		}
@@ -159,8 +159,6 @@ func (sm *StateMachine) LoadState(in *Msg) {
 
 	// Have we already entered a state?
 	sm.stateEntered = sm.plugin.GetMemory(in, stateEnteredKey).Bool()
-	sm.plugin.Log.Debug("set state to", sm.state)
-	sm.plugin.Log.Debug("set state entered to", sm.stateEntered)
 	return
 }
 
@@ -194,8 +192,9 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 	// Ensure the state has not been entered yet
 	h := sm.Handlers[sm.state]
 	if !sm.stateEntered {
+		sm.plugin.Log.Debug("state was not entered")
+		done, _ := h.Complete(in)
 		if h.SkipIfComplete {
-			done, _ := h.Complete(in)
 			if done {
 				sm.plugin.Log.Debug("state was complete. moving on")
 				sm.state++
@@ -210,47 +209,34 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 		// reset the state machine. This fixes the "forever trapped"
 		// loop of being in a plugin's finished state machine.
 		resp := h.OnEntry(in)
-		if sm.state+1 == len(sm.Handlers) {
+		if sm.state+1 >= len(sm.Handlers) && done {
 			sm.Reset(in)
 		}
 		return resp
 	}
+
+	// State was already entered, so process the input and check for
+	// completion
 	sm.plugin.Log.Debug("state was already entered")
 	h.OnInput(in)
-
-	// State was already entered, so check for completion
 	done, str := h.Complete(in)
 	if done {
 		sm.plugin.Log.Debug("state is done. going to next")
 		sm.state++
 		sm.plugin.SetMemory(in, StateKey, sm.state)
-		sm.setEntered(in)
-		byt, err := json.Marshal(sm.state)
-		if err != nil {
-			sm.plugin.Log.Info("failed to marshal state.", err)
-		}
-		if in.User.ID > 0 {
-			q := `UPDATE states SET value=$1
-			      WHERE key=$2 AND userid=$3`
-			_, err = sm.plugin.DB.Exec(q, byt, StateKey, in.User.ID)
-		} else {
-			q := `UPDATE states SET value=$1
-			      WHERE key=$2 AND flexid=$3 AND flexidtype=$4`
-			_, err = sm.plugin.DB.Exec(q, byt, StateKey, in.User.FlexID,
-				in.User.FlexIDType)
-		}
-		if err != nil {
-			sm.plugin.Log.Info("could not update state.", err)
-		}
 		if sm.state >= len(sm.Handlers) {
 			sm.plugin.Log.Debug("finished states. resetting")
 			sm.Reset(in)
 			return sm.Next(in)
 		}
+		sm.setEntered(in)
 		str = sm.Handlers[sm.state].OnEntry(in)
 		sm.plugin.Log.Debug("going to next state", sm.state)
 		return str
 	}
+
+	sm.plugin.Log.Debug("set state to", sm.state)
+	sm.plugin.Log.Debug("set state entered to", sm.stateEntered)
 	return str
 }
 
