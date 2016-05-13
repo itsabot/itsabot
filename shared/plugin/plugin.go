@@ -140,19 +140,19 @@ func SetKeywords(p *dt.Plugin, khs ...dt.KeywordHandler) {
 		Commands: map[string]struct{}{},
 		Objects:  map[string]struct{}{},
 		Intents:  map[string]struct{}{},
-		Dict:     map[string]dt.KeywordFn{},
+		Dict:     map[string]*dt.KeywordFn{},
 	}
 	eng := porter2.Stemmer
 	for _, kh := range khs {
 		for _, intent := range kh.Trigger.Intents {
-			k.Dict[intent] = kh.Fn
+			k.Dict["I_"+intent] = &kh.Fn
 			k.Intents[intent] = struct{}{}
 			if !language.Contains(p.Trigger.Intents, intent) {
 				p.Trigger.Intents = append(p.Trigger.Intents, intent)
 			}
 		}
 		for _, cmd := range kh.Trigger.Commands {
-			k.Dict[cmd] = kh.Fn
+			k.Dict["C_"+cmd] = &kh.Fn
 			cmd = eng.Stem(cmd)
 			k.Commands[cmd] = struct{}{}
 			if !language.Contains(p.Trigger.Commands, cmd) {
@@ -160,7 +160,7 @@ func SetKeywords(p *dt.Plugin, khs ...dt.KeywordHandler) {
 			}
 		}
 		for _, obj := range kh.Trigger.Objects {
-			k.Dict[obj] = kh.Fn
+			k.Dict["O_"+obj] = &kh.Fn
 			obj = eng.Stem(obj)
 			k.Objects[obj] = struct{}{}
 			if !language.Contains(p.Trigger.Objects, obj) {
