@@ -31,8 +31,10 @@ abot.Header.view = function() {
 				m("a.logo", {
 					href: "/",
 					config: m.route
-				}, "Abot")
-			])
+				}, m("img[src=/public/images/logo_white.svg]", {
+					alt: "Abot",
+				})),
+			]),
 		]),
 		m("div", { id: "content" })
 	])

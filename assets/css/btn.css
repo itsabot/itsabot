@@ -25,3 +25,6 @@
 	margin-right: 0.5em;
 	font-size: 13px;
 }
+.centered .btn {
+	margin-right: 0;
+}

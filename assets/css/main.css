@@ -20,7 +20,8 @@ html, body {
 	margin: 3em 1em 0 1em;
 }
 .main-no-sidebar .big-icon {
-	width: 150px;
+	width: 250px;
+	margin-bottom: 1.5em;
 }
 .top-el {
 	margin-top: 0;

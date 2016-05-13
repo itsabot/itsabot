@@ -1,18 +1,12 @@
 package dt
 
-import (
-	"database/sql"
-	"encoding/json"
+import "encoding/json"
 
-	"github.com/itsabot/abot/core/log"
-	"github.com/jmoiron/sqlx"
-)
-
-// stateKey is a reserved key in the state of a plugin that tracks which state
+// StateKey is a reserved key in the state of a plugin that tracks which state
 // the plugin is currently in for each user.
-const stateKey string = "__state"
+const StateKey string = "__state"
 
-// stateKeyEntered keeps track of whether the current state has already been
+// StateKeyEntered keeps track of whether the current state has already been
 // "entered", which determines whether the OnEntry function should run or not.
 // As mentioned elsewhere, the OnEntry function is only ever run once.
 const stateEnteredKey string = "__state_entered"
@@ -28,9 +22,7 @@ type StateMachine struct {
 	state        int
 	stateEntered bool
 	states       map[string]int
-	pluginName   string
-	logger       *log.Logger
-	db           *sqlx.DB
+	plugin       *Plugin
 	resetFn      func(*Msg)
 }
 
@@ -86,10 +78,8 @@ type EventRequest int
 // NewStateMachine initializes a stateMachine to its starting state.
 func NewStateMachine(p *Plugin) *StateMachine {
 	sm := StateMachine{
-		state:      0,
-		pluginName: p.Config.Name,
-		logger:     p.Log,
-		db:         p.DB,
+		state:  0,
+		plugin: p,
 	}
 	sm.states = map[string]int{}
 	sm.resetFn = func(*Msg) {}
@@ -99,23 +89,18 @@ func NewStateMachine(p *Plugin) *StateMachine {
 // SetStates takes [][]State as an argument. Note that it's a slice of a slice,
 // which is used to enable tasks like requesting a user's shipping address,
 // which themselves are []Slice, to be included inline when defining the states
-// of a stateMachine. See plugins/ava_purchase/ava_purchase.go as an example.
-func (sm *StateMachine) SetStates(sss ...[]State) {
-	for i, ss := range sss {
-		for j, s := range ss {
-			sm.Handlers = append(sm.Handlers, s)
-			if len(s.Label) > 0 {
-				sm.states[s.Label] = i + j
+// of a stateMachine.
+func (sm *StateMachine) SetStates(ssss ...[][]State) {
+	for i, sss := range ssss {
+		for j, ss := range sss {
+			for k, s := range ss {
+				sm.Handlers = append(sm.Handlers, s)
+				if len(s.Label) > 0 {
+					sm.states[s.Label] = i + j + k
+				}
 			}
 		}
 	}
-}
-
-// SetOnReset sets the OnReset function for the stateMachine, which should be
-// called from a plugin's Run() function. See
-// plugins/ava_purchase/ava_purchase.go for an example.
-func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
-	sm.resetFn = reset
 }
 
 // LoadState upserts state into the database. If there is an existing state for
@@ -124,7 +109,7 @@ func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
 func (sm *StateMachine) LoadState(in *Msg) {
 	tmp, err := json.Marshal(sm.state)
 	if err != nil {
-		sm.logger.Info("failed to marshal state for db.", err)
+		sm.plugin.Log.Info("failed to marshal state for db.", err)
 		return
 	}
 
@@ -134,51 +119,46 @@ func (sm *StateMachine) LoadState(in *Msg) {
 	if in.User.ID > 0 {
 		q := `INSERT INTO states
 		      (key, userid, value, pluginname) VALUES ($1, $2, $3, $4)`
-		err = sm.db.QueryRowx(q, stateKey, in.User.ID, tmp,
-			sm.pluginName).Scan(&tmp)
+		_, err = sm.plugin.DB.Exec(q, StateKey, in.User.ID, tmp,
+			sm.plugin.Config.Name)
 	} else {
 		q := `INSERT INTO states
 		      (key, flexid, flexidtype, value, pluginname) VALUES ($1, $2, $3, $4, $5)`
-		err = sm.db.QueryRowx(q, stateKey, in.User.FlexID,
-			in.User.FlexIDType, tmp, sm.pluginName).Scan(&tmp)
+		_, err = sm.plugin.DB.Exec(q, StateKey, in.User.FlexID,
+			in.User.FlexIDType, tmp, sm.plugin.Config.Name)
 	}
 	if err != nil {
 		if err.Error() != `pq: duplicate key value violates unique constraint "states_userid_pkgname_key_key"` &&
 			err.Error() != `pq: duplicate key value violates unique constraint "states_flexid_flexidtype_pluginname_key_key"` {
-			sm.logger.Info("could not fetch value from states.", err)
+			sm.plugin.Log.Info("could not insert value into states.", err)
 			sm.state = 0
 			return
 		}
 		if in.User.ID > 0 {
 			q := `SELECT value FROM states
 			      WHERE userid=$1 AND key=$2 AND pluginname=$3`
-			err = sm.db.Get(&tmp, q, in.User.ID, stateKey,
-				sm.pluginName)
+			err = sm.plugin.DB.Get(&tmp, q, in.User.ID, StateKey,
+				sm.plugin.Config.Name)
 		} else {
 			q := `SELECT value FROM states
 			      WHERE flexid=$1 AND flexidtype=$2 AND key=$3 AND pluginname=$4`
-			err = sm.db.Get(&tmp, q, in.User.FlexID,
-				in.User.FlexIDType, stateKey, sm.pluginName)
+			err = sm.plugin.DB.Get(&tmp, q, in.User.FlexID,
+				in.User.FlexIDType, StateKey, sm.plugin.Config.Name)
 		}
 		if err != nil {
-			sm.logger.Info("failed to get value from state.", err)
+			sm.plugin.Log.Info("failed to get value from state.", err)
 			return
 		}
-		sm.logger.Debug("retrieved state from db")
-	} else {
-		sm.logger.Debug("added state to db")
 	}
 	var val int
 	if err = json.Unmarshal(tmp, &val); err != nil {
-		sm.logger.Info("failed unmarshaling state from db.", err)
+		sm.plugin.Log.Info("failed unmarshaling state from db.", err)
 		return
 	}
 	sm.state = val
 
 	// Have we already entered a state?
-	sm.stateEntered = sm.GetMemory(in, stateEnteredKey).Bool()
-	sm.logger.Debug("set state to", sm.state)
-	sm.logger.Debug("set state entered to", sm.stateEntered)
+	sm.stateEntered = sm.plugin.GetMemory(in, stateEnteredKey).Bool()
 	return
 }
 
@@ -191,80 +171,73 @@ func (sm *StateMachine) State() int {
 	return sm.state
 }
 
-// GetDBConn allows for accessing a stateMachine's provided database connection.
-func (sm *StateMachine) GetDBConn() *sqlx.DB {
-	return sm.db
-}
-
 // Next moves a stateMachine from its current state to its next state. Next
 // handles a variety of corner cases such as reaching the end of the states,
 // ensuring that the current state's Complete() == true, etc. It directly
 // returns the next response of the stateMachine, whether that's the Complete()
 // failed string or the OnEntry() string.
 func (sm *StateMachine) Next(in *Msg) (response string) {
+	// This check prevents a panic when no states are being used.
+	if len(sm.Handlers) == 0 {
+		return
+	}
+
 	// This check prevents a panic when a plugin has been modified to remove
 	// one or more states.
 	if sm.state >= len(sm.Handlers) {
-		sm.logger.Debug("state is >= len(handlers)")
-		return ""
+		sm.plugin.Log.Debug("state is >= len(handlers)")
+		sm.Reset(in)
 	}
 
-	// Ensure the state has not been entered, yet
+	// Ensure the state has not been entered yet
 	h := sm.Handlers[sm.state]
 	if !sm.stateEntered {
+		sm.plugin.Log.Debug("state was not entered")
+		done, _ := h.Complete(in)
 		if h.SkipIfComplete {
-			done, _ := h.Complete(in)
 			if done {
-				sm.logger.Debug("state was complete. moving on")
+				sm.plugin.Log.Debug("state was complete. moving on")
 				sm.state++
+				sm.plugin.SetMemory(in, StateKey, sm.state)
 				return sm.Next(in)
 			}
 		}
 		sm.setEntered(in)
-		sm.logger.Debug("setting state entered")
-		return h.OnEntry(in)
-	}
-	sm.logger.Debug("state was already entered")
-	h.OnInput(in)
+		sm.plugin.Log.Debug("setting state entered")
 
-	// State was already entered, so check for completion
+		// If this is the final state and complete on entry, we'll
+		// reset the state machine. This fixes the "forever trapped"
+		// loop of being in a plugin's finished state machine.
+		resp := h.OnEntry(in)
+		if sm.state+1 >= len(sm.Handlers) && done {
+			sm.Reset(in)
+		}
+		return resp
+	}
+
+	// State was already entered, so process the input and check for
+	// completion
+	sm.plugin.Log.Debug("state was already entered")
+	h.OnInput(in)
 	done, str := h.Complete(in)
 	if done {
-		sm.logger.Debug("state is done. going to next")
-		if sm.state+1 >= len(sm.Handlers) {
-			sm.logger.Debug("finished states")
-			return ""
-		}
+		sm.plugin.Log.Debug("state is done. going to next")
 		sm.state++
+		sm.plugin.SetMemory(in, StateKey, sm.state)
+		if sm.state >= len(sm.Handlers) {
+			sm.plugin.Log.Debug("finished states. resetting")
+			sm.Reset(in)
+			return sm.Next(in)
+		}
 		sm.setEntered(in)
-		sm.logger.Debug("set state to", sm.state)
-		sm.logger.Debug("set state entered to true")
-		byt, err := json.Marshal(sm.state)
-		if err != nil {
-			sm.logger.Info("failed to marshal state.", err)
-		}
-		if in.User.ID > 0 {
-			q := `UPDATE states SET value=$1
-			      WHERE key=$2 AND userid=$3`
-			_, err = sm.db.Exec(q, byt, stateKey, in.User.ID)
-		} else {
-			q := `UPDATE states SET value=$1
-			      WHERE key=$2 AND flexid=$3 AND flexidtype=$4`
-			_, err = sm.db.Exec(q, byt, stateKey, in.User.FlexID,
-				in.User.FlexIDType)
-		}
-		if err != nil {
-			sm.logger.Info("could not update state.", err)
-		}
 		str = sm.Handlers[sm.state].OnEntry(in)
-		sm.logger.Debug("going to next state", sm.state)
-		return str
-	} else if len(str) > 0 {
-		sm.logger.Debug("incomplete with message")
+		sm.plugin.Log.Debug("going to next state", sm.state)
 		return str
 	}
-	sm.logger.Debug("reached here")
-	return ""
+
+	sm.plugin.Log.Debug("set state to", sm.state)
+	sm.plugin.Log.Debug("set state entered to", sm.stateEntered)
+	return str
 }
 
 // setEntered is used internally to set a state as having been entered both in
@@ -272,120 +245,23 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 // not run a state's OnEntry function twice.
 func (sm *StateMachine) setEntered(in *Msg) {
 	sm.stateEntered = true
-	sm.SetMemory(in, stateEnteredKey, true)
+	sm.plugin.SetMemory(in, stateEnteredKey, true)
 }
 
-// OnInput runs the stateMachine's current OnInput function. Most of the time
-// this is not used directly, since Next() will automatically run this function
-// when appropriate. It's an exported function to provide users more control
-// over their plugins.
-func (sm *StateMachine) OnInput(in *Msg) {
-	sm.Handlers[sm.state].OnInput(in)
-}
-
-// SetMemory saves to some key to some value in Abot's memory, which can be
-// accessed by any state or plugin. Memories are stored in a key-value format,
-// and any marshalable/unmarshalable datatype can be stored and retrieved.
-// Note that Ava's memory is global, peristed across plugins. This enables
-// plugins that subscribe to an agreed-upon memory API to communicate between
-// themselves. Thus, if it's absolutely necessary that no some other plugins
-// modify or access a memory, use a long key unlikely to collide with any other
-// plugin's.
-func (sm *StateMachine) SetMemory(in *Msg, k string, v interface{}) {
-	b, err := json.Marshal(v)
-	if err != nil {
-		sm.logger.Infof("could not marshal memory interface to json at %s. %s",
-			k, err.Error())
-		return
-	}
-	sm.logger.Debug("setting memory for", k, "to", string(b))
-	if in.User.ID > 0 {
-		q := `INSERT INTO states (key, value, pluginname, userid)
-		      VALUES ($1, $2, $3, $4)
-		      ON CONFLICT (userid, pluginname, key)
-		      DO UPDATE SET value=$2`
-		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.ID)
-	} else {
-		q := `INSERT INTO states
-		      (key, value, pluginname, flexid, flexidtype)
-		      VALUES ($1, $2, $3, $4, $5)
-		      ON CONFLICT (flexid, flexidtype, pluginname, key)
-		      DO UPDATE SET value=$2`
-		_, err = sm.db.Exec(q, k, b, sm.pluginName, in.User.FlexID,
-			in.User.FlexIDType)
-	}
-	if err != nil {
-		sm.logger.Infof("could not set memory at %s to %s. %s", k, v,
-			err.Error())
-		return
-	}
-}
-
-// GetMemory retrieves a memory for a given key. Accessing that Memory's value
-// is described in itsabot.org/abot/shared/datatypes/memory.go.
-func (sm *StateMachine) GetMemory(in *Msg, k string) Memory {
-	var buf []byte
-	var err error
-	if in.User.ID > 0 {
-		q := `SELECT value FROM states
-		      WHERE userid=$1
-		      AND pluginname=$2 AND key=$3`
-		err = sm.db.Get(&buf, q, in.User.ID, sm.pluginName, k)
-	} else {
-		q := `SELECT value FROM states
-		      WHERE flexid=$1 AND flexidtype=$2
-		      AND pluginname=$3 AND key=$4`
-		err = sm.db.Get(&buf, q, in.User.FlexID, in.User.FlexIDType,
-			sm.pluginName, k)
-	}
-	if err == sql.ErrNoRows {
-		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
-	}
-	if err != nil {
-		sm.logger.Infof("could not get memory for key %s. %s", k,
-			err.Error())
-		return Memory{Key: k, Val: json.RawMessage{}, logger: sm.logger}
-	}
-	return Memory{Key: k, Val: buf, logger: sm.logger}
-}
-
-// DeleteMemory deletes a memory for a given key. It is not an error to delete a
-// key that does not exist.
-func (sm *StateMachine) DeleteMemory(in *Msg, k string) {
-	var err error
-	if in.User.ID > 0 {
-		q := `DELETE FROM states
-		      WHERE userid=$1 AND pluginname=$2 AND key=$3`
-		_, err = sm.db.Exec(q, in.User.ID, sm.pluginName, k)
-	} else {
-		q := `DELETE FROM states
-		      WHERE flexid=$1 AND flexidtype=$2 AND pluginname=$3
-		      AND key=$4`
-		_, err = sm.db.Exec(q, in.User.FlexID, in.User.FlexIDType,
-			sm.pluginName, k)
-	}
-	if err != nil {
-		sm.logger.Infof("could not delete memory for key %s. %s", k,
-			err.Error())
-	}
-}
-
-// HasMemory is a helper function to simply a common use-case, determing if some
-// key/value has been set in Ava, i.e. if the memory exists.
-func (sm *StateMachine) HasMemory(in *Msg, k string) bool {
-	return len(sm.GetMemory(in, k).Val) > 0
+// SetOnReset sets the OnReset function for the stateMachine, which is used to
+// clear Abot's memory of temporary things between runs.
+func (sm *StateMachine) SetOnReset(reset func(in *Msg)) {
+	sm.resetFn = reset
 }
 
 // Reset the stateMachine both in memory and in the database. This also runs the
 // programmer-defined reset function (SetOnReset) to reset memories to some
-// starting state for running the same plugin multiple times. This is usually
-// called from a plugin's Run() function. See
-// plugins/ava_purchase/ava_purchase.go for an example.
+// starting state for running the same plugin multiple times.
 func (sm *StateMachine) Reset(in *Msg) {
 	sm.state = 0
 	sm.stateEntered = false
-	sm.SetMemory(in, stateKey, 0)
-	sm.SetMemory(in, stateEnteredKey, false)
+	sm.plugin.SetMemory(in, StateKey, 0)
+	sm.plugin.SetMemory(in, stateEnteredKey, false)
 	sm.resetFn(in)
 }
 
@@ -404,16 +280,20 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 	if sm.state > desiredState {
 		sm.state = desiredState
 		sm.stateEntered = false
+		sm.plugin.SetMemory(in, StateKey, desiredState)
+		sm.plugin.SetMemory(in, stateEnteredKey, false)
 		return sm.Handlers[desiredState].OnEntry(in)
 	}
 
 	// If we're in a state before the desired state, go forward only as far
-	// as we're allowed to by the Complete guards.
+	// as we're allowed by the Complete guards.
 	for s := sm.state; s < desiredState; s++ {
 		ok, _ := sm.Handlers[s].Complete(in)
 		if !ok {
 			sm.state = s
 			sm.stateEntered = false
+			sm.plugin.SetMemory(in, StateKey, s)
+			sm.plugin.SetMemory(in, stateEnteredKey, false)
 			return sm.Handlers[s].OnEntry(in)
 		}
 	}
@@ -422,5 +302,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 	// so reset the state and run OnEntry again.
 	sm.state = desiredState
 	sm.stateEntered = false
+	sm.plugin.SetMemory(in, StateKey, desiredState)
+	sm.plugin.SetMemory(in, stateEnteredKey, false)
 	return sm.Handlers[desiredState].OnEntry(in)
 }

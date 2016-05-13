@@ -326,10 +326,6 @@ func loadPluginsGo() error {
 		if err.Error() != "open plugins.go: no such file or directory" {
 			return err
 		}
-		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.go"))
-		if err != nil {
-			return err
-		}
 	}
 	var val []byte
 	var foundStart bool
@@ -346,6 +342,9 @@ func loadPluginsGo() error {
 			continue
 		}
 		val = append(val, b)
+	}
+	if len(val) == 0 {
+		return nil
 	}
 	val = append([]byte("["), val...)
 	val = append(val[:len(val)-1], []byte("]")...)
@@ -378,10 +377,13 @@ func trainClassifiers() error {
 		// Build classifier from complete sets of intents
 		for _, s := range ss {
 			intents := pluginIntents[s.PluginID]
-			if len(intents) < 2 {
-				// Calling bayesian.NewClassifier() with 0 or 1
-				// classes causes a panic.
-				continue
+			// Calling bayesian.NewClassifier() with 0 or 1
+			// classes causes a panic.
+			if len(intents) == 0 {
+				break
+			}
+			if len(intents) == 1 {
+				intents = append(intents, bayesian.Class("__no_intent"))
 			}
 			c := bayesian.NewClassifier(intents...)
 			bClassifiers[s.PluginID] = c

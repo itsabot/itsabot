@@ -8,7 +8,7 @@ import (
 )
 
 // requestSignup asks the user to sign up or login via the ABOT_URL/signup.
-func requestSignup(sm *dt.StateMachine, label string) []dt.State {
+func requestSignup(p *dt.Plugin, label string) []dt.State {
 	return []dt.State{
 		{
 			OnEntry: func(in *dt.Msg) string {

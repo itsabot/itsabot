@@ -25,6 +25,9 @@ abot.Login.controller = function() {
 			Cookies.set("csrfToken", data.CSRFToken, exp, null, null, secure)
 			Cookies.set("scopes", data.Scopes, exp, null, null, secure)
 			if (m.route.param("r") == null) {
+				if (abot.isAdmin()) {
+					return m.route("/admin")
+				}
 				return m.route("/profile")
 			}
 			m.route(decodeURIComponent(m.route.param("r")).substr(1))
@@ -32,11 +35,6 @@ abot.Login.controller = function() {
 			ctrl.showError(err.Msg)
 		})
 	}
-	abot.Login.checkAuth(function(loggedIn) {
-		if (loggedIn) {
-			return m.route("/profile")
-		}
-	})
 	ctrl.hideError = function() {
 		ctrl.error("")
 		document.getElementById("err").classList.add("hidden")
@@ -86,16 +84,5 @@ abot.Login.view = function(ctrl) {
 			]),
 		]),
 	])
-}
-abot.Login.checkAuth = function(callback) {
-	var id = Cookies.get("id")
-	var issuedAt = Cookies.get("issuedAt")
-	var email = Cookies.get("email")
-	if (id != null && id !== "undefined" &&
-		issuedAt != null && issuedAt !== "undefined" &&
-		email != null && email !== "undefined") {
-		return callback(true)
-	}
-	return callback(false)
 }
 })(!window.abot ? window.abot={} : window.abot);
