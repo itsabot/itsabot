@@ -3,14 +3,13 @@ package core
 import (
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
-	"github.com/itsabot/abot/shared/nlp"
 )
 
-// NewMsg builds a message struct with Tokens, Stems, and a Structured Input.
-func NewMsg(u *dt.User, cmd string) *dt.Msg {
-	tokens := nlp.TokenizeSentence(cmd)
-	stems := nlp.StemTokens(tokens)
-	si := NER().ClassifyTokens(tokens)
+// newMsg builds a message struct with Tokens, Stems, and a Structured Input.
+func newMsg(u *dt.User, cmd string) *dt.Msg {
+	tokens := TokenizeSentence(cmd)
+	stems := StemTokens(tokens)
+	si := ner.classifyTokens(tokens)
 
 	// Get the intents as determined by each plugin
 	for pluginID, c := range bClassifiers {

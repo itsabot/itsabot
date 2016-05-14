@@ -34,19 +34,10 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-
-	if err := core.LoadConf(); err != nil {
-		log.Fatal(err)
-	}
 	if err := core.LoadEnvVars(); err != nil {
 		log.Fatal(err)
 	}
-
-	conf := core.Conf()
 	app := cli.NewApp()
-	app.Name = conf.Name
-	app.Usage = conf.Description
-	app.Version = conf.Version
 	app.Commands = []cli.Command{
 		{
 			Name:    "server",
@@ -144,6 +135,7 @@ func startServer() error {
 	if err != nil {
 		return err
 	}
+	log.Info("started abot")
 	if err = http.ListenAndServe(":"+os.Getenv("PORT"), hr); err != nil {
 		return err
 	}
@@ -164,7 +156,7 @@ func searchPlugins(query string) error {
 func outputPluginResults(w io.Writer, byt []byte) error {
 	var results []struct {
 		ID            uint64
-		Name          sql.NullString
+		Name          string
 		Description   sql.NullString
 		Path          string
 		DownloadCount uint64
@@ -181,11 +173,11 @@ func outputPluginResults(w io.Writer, byt []byte) error {
 	}
 	for _, result := range results {
 		d := result.Description
-		if len(result.Description.String) >= 30 {
+		if len(d.String) >= 30 {
 			d.String = d.String[:27] + "..."
 		}
 		_, err = writer.Write([]byte(fmt.Sprintf("%s\t%s\t%d\n",
-			result.Name.String, d.String, result.DownloadCount)))
+			result.Name, d.String, result.DownloadCount)))
 		if err != nil {
 			return err
 		}
@@ -215,10 +207,14 @@ func startConsole(c *cli.Context) error {
 		return errors.New("usage: abot console {abotAddress} {userPhone}")
 	}
 	var addr, phone string
-	if len(args) == 1 {
+	switch len(args) {
+	case 0:
+		addr = "http://localhost:" + os.Getenv("PORT")
+		phone = "+15555551234"
+	case 1:
 		addr = "http://localhost:" + os.Getenv("PORT")
 		phone = args[0]
-	} else if len(args) == 2 {
+	case 2:
 		addr = args[0]
 		phone = args[1]
 	}
@@ -292,6 +288,10 @@ func installPlugins() {
 	l.SetFlags(0)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 
+	if err := core.LoadConf(); err != nil {
+		l.Fatal(err)
+	}
+	log.Info("buildPluginFile running installPlugins!")
 	plugins := buildPluginFile(l)
 
 	// Fetch all plugins
@@ -389,6 +389,10 @@ func updatePlugins() {
 	l.SetFlags(0)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 
+	if err := core.LoadConf(); err != nil {
+		l.Fatal(err)
+	}
+	log.Info("buildPluginFile running updatePlugins!")
 	plugins := buildPluginFile(l)
 
 	l.Info("Updating plugins...")
@@ -461,9 +465,9 @@ func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
 		s += u + "\n"
 		log.Debug("reading file", p)
 		p = filepath.Join(tokenizedPath[0], "src", u, "plugin.json")
-		fi2, err := os.Open(p)
-		if err != nil {
-			l.Fatal(err)
+		fi2, err2 := os.Open(p)
+		if err2 != nil {
+			l.Fatal(err2)
 		}
 		scn := bufio.NewScanner(fi2)
 		var tmp string
@@ -472,33 +476,33 @@ func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
 			s += line
 			tmp += line
 		}
-		if err := scn.Err(); err != nil {
-			l.Fatal(err)
+		if err2 = scn.Err(); err2 != nil {
+			l.Fatal(err2)
 		}
-		if err = fi2.Close(); err != nil {
-			l.Fatal(err)
+		if err2 = fi2.Close(); err2 != nil {
+			l.Fatal(err2)
 		}
 
 		var plg struct{ Name string }
-		if err = json.Unmarshal([]byte(tmp), &plg); err != nil {
-			l.Fatal(err)
+		if err2 = json.Unmarshal([]byte(tmp), &plg); err2 != nil {
+			l.Fatal(err2)
 		}
 
 		// Fetch remote plugin IDs to be included in the plugin confs
 		plg.Name = url.QueryEscape(plg.Name)
 		ul := os.Getenv("ITSABOT_URL") + "/api/plugins/by_name/" + plg.Name
-		req, err := http.NewRequest("GET", ul, nil)
-		if err != nil {
-			l.Fatal(err)
+		req, err2 := http.NewRequest("GET", ul, nil)
+		if err2 != nil {
+			l.Fatal(err2)
 		}
 		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
-		if err != nil {
-			l.Fatal(err)
+		resp, err2 := client.Do(req)
+		if err2 != nil {
+			l.Fatal(err2)
 		}
 		var data struct{ ID uint64 }
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			l.Fatal(err)
+		if err2 := json.NewDecoder(resp.Body).Decode(&data); err2 != nil {
+			l.Fatal(err2)
 		}
 		id := strconv.FormatUint(data.ID, 10)
 
@@ -514,6 +518,7 @@ func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
 }
 
 func buildPluginFile(l *log.Logger) *core.PluginJSON {
+	log.Info("buildPluginFile running!")
 	// Create plugins.go file, truncate if exists
 	fi, err := os.Create("plugins.go")
 	if err != nil {
@@ -618,9 +623,8 @@ func publishPlugin(c *cli.Context) {
 			login()
 			publishPlugin(c)
 			return
-		} else {
-			log.Fatal(err)
 		}
+		log.Fatal(err)
 	}
 	defer func() {
 		if err = fi.Close(); err != nil {

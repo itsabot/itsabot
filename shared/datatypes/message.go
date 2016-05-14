@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -16,13 +15,14 @@ type Msg struct {
 	FlexIDType      FlexIDType
 	Sentence        string
 	User            *User
-	StructuredInput *nlp.StructuredInput
+	StructuredInput *StructuredInput
 	Stems           []string
 	Plugin          string
 	CreatedAt       *time.Time
 	// AbotSent determines if msg is from the user or Abot
 	AbotSent      bool
 	NeedsTraining bool
+	Trained       bool
 	// Tokens breaks the sentence into words. Tokens like ,.' are treated as
 	// individual words.
 	Tokens []string
@@ -43,9 +43,7 @@ func GetMsg(db *sqlx.DB, id uint64) (*Msg, error) {
 
 // Update a message as needing training.
 func (m *Msg) Update(db *sqlx.DB) error {
-	q := `UPDATE messages
-	      SET needstraining=$1
-	      WHERE id=$2`
+	q := `UPDATE messages SET needstraining=$1 WHERE id=$2`
 	if _, err := db.Exec(q, m.NeedsTraining, m.ID); err != nil {
 		return err
 	}
@@ -56,10 +54,11 @@ func (m *Msg) Update(db *sqlx.DB) error {
 func (m *Msg) Save(db *sqlx.DB) error {
 	q := `INSERT INTO messages
 	      (userid, sentence, plugin, route, abotsent, needstraining, flexid,
-		flexidtype)
-	      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+		flexidtype, trained)
+	      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
 	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Plugin, m.Route,
-		m.AbotSent, m.NeedsTraining, m.User.FlexID, m.User.FlexIDType)
+		m.AbotSent, m.NeedsTraining, m.User.FlexID, m.User.FlexIDType,
+		m.Trained)
 	if err := row.Scan(&m.ID); err != nil {
 		return err
 	}

@@ -26,7 +26,7 @@ func TestSearch(t *testing.T) {
 	var err error
 	if testing.Short() {
 		log.Info("stubbing plugin search results in short mode.")
-		byt = []byte(`[{"Name":{"String":"Weather","Valid":true}}]`)
+		byt = []byte(`[{"Name":"Weather","Valid":true}]`)
 	} else {
 		byt, err = searchItsAbot(query)
 		if err != nil {

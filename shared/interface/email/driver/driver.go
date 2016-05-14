@@ -15,9 +15,6 @@ type Driver interface {
 
 // Conn is a connection to the external email service.
 type Conn interface {
-	// Receive is called when an email is received.
-	Receive(from, subj, html string) error
-
 	// SendHTML email through the opened driver connection.
 	SendHTML(to []string, from, subj, html string) error
 

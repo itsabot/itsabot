@@ -1,7 +1,7 @@
 {
 	"Name": "Abot",
 	"Description": "Digital assistant framework",
-	"Version": "0.2.0-alpha",
+	"Version": 0.2,
 	"ImportPath": "github.com/itsabot/abot",
 	"Dependencies": {
 	}

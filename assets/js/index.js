@@ -2,7 +2,7 @@
 abot.Index = {}
 abot.Index.controller = function() {
 	if (abot.isAdmin()) {
-		return m.route("/admin", null, true)
+		return m.route("/dashboard", null, true)
 	}
 	if (abot.isLoggedIn()) {
 		return m.route("/profile", null, true)
@@ -64,29 +64,31 @@ abot.Index.loadedView = function(ctrl) {
 				m("img[src=/public/images/logo.svg].big-icon"),
 			]),
 			m(".well.well-form", [
-				m(".centered", [ m("h3.top-el", "Welcome to Abot!") ]),
-				m("p.top-el", [
-					"Before you start building your bot, let's set up an admin account.",
-				]),
-				m("form.centered", { onsubmit: ctrl.submit }, [
-					m(".form-el", m("input#name[type=text][placeholder=Name]", {
-						config: this.focus,
-					})),
-					m(".form-el", m("input#email[type=email]", {
-						placeholder: "Email",
-					})),
-					m(".form-el", m("input#phone[type=tel]", {
-						placeholder: "Phone number",
-					})),
-					m(".form-el", m("input#password[type=password]]", {
-						placeholder: "Password",
-					})),
-					m(".form-el", m("input[type=submit].btn", {
-						value: "Create Admin Account",
-					})),
+				m(".well-padding", [
+					m(".centered", [ m("h3.top-el", "Welcome to Abot!") ]),
+					m("p.top-el", [
+						"Before you start building your bot, let's set up an admin account.",
+					]),
+					m("form.centered", { onsubmit: ctrl.submit }, [
+						m(".form-el", m("input#name[type=text][placeholder=Name]", {
+							config: this.focus,
+						})),
+						m(".form-el", m("input#email[type=email]", {
+							placeholder: "Email",
+						})),
+						m(".form-el", m("input#phone[type=tel]", {
+							placeholder: "Phone number",
+						})),
+						m(".form-el", m("input#password[type=password]]", {
+							placeholder: "Password",
+						})),
+						m(".form-el", m("input[type=submit].btn", {
+							value: "Create Admin Account",
+						})),
+					]),
 				]),
 			]),
-		])
+		]),
 	])
 }
 })(!window.abot ? window.abot={} : window.abot);

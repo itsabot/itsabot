@@ -43,7 +43,7 @@ abot.TrainingNewSentence.controller = function(pctrl) {
 	}
 }
 abot.TrainingNewSentence.view = function(ctrl) {
-	return m("#train-sentence.well.hidden", [
+	return m("#train-sentence.well.well-md.hidden", [
 		m("div", [
 			m("input[type=text]#sentence.input-clear.input-full", {
 				placeholder: "Your sentence here...",

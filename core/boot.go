@@ -19,7 +19,6 @@ import (
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/interface/email"
 	"github.com/itsabot/abot/shared/interface/sms"
-	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jbrukh/bayesian"
 	"github.com/jmoiron/sqlx"
 	"github.com/julienschmidt/httprouter"
@@ -27,7 +26,7 @@ import (
 )
 
 var db *sqlx.DB
-var ner Classifier
+var ner classifier
 var offensive map[string]struct{}
 var smsConn *sms.Conn
 var emailConn *email.Conn
@@ -52,24 +51,9 @@ type tSentence struct {
 	PluginID uint64
 }
 
-// DB returns a connection to the database.
-func DB() *sqlx.DB {
-	return db
-}
-
 // Conf returns Abot's plugins.json configuration.
 func Conf() *PluginJSON {
 	return conf
-}
-
-// NER returns a Named Entity Recognition classifier.
-func NER() Classifier {
-	return ner
-}
-
-// Offensive returns a set of offensive words.
-func Offensive() map[string]struct{} {
-	return offensive
 }
 
 // NewServer connects to the database and boots all plugins before returning a
@@ -109,10 +93,12 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err != nil {
 		log.Debug("could not build classifier", err)
 	}
-	log.Info("training classifiers")
-	if err = trainClassifiers(); err != nil {
-		log.Info("could not train classifiers", err)
-	}
+	go func() {
+		log.Info("training classifiers")
+		if err = trainClassifiers(); err != nil {
+			log.Info("could not train classifiers", err)
+		}
+	}()
 	offensive, err = buildOffensiveMap()
 	if err != nil {
 		log.Debug("could not build offensive map", err)
@@ -193,15 +179,18 @@ func NewServer() (r *httprouter.Router, err error) {
 		}
 	}(evtChan)
 
+	// Update cached analytics data on boot and every 15 minutes
+	go updateAnalyticsTick(time.Now())
+	go updateAnalytics(15 * time.Minute)
+
 	return r, nil
 }
 
-// CompileAssets compresses and merges assets from Abot core and all plugins on
+// compileAssets compresses and merges assets from Abot core and all plugins on
 // boot. In development, this step is repeated on each server HTTP request prior
 // to serving any assets.
-func CompileAssets() error {
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "cmd", "compileassets.sh")
+func compileAssets() error {
+	p := filepath.Join("cmd", "compileassets.sh")
 	outC, err := exec.
 		Command("/bin/sh", "-c", p).
 		CombinedOutput()
@@ -392,8 +381,8 @@ func trainClassifiers() error {
 		// With classifiers initialized, train each of them on a
 		// sentence's stems.
 		for _, s := range ss {
-			tokens := nlp.TokenizeSentence(s.Sentence)
-			stems := nlp.StemTokens(tokens)
+			tokens := TokenizeSentence(s.Sentence)
+			stems := StemTokens(tokens)
 			c, exists := bClassifiers[s.PluginID]
 			if exists {
 				c.Learn(stems, bayesian.Class(s.Intent))

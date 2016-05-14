@@ -15,7 +15,6 @@ import (
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/language"
-	"github.com/itsabot/abot/shared/nlp"
 	_ "github.com/lib/pq" // Import the pq PostgreSQL driver
 )
 
@@ -37,7 +36,7 @@ func New(url string) (*dt.Plugin, error) {
 		return nil, err
 	}
 	defer func() {
-		if err := fi.Close(); err != nil {
+		if err = fi.Close(); err != nil {
 			log.Info("failed to close file", fi.Name())
 			return
 		}
@@ -58,7 +57,7 @@ func New(url string) (*dt.Plugin, error) {
 		}
 		data += t
 	}
-	if err := scn.Err(); err != nil {
+	if err = scn.Err(); err != nil {
 		return nil, err
 	}
 	db, err := core.ConnectDB()
@@ -77,13 +76,13 @@ func New(url string) (*dt.Plugin, error) {
 	l := log.New(c.Name)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 	plg := &dt.Plugin{
-		Trigger:     &nlp.StructuredInput{},
+		Trigger:     &dt.StructuredInput{},
 		SetBranches: func(in *dt.Msg) [][]dt.State { return nil },
 		Events: &dt.PluginEvents{
 			PostReceive:    func(cmd *string) {},
 			PreProcessing:  func(cmd *string, u *dt.User) {},
 			PostProcessing: func(in *dt.Msg) {},
-			PostResponse:   func(in *dt.Msg, resp *string) {},
+			PreResponse:    func(in *dt.Msg, resp *string) {},
 		},
 		Config: c,
 		DB:     db,
@@ -179,7 +178,7 @@ func SetStates(p *dt.Plugin, states [][]dt.State) {
 
 // AppendTrigger appends the StructuredInput's modified contents to a plugin.
 // All Commands and Objects stemmed using the Porter2 Snowball algorithm.
-func AppendTrigger(p *dt.Plugin, t *nlp.StructuredInput) {
+func AppendTrigger(p *dt.Plugin, t *dt.StructuredInput) {
 	eng := porter2.Stemmer
 	for _, cmd := range t.Commands {
 		cmd = eng.Stem(cmd)

@@ -1,10 +1,45 @@
 .well {
-	margin: 1em 0 1em;
-	padding: 1em;
-	width: 60%;
-	min-width: 300px;
+	min-width: 200px;
 	border: 1px solid #DDD;
 	border-radius: 4px;
+	display: inline-block;
+	margin: 0.5em;
+	vertical-align: top;
+}
+.well.well-full {
+	display: block;
+	margin-bottom: 1em;
+}
+.well .well-padding {
+	padding: 0.75em;
+}
+.well .well-content-lg {
+	margin: 0.5em 0;
+	font-size: 2.5em;
+	font-weight: 600;
+}
+.well .well-content {
+	margin-top: 1em;
+}
+.well .well-footer {
+	border-top: 1px solid #DDD;
+	margin-top: -0.5em;
+	text-align: center;
+}
+.well .well-footer a {
+	padding: 0.5em;
+	display: block;
+	color: #2980B9;
+}
+.well .well-footer:hover {
+	background-color: #EFEFEF;
+}
+.well.well-sm {
+	width: 30%;
+}
+.well.well-md {
+	width: 46%;
+	min-width: 360px;
 }
 .well.well-centered {
 	display: block;

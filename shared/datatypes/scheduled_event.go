@@ -19,7 +19,7 @@ type ScheduledEvent struct {
 // Send a scheduled event. Currently only phones are supported.
 func (s *ScheduledEvent) Send(c *sms.Conn) error {
 	switch s.FlexIDType {
-	case fidtPhone:
+	case FIDTPhone:
 		if err := c.Send(s.FlexID, s.Content); err != nil {
 			return err
 		}

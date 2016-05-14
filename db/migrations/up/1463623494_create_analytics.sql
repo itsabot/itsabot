@@ -1,0 +1,6 @@
+CREATE TABLE analytics (
+	label VARCHAR(255) NOT NULL,
+	createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+	value NUMERIC NOT NULL,
+	PRIMARY KEY (label, createdat)
+);

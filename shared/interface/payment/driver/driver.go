@@ -11,10 +11,8 @@ import (
 // Driver is the interface that must be implemented by a payment driver.
 type Driver interface {
 	// Open returns a new connection to the payment server. The echo router
-	// is included to drivers to extend routes at runtime. The database
-	// connection allows the implementation to set and retrieve
-	// User.PaymentServiceID in the database.The name is a string in a
-	// driver-specific format.
+	// is included to drivers to extend routes at runtime. The name is a
+	// string in a driver-specific format.
 	Open(db *sqlx.DB, r *httprouter.Router, name string) (Conn, error)
 }
 
@@ -29,8 +27,7 @@ type Conn interface {
 	// its 3-letter ISO code.
 	ChargeCard(cardID uint64, amountInCents uint64, isoCurrency string) error
 
-	// RegisterUser on the external payment service, saving the customer
-	// identifying token to User.PaymentServiceID in the database.
+	// RegisterUser on the external payment service.
 	RegisterUser(user *dt.User) error
 
 	// Close the connection.

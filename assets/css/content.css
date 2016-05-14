@@ -1,9 +1,23 @@
 .content {
 	padding: 1em;
+	height: inherit;
+	min-height: inherit;
 }
 .content h3 {
 	margin-top: 1.5em;
 }
 .content h3.top-el {
 	margin-top: 0;
+}
+.content .top-el-right {
+	float: right;
+}
+.content .top-el-right .btn {
+	margin: 0;
+}
+.content-container {
+	display: table;
+	width: 100%;
+	height: inherit;
+	min-height: inherit;
 }
