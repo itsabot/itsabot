@@ -651,13 +651,13 @@ func publishPlugin(c *cli.Context) {
 		cookie := &http.Cookie{}
 		switch lineNum {
 		case 0:
-			cookie.Name = "id"
+			cookie.Name = "iaID"
 		case 1:
-			cookie.Name = "email"
+			cookie.Name = "iaEmail"
 		case 2:
 			req.Header.Set("Authorization", "Bearer "+line)
 		case 3:
-			cookie.Name = "issuedAt"
+			cookie.Name = "iaIssuedAt"
 		default:
 			log.Fatal("unknown line in abot.conf")
 		}
@@ -671,7 +671,7 @@ func publishPlugin(c *cli.Context) {
 		log.Fatal(err)
 	}
 	cookie := &http.Cookie{}
-	cookie.Name = "scopes"
+	cookie.Name = "iaScopes"
 	req.AddCookie(cookie)
 
 	client := &http.Client{}
