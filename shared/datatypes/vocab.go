@@ -1,9 +1,6 @@
 package dt
 
-import (
-	"github.com/itsabot/abot/core/log"
-	"github.com/itsabot/abot/shared/nlp"
-)
+import "github.com/itsabot/abot/shared/nlp"
 
 // Keywords maintains sets of Commands and Objects recognized by plugins as well
 // as the functions to be performed when such Commands or Objects are found.
@@ -11,7 +8,7 @@ type Keywords struct {
 	Commands map[string]struct{}
 	Objects  map[string]struct{}
 	Intents  map[string]struct{}
-	Dict     map[string]KeywordFn
+	Dict     map[string]*KeywordFn
 }
 
 // KeywordHandler maintains sets of Commands and Objects recognized by plugins as
@@ -32,15 +29,43 @@ func (k *Keywords) handle(m *Msg) string {
 	if k == nil {
 		return ""
 	}
-	var resp string
-	for _, w := range m.Stems {
-		fn, ok := k.Dict[w]
+	for _, intent := range m.StructuredInput.Intents {
+		fn, ok := k.Dict["I_"+intent]
 		if !ok {
 			continue
 		}
-		log.Debug("found fn in stems", w, fn)
-		resp = fn(m)
-		break
+
+		// If we find an intent function, use that.
+		return (*fn)(m)
 	}
-	return resp
+
+	// No matching intent was found, so check for both Command and Object.
+	var fns []*KeywordFn
+	for _, cmd := range m.StructuredInput.Commands {
+		fn, ok := k.Dict["C_"+cmd]
+		if !ok {
+			continue
+		}
+		fns = append(fns, fn)
+	}
+	if len(fns) == 0 {
+		return ""
+	}
+	idx := -1
+	for _, obj := range m.StructuredInput.Objects {
+		fn2, ok := k.Dict["O_"+obj]
+		if !ok {
+			continue
+		}
+		for i, fn := range fns {
+			if fn2 == fn {
+				idx = i
+				break
+			}
+		}
+	}
+	if idx < 0 {
+		return ""
+	}
+	return (*fns[idx])(m)
 }
