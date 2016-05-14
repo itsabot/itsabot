@@ -144,115 +144,117 @@ abot.Training.controller = function() {
 	})
 }
 abot.Training.view = function(ctrl) {
-	return m(".container", [
+	return m(".body", [
 		m.component(abot.Header),
-		m.component(abot.Sidebar, { active: 1 }),
-		m(".main", [
-			m(".topbar", [
-				m(".topbar-inline", ctrl.props.title()),
-				function() {
-					var plugins = []
-					var ps = ctrl.props.plugins()
-					for (var i = 0; i < ps.length; ++i) {
-						var el = m("a", {
-							href: "#/",
-							onclick: ctrl.selectPlugin.bind(this, i),
-						}, ps[i].Name)
-						plugins.push(el)
-					}
-					if (ps.length === 0) {
-						return
-					}
-					return m(".topbar-right", plugins)
-				}(),
-			]),
-			m(".content", [
-				function() {
-					if (ctrl.props.error().length > 0) {
-						return m(".alert.alert-danger.alert-margin", ctrl.props.error())
-					}
-					if (ctrl.props.success().length > 0) {
-						return m(".alert.alert-success.alert-margin", ctrl.props.success())
-					}
-				}(),
-				function() {
-					if (ctrl.props.plugins().length === 0) {
-						return [
-							m(".alert.alert-danger", "No plugins installed."),
-							m("p", "Install a plugin to start training."),
-						]
-					} else if (!ctrl.props.published()) {
-						var p = ctrl.props.plugins()[ctrl.props.pluginIdx()]
-						return [
-							m(".alert.alert-danger", "Publish this plugin to start training."),
-							m("p", "To publish a plugin, enter the following command in your terminal (replacing your/go/get/path):"),
-							m("code", "$ abot plugin publish your/go/get/path"),
-						]
-					} else {
-						return [
-							function() {
-								if (ctrl.props.trainable()) {
-									return m("h3.top-el", "Sentences")
-								}
-								return [
-									m(".alert.alert-warn", [
-										"This plugin's publisher hasn't connected their account to " + abot.itsAbotURL(),
-										". Connect your account by following ",
-										m("a[href=/account_connect]", { config: m.route }, "the instructions here."),
-										" No changes you make here will be saved until the account is connected.",
-									]),
-									m("h3", "Sentences"),
-								]
-							}(),
-							m("a[href=#]#train-sentence-btn", {
-								onclick: ctrl.addSentence,
-							}, "+ Train sentence"),
-						]
-					}
-				}(),
-				ctrl.subviews.newSentence,
-				function() {
-					var s = ctrl.props.sentences()
-					var sentences = []
-					for (var i = 0; i < s.length; ++i) {
-						sentences.push(m(".list-item", [
-							m("div", [
-								m("a[href=#/].btn-x", {
-									"data-idx": i,
-									onclick: ctrl.deleteSentence
-								}, "X"),
-								s[i].Sentence,
-							]),
-							m(".badge-container.badge-container-right", [
-								m(".badge", "Intent"),
-								m("input[type=text]#intent.input-clear.input-sm", {
-									"data-idx": i,
-									placeholder: "set_alarm",
-									value: s[i].Intent,
-									oninput: m.withAttr("value", ctrl.markChanged),
-								}),
-							]),
-						]))
-					}
-					return m("form.list", [
-						sentences
-					])
-				}(),
-				function() {
-					if (ctrl.props.sentences().length === 0 || !ctrl.props.published()) {
-						return
-					}
-					return m("#btns.btn-container-left", [
-						m("input[type=button].btn", {
-							onclick: ctrl.discard,
-							value: "Discard Changes",
-						}),
-						m("input[type=button].btn.btn-primary", {
-							onclick: ctrl.save,
-							value: "Save",
-						}),
-					])
-				}(),
+		m(".container", [
+			m.component(abot.Sidebar, { active: 1 }),
+			m(".main", [
+				m(".topbar", [
+					m(".topbar-inline", ctrl.props.title()),
+					function() {
+						var plugins = []
+						var ps = ctrl.props.plugins()
+						for (var i = 0; i < ps.length; ++i) {
+							var el = m("a", {
+								href: "#/",
+								onclick: ctrl.selectPlugin.bind(this, i),
+							}, ps[i].Name)
+							plugins.push(el)
+						}
+						if (ps.length === 0) {
+							return
+						}
+						return m(".topbar-right", plugins)
+					}(),
+				]),
+				m(".content", [
+					function() {
+						if (ctrl.props.error().length > 0) {
+							return m(".alert.alert-danger.alert-margin", ctrl.props.error())
+						}
+						if (ctrl.props.success().length > 0) {
+							return m(".alert.alert-success.alert-margin", ctrl.props.success())
+						}
+					}(),
+					function() {
+						if (ctrl.props.plugins().length === 0) {
+							return [
+								m(".alert.alert-danger", "No plugins installed."),
+								m("p", "Install a plugin to start training."),
+							]
+						} else if (!ctrl.props.published()) {
+							var p = ctrl.props.plugins()[ctrl.props.pluginIdx()]
+							return [
+								m(".alert.alert-danger", "Publish this plugin to start training."),
+								m("p", "To publish a plugin, enter the following command in your terminal (replacing your/go/get/path):"),
+								m("code", "$ abot plugin publish your/go/get/path"),
+							]
+						} else {
+							return [
+								function() {
+									if (ctrl.props.trainable()) {
+										return m("h3.top-el", "Sentences")
+									}
+									return [
+										m(".alert.alert-warn", [
+											"This plugin's publisher hasn't connected their account to " + abot.itsAbotURL(),
+											". Connect your account by following ",
+											m("a[href=/account_connect]", { config: m.route }, "the instructions here."),
+											" No changes you make here will be saved until the account is connected.",
+										]),
+										m("h3", "Sentences"),
+									]
+								}(),
+								m("a[href=#]#train-sentence-btn", {
+									onclick: ctrl.addSentence,
+								}, "+ Train sentence"),
+							]
+						}
+					}(),
+					ctrl.subviews.newSentence,
+					function() {
+						var s = ctrl.props.sentences()
+						var sentences = []
+						for (var i = 0; i < s.length; ++i) {
+							sentences.push(m(".list-item", [
+								m("div", [
+									m("a[href=#/].btn-x", {
+										"data-idx": i,
+										onclick: ctrl.deleteSentence
+									}, "X"),
+									s[i].Sentence,
+								]),
+								m(".badge-container.badge-container-right", [
+									m(".badge", "Intent"),
+									m("input[type=text]#intent.input-clear.input-sm", {
+										"data-idx": i,
+										placeholder: "set_alarm",
+										value: s[i].Intent,
+										oninput: m.withAttr("value", ctrl.markChanged),
+									}),
+								]),
+							]))
+						}
+						return m("form.list", [
+							sentences
+						])
+					}(),
+					function() {
+						if (ctrl.props.sentences().length === 0 || !ctrl.props.published()) {
+							return
+						}
+						return m("#btns.btn-container-left", [
+							m("input[type=button].btn", {
+								onclick: ctrl.discard,
+								value: "Discard Changes",
+							}),
+							m("input[type=button].btn.btn-primary", {
+								onclick: ctrl.save,
+								value: "Save",
+							}),
+						])
+					}(),
+				]),
 			]),
 		]),
 	])

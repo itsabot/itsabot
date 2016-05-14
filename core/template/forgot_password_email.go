@@ -17,7 +17,7 @@ func ForgotPasswordEmail(name, secret string) string {
 	h += fmt.Sprintf("<p>%s</p>", os.Getenv("ABOT_URL")+"/reset_password?s="+secret)
 	h += "<p>If you received this email in error, please ignore it.</p>"
 	h += "<p>Have a great day!</p>"
-	h += "<p>-Ava</p>"
+	h += "<p>-Abot</p>"
 	h += "</body></html>"
 	return h
 }

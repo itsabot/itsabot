@@ -1,15 +1,17 @@
 .sidebar {
-	float: left;
-	display: inline-block;
-	width: 15%;
-	height: auto;
-	min-height: 100%;
+	display: table-cell;
+	height: inherit;
+	min-height: inherit;
 	overflow-x: hidden;
 	background-color: #F3F3F3;
+	width: 200px;
 }
 .sidebar ul {
 	list-style-type: none;
 	padding-left: 0;
+}
+.sidebar ul li {
+	white-space: nowrap;
 }
 .sidebar ul li a {
 	display: block;
@@ -27,4 +29,25 @@
 .sidebar ul li a.active:hover {
 	background-color: rgba(52, 152, 219, 0.2);
 	color: #2980B9;
+}
+.sidebar ul li a img {
+	width: 20px;
+	margin-right: 8px;
+	vertical-align: text-bottom;
+}
+.sidebar.sidebar-right {
+	border-left: 1px solid rgba(0, 0, 0, 0.2);
+	width: 200px;
+	padding: 1em;
+	vertical-align: top;
+}
+.sidebar.sidebar-right .sidebar-content {
+	font-size: 14px;
+	color: #888;
+}
+.sidebar.sidebar-right .sidebar-content img {
+	width: 14px;
+	margin-right: 4px;
+	position: relative;
+	top: 2px;
 }

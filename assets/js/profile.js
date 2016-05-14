@@ -37,30 +37,32 @@ abot.Profile.controller = function() {
 	ctrl.sendView(userId)
 }
 abot.Profile.view = function(ctrl) {
-	return m(".container", [
+	return m(".body", [
 		m.component(abot.Header),
-		m.component(abot.Sidebar, { active: -1 }),
-		m(".main", [
-			m(".topbar", "Profile"),
-			m(".content", [
-				m("h3.top-el", "Account Details"),
-				m("div", [
-					m("label", "Username"),
-					m("div", m("div", ctrl.props.email())),
-				]),
-				m(".form-el", [
-					m("label", "Password"),
-					m("div", m("a[href=#]", "Change password")),
-				]),
-				m(".form-el", [
-					m("label", { for: "username" }, "Name"),
+		m(".container", [
+			m.component(abot.Sidebar, { active: -1 }),
+			m(".main", [
+				m(".topbar", "Profile"),
+				m(".content", [
+					m("h3.top-el", "Account Details"),
 					m("div", [
-						m("input#username[type=text]", {
-							value: ctrl.props.username(),
-						}),
+						m("label", "Username"),
+						m("div", m("div", ctrl.props.email())),
 					]),
+					m(".form-el", [
+						m("label", "Password"),
+						m("div", m("a[href=#]", "Change password")),
+					]),
+					m(".form-el", [
+						m("label", { for: "username" }, "Name"),
+						m("div", [
+							m("input#username[type=text]", {
+								value: ctrl.props.username(),
+							}),
+						]),
+					]),
+					m.component(abot.Phones, ctrl.props.phones()),
 				]),
-				m.component(abot.Phones, ctrl.props.phones()),
 			]),
 		]),
 	])

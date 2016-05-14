@@ -10,7 +10,10 @@ abot.SidebarItem.view = function(_, args) {
 			href: args.href,
 			config: m.route,
 			"class": klass,
-		}, args.text),
+		}, [
+			m("img", { src: "/public/images/"+args.icon }),
+			args.text,
+		]),
 	])
 }
 })(!window.abot ? window.abot={} : window.abot);

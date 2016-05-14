@@ -43,6 +43,9 @@ abot.Login.controller = function() {
 		ctrl.error(err)
 		document.getElementById("err").classList.remove("hidden")
 	}
+	ctrl.focus = function(el) {
+		el.focus()
+	}
 	ctrl.error = m.prop("")
 }
 abot.Login.view = function(ctrl) {
@@ -59,7 +62,8 @@ abot.Login.view = function(ctrl) {
 					m("form", { onsubmit: ctrl.login }, [
 						m(".form-el", [
 							m("input#email[type=email]", {
-								placeholder: "Email"
+								placeholder: "Email",
+								config: ctrl.focus,
 							}),
 						]),
 						m(".form-el", [

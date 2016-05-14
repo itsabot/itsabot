@@ -113,10 +113,10 @@ func ProcessText(r *http.Request) (ret string, uid uint64, err error) {
 	if plugin != nil {
 		m.Plugin = plugin.Config.Name
 	}
+	sendPreResponseEvent(msg, &m.Sentence)
 	if err = m.Save(db); err != nil {
 		return "", m.User.ID, err
 	}
-	sendPostResponseEvent(msg, &ret)
 	return m.Sentence, m.User.ID, nil
 }
 
@@ -138,8 +138,8 @@ func sendPostProcessingEvent(in *dt.Msg) {
 	}
 }
 
-func sendPostResponseEvent(in *dt.Msg, resp *string) {
+func sendPreResponseEvent(in *dt.Msg, resp *string) {
 	for _, p := range AllPlugins {
-		p.Events.PostResponse(in, resp)
+		p.Events.PreResponse(in, resp)
 	}
 }
