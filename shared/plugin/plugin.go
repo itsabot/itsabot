@@ -29,6 +29,10 @@ var ErrMissingTrigger = errors.New("missing plugin trigger")
 // New builds a Plugin with its trigger, RPC, and configuration settings from
 // its plugin.json.
 func New(url string) (*dt.Plugin, error) {
+	if err := core.LoadEnvVars(); err != nil {
+		log.Fatal(err)
+	}
+	
 	// Read plugin.json data from within plugins.go, unmarshal into struct
 	p := filepath.Join("plugins.go")
 	fi, err := os.OpenFile(p, os.O_RDONLY|os.O_CREATE, 0666)

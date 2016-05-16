@@ -32,6 +32,7 @@ var smsConn *sms.Conn
 var emailConn *email.Conn
 var conf = &PluginJSON{}
 var pluginsGo = []dt.PluginConfig{}
+var envLoaded bool
 
 // bClassifiers holds the trained bayesian classifiers for our plugins. The key
 // is the plugin ID to which the trained classifier belongs.
@@ -260,6 +261,10 @@ func LoadConf() error {
 
 // LoadEnvVars from abot.env into memory
 func LoadEnvVars() error {
+	if envLoaded {
+		return nil
+	}
+	
 	if len(os.Getenv("ITSABOT_URL")) == 0 {
 		log.Debug("ITSABOT_URL not set, using https://www.itsabot.org")
 		err := os.Setenv("ITSABOT_URL", "https://www.itsabot.org")
@@ -305,6 +310,7 @@ func LoadEnvVars() error {
 	if err = scn.Err(); err != nil {
 		return err
 	}
+	envLoaded = true
 	return nil
 }
 
