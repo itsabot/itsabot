@@ -21,7 +21,12 @@ type Memory struct {
 // String is a helper method making it easier to perform a common use-case,
 // converting a memory's []byte Val into a string.
 func (m Memory) String() string {
-	return string(m.Val)
+	if len(m.Val) < 2 {
+		return ""
+	}
+
+	// Remove the opening and closing " quotes.
+	return string(m.Val[1 : len(m.Val)-1])
 }
 
 // Int64 is a helper method making it easier to perform a common use-case,

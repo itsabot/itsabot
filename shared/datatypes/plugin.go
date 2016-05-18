@@ -48,7 +48,7 @@ type PluginEvents struct {
 	PostReceive    func(cmd *string)
 	PreProcessing  func(cmd *string, u *User)
 	PostProcessing func(in *Msg)
-	PostResponse   func(in *Msg, resp *string)
+	PreResponse    func(in *Msg, resp *string)
 }
 
 // Schedule a message to the user to be delivered at a future time. This is

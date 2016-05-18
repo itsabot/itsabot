@@ -83,7 +83,7 @@ func New(url string) (*dt.Plugin, error) {
 			PostReceive:    func(cmd *string) {},
 			PreProcessing:  func(cmd *string, u *dt.User) {},
 			PostProcessing: func(in *dt.Msg) {},
-			PostResponse:   func(in *dt.Msg, resp *string) {},
+			PreResponse:    func(in *dt.Msg, resp *string) {},
 		},
 		Config: c,
 		DB:     db,

@@ -26,6 +26,7 @@ import (
 	"github.com/itsabot/abot/core/websocket"
 	"github.com/itsabot/abot/shared/datatypes"
 	"github.com/itsabot/abot/shared/interface/emailsender"
+	"github.com/itsabot/abot/shared/prefs"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -69,6 +70,10 @@ func newRouter() *httprouter.Router {
 
 	// API routes (restricted to admins)
 	router.HandlerFunc("GET", "/api/admin/plugins.json", HAPIPlugins)
+	router.HandlerFunc("GET", "/api/admin/conversations_need_training.json", HAPIConversationsNeedTraining)
+	router.Handle("GET", "/api/admin/conversations/:uid/:fid/:fidt/:off", HAPIConversation)
+	router.HandlerFunc("PATCH", "/api/admin/conversations.json", HAPIConversationsUpdate)
+	router.HandlerFunc("POST", "/api/admins/send_message.json", HAPISendMessage)
 	router.HandlerFunc("GET", "/api/admins.json", HAPIAdmins)
 	router.HandlerFunc("PUT", "/api/admins.json", HAPIAdminsUpdate)
 	router.HandlerFunc("GET", "/api/admin/remote_tokens.json", HAPIRemoteTokens)
@@ -82,8 +87,7 @@ func newRouter() *httprouter.Router {
 func HIndex(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if os.Getenv("ABOT_ENV") != "production" {
-		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
-			"itsabot", "abot", "assets", "html", "layout.html")
+		p := filepath.Join("assets", "html", "layout.html")
 		tmplLayout, err = template.ParseFiles(p)
 		if err != nil {
 			writeErrorInternal(w, err)
@@ -575,6 +579,263 @@ func HAPIPlugins(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeBytes(w, pluginsGo)
+}
+
+// HAPIConversationsNeedTraining returns a list of all sentences that require a
+// human response.
+func HAPIConversationsNeedTraining(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	msgs := []struct {
+		Sentence   string
+		FlexID     *string
+		CreatedAt  time.Time
+		UserID     uint64
+		FlexIDType *int
+	}{}
+	q := `SELECT * FROM (
+		SELECT DISTINCT ON (userid, flexidtype)
+			userid, flexid, flexidtype, sentence, createdat
+		FROM messages
+		WHERE needstraining=TRUE AND abotsent=FALSE AND sentence<>''
+	) t ORDER BY createdat DESC`
+	err := db.Select(&msgs, q)
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusOK)
+	}
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	byt, err := json.Marshal(msgs)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(byt)
+	if err != nil {
+		log.Info("failed to write response.", err)
+	}
+}
+
+// HAPIConversation returns a conversation for a specific user or flexID.
+func HAPIConversation(w http.ResponseWriter, r *http.Request,
+	ps httprouter.Params) {
+
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var msgs []struct {
+		Sentence  string
+		AbotSent  bool
+		CreatedAt time.Time
+	}
+	var name, location string
+	var signedUp time.Time
+	uid := ps.ByName("uid")
+	fid := ps.ByName("fid")
+	fidT := ps.ByName("fidt")
+	offset := ps.ByName("off")
+	if uid != "0" {
+		q := `WITH t AS (
+			SELECT sentence, abotsent, createdat FROM messages
+			WHERE userid=$1
+			ORDER BY createdat DESC LIMIT 30 OFFSET $2
+		      ) SELECT * FROM t ORDER BY createdat ASC`
+		if err := db.Select(&msgs, q, uid, offset); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+		q = `SELECT createdat FROM users WHERE id=$1`
+		if err := db.Get(&signedUp, q, uid); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+		var val []byte
+		q = `SELECT value FROM states WHERE userid=$1 AND key=$2`
+		err := db.Get(&val, q, uid, prefs.Name)
+		if err != sql.ErrNoRows {
+			writeErrorInternal(w, err)
+			if err := json.Unmarshal(val, &name); err != nil {
+				return
+			}
+		}
+		err = db.Get(&val, q, uid, prefs.Location)
+		if err != sql.ErrNoRows {
+			writeErrorInternal(w, err)
+			if err := json.Unmarshal(val, &location); err != nil {
+				return
+			}
+		}
+	} else {
+		q := `WITH t AS (
+			SELECT sentence, abotsent, createdat FROM messages
+		        WHERE flexid=$1 AND flexidtype=$2
+		        ORDER BY createdat DESC LIMIT 30 OFFSET $3
+		      ) SELECT * FROM t ORDER BY createdat ASC`
+		if err := db.Select(&msgs, q, fid, fidT, offset); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+		q = `SELECT createdat FROM messages
+		     WHERE flexid=$1 AND flexidtype=$2 ORDER BY createdat ASC`
+		if err := db.Get(&signedUp, q, fid, fidT); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+		var val []byte
+		q = `SELECT value FROM states
+		     WHERE flexid=$1 AND flexidtype=$2 AND key=$3`
+		err := db.Get(&val, q, fid, fidT, prefs.Name)
+		if err != sql.ErrNoRows {
+			writeErrorInternal(w, err)
+			if err = json.Unmarshal(val, &name); err != nil {
+				return
+			}
+		}
+		err = db.Get(&val, q, fid, fidT, prefs.Location)
+		if err != sql.ErrNoRows {
+			writeErrorInternal(w, err)
+			if err = json.Unmarshal(val, &location); err != nil {
+				return
+			}
+		}
+	}
+	resp := struct {
+		Name      string
+		CreatedAt time.Time
+		Location  string
+		Messages  []struct {
+			Sentence  string
+			AbotSent  bool
+			CreatedAt time.Time
+		}
+	}{
+		Name:      name,
+		CreatedAt: signedUp,
+		Location:  location,
+		Messages:  msgs,
+	}
+	byt, err := json.Marshal(resp)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	_, err = w.Write(byt)
+	if err != nil {
+		log.Info("failed to write response.", err)
+	}
+}
+
+func HAPIConversationsUpdate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var req struct {
+		MessageID  uint64
+		UserID     uint64
+		FlexID     string
+		FlexIDType dt.FlexIDType
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	q := `UPDATE messages SET needstraining=false
+	      WHERE userid=$1 AND id>=$2`
+	_, err := db.Exec(q, req.UserID, req.MessageID)
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// HAPISendMessage enables an admin to send a message to a user on behalf of
+// Abot from the Response Panel.
+func HAPISendMessage(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !Admin(w, r) {
+			return
+		}
+		if !LoggedIn(w, r) {
+			return
+		}
+	}
+	var req struct {
+		UserID     uint64
+		FlexID     string
+		FlexIDType dt.FlexIDType
+		Name       string
+		Sentence   string
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	msg := &dt.Msg{
+		User:       &dt.User{ID: req.UserID},
+		FlexID:     req.FlexID,
+		FlexIDType: req.FlexIDType,
+		Sentence:   req.Sentence,
+		AbotSent:   true,
+	}
+	switch req.FlexIDType {
+	case dt.FIDTPhone:
+		if smsConn == nil {
+			writeErrorInternal(w, errors.New("No SMS driver installed."))
+			return
+		}
+		if err := smsConn.Send(msg.FlexID, msg.Sentence); err != nil {
+			writeErrorInternal(w, err)
+			return
+		}
+	case dt.FIDTEmail:
+		/*
+			// TODO
+			if emailConn == nil {
+				writeErrorInternal(w, errors.New("No email driver installed."))
+				return
+			}
+			adminEmail := os.Getenv("ABOT_EMAIL")
+			email := template.GenericEmail(req.Name)
+			err := emailConn.SendHTML(msg.FlexID, adminEmail, "SUBJ", email)
+			if err != nil {
+				writeErrorInternal(w, err)
+				return
+			}
+		*/
+	case dt.FIDTSession:
+		/*
+			// TODO
+			if err := ws.NotifySocketSession(); err != nil {
+			}
+		*/
+	default:
+		writeErrorInternal(w, errors.New("invalid flexidtype"))
+		return
+	}
+	if err := msg.Save(db); err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 // HAPIAdmins returns a list of all admins with the training and manage team
