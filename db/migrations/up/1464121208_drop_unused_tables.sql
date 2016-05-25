@@ -1,0 +1,11 @@
+DROP TABLE addresses;
+DROP TABLE authorizations;
+DROP TABLE emails;
+DROP TABLE locations;
+DROP TABLE inputs;
+DROP TABLE purchases;
+DROP EXTENSION "uuid-ossp";
+DROP TABLE vendors;
+DROP TABLE responses;
+ALTER TABLE messages DROP COLUMN sentenceannotated;
+ALTER TABLE messages DROP COLUMN trainingid;

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/itsabot/abot/core/log"
-	"github.com/itsabot/abot/shared/nlp"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -16,7 +15,7 @@ type Plugin struct {
 	Config      PluginConfig
 	SM          *StateMachine
 	Keywords    *Keywords
-	Trigger     *nlp.StructuredInput
+	Trigger     *StructuredInput
 	States      [][]State
 	DB          *sqlx.DB
 	Log         *log.Logger
@@ -48,7 +47,7 @@ type PluginEvents struct {
 	PostReceive    func(cmd *string)
 	PreProcessing  func(cmd *string, u *User)
 	PostProcessing func(in *Msg)
-	PostResponse   func(in *Msg, resp *string)
+	PreResponse    func(in *Msg, resp *string)
 }
 
 // Schedule a message to the user to be delivered at a future time. This is

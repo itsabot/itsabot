@@ -1,7 +1,5 @@
 package dt
 
-import "github.com/itsabot/abot/shared/nlp"
-
 // Keywords maintains sets of Commands and Objects recognized by plugins as well
 // as the functions to be performed when such Commands or Objects are found.
 type Keywords struct {
@@ -16,7 +14,7 @@ type Keywords struct {
 // found.
 type KeywordHandler struct {
 	Fn      KeywordFn
-	Trigger *nlp.StructuredInput
+	Trigger *StructuredInput
 }
 
 // KeywordFn is a function run when the user sends a matched keyword as

@@ -5,11 +5,6 @@ abot.Signup.controller = function() {
 		return m.route("/profile", null, true)
 	}
 	var ctrl = this
-	ctrl.props = {
-		userName: m.prop(m.route.param("name") || ""),
-		phone: m.prop(m.route.param("fid") || ""),
-		error: m.prop("")
-	}
 	ctrl.signup = function(ev) {
 		ev.preventDefault()
 		var name = document.getElementById("name").value
@@ -40,8 +35,16 @@ abot.Signup.controller = function() {
 			ctrl.props.error(err.Msg)
 		})
 	}
+	ctrl.focus = function(el) {
+		el.focus()
+	}
 	ctrl.phoneDisabled = function() {
 		return ctrl.props.phone().length > 0
+	}
+	ctrl.props = {
+		userName: m.prop(m.route.param("name") || ""),
+		phone: m.prop(m.route.param("fid") || ""),
+		error: m.prop("")
 	}
 }
 abot.Signup.view = function(ctrl) {
@@ -55,56 +58,59 @@ abot.Signup.view = function(ctrl) {
 			m(".centered.content", [
 				m("h1", "Sign Up"),
 				m(".well.well-form", [
-					errMsg,
-					m("form", { onsubmit: ctrl.signup }, [
-						m(".form-el", [
-							m("input", {
-								type: "text",
-								class: "form-control",
-								id: "name",
-								placeholder: "Your name"
-							})
-						]),
-						m(".form-el", [
-							m("input", {
-								type: "tel",
-								class: "form-control",
-								id: "phone",
-								placeholder: "Your phone number",
-								value: ctrl.props.phone(),
-								disabled: ctrl.phoneDisabled()
-							})
-						]),
-						m(".form-el", [
-							m("input", {
-								type: "email",
-								class: "form-control",
-								id: "email",
-								placeholder: "Email"
-							})
-						]),
-						m(".form-el", [
-							m("input", {
-								type: "password",
-								class: "form-control",
-								id: "password",
-								placeholder: "Password"
-							})
-						]),
-						m(".form-el", [
-							m("input", {
-								class: "btn btn-sm",
-								id: "btn",
-								type: "submit",
-								value: "Sign Up"
-							})
-						]),
-						m("small", [
-							m("span", "Have an account? "),
-							m("a", {
-								href: "/login",
-								config: m.route
-							}, "Log In")
+					m(".well-padding", [
+						errMsg,
+						m("form", { onsubmit: ctrl.signup }, [
+							m(".form-el", [
+								m("input", {
+									type: "text",
+									class: "form-control",
+									id: "name",
+									placeholder: "Your name",
+									config: ctrl.focus,
+								})
+							]),
+							m(".form-el", [
+								m("input", {
+									type: "tel",
+									class: "form-control",
+									id: "phone",
+									placeholder: "Your phone number",
+									value: ctrl.props.phone(),
+									disabled: ctrl.phoneDisabled()
+								})
+							]),
+							m(".form-el", [
+								m("input", {
+									type: "email",
+									class: "form-control",
+									id: "email",
+									placeholder: "Email",
+								})
+							]),
+							m(".form-el", [
+								m("input", {
+									type: "password",
+									class: "form-control",
+									id: "password",
+									placeholder: "Password"
+								})
+							]),
+							m(".form-el", [
+								m("input", {
+									class: "btn btn-sm",
+									id: "btn",
+									type: "submit",
+									value: "Sign Up"
+								})
+							]),
+							m("small", [
+								m("span", "Have an account? "),
+								m("a", {
+									href: "/login",
+									config: m.route
+								}, "Log In")
+							]),
 						]),
 					]),
 				]),

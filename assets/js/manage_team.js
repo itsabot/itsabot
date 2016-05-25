@@ -38,51 +38,53 @@ abot.ManageTeam.controller = function() {
 	})
 }
 abot.ManageTeam.view = function(ctrl) {
-	return m(".container", [
+	return m(".body", [
 		m.component(abot.Header),
-		m.component(abot.Sidebar, { active: 3 }),
-		m(".main", [
-			m(".topbar", "Manage Team"),
-			m(".content", [
-				m("h3.top-el", "Admins"),
-				function() {
-					if (ctrl.props.error().length > 0) {
-						return m(".alert.alert-danger.alert-margin", ctrl.props.error())
-					}
-					if (ctrl.props.success().length > 0) {
-						return m(".alert.alert-success.alert-margin", ctrl.props.success())
-					}
-				}(),
-				m("p", "Removing permissions will take effect immediately. Adding permissions will require that user to log out and back in again to be available."),
-				m("table.table-compact", [
-					m("thead", [
-						m("th", ""),
-						m("th", "Name"),
-						m("th", "Email"),
-					]),
+		m(".container", [
+			m.component(abot.Sidebar, { active: 3 }),
+			m(".main", [
+				m(".topbar", "Manage Team"),
+				m(".content", [
+					m("h3.top-el", "Admins"),
 					function() {
-						var c = []
-						var a = ctrl.props.admins()
-						var e = Cookies.get("email")
-						// Store this bool so we can stop doing expensive
-						// string comparisons once we've found the user
-						var looking = true
-						for (var i = 0; i < a.length; ++i) {
-							if (looking || a[i].Email === e) {
-								c.unshift(m.component(abot.TableItemUser, ctrl, a[i]))
-								looking = false
-							} else {
-								c.push(m.component(abot.TableItemUser, ctrl, a[i]))
-							}
+						if (ctrl.props.error().length > 0) {
+							return m(".alert.alert-danger.alert-margin", ctrl.props.error())
 						}
-						return c
+						if (ctrl.props.success().length > 0) {
+							return m(".alert.alert-success.alert-margin", ctrl.props.success())
+						}
 					}(),
-				]),
-				m(".well.well-no-border", [
-					m("form", { onsubmit: ctrl.addAdmin }, [
-						m("h4.form-header", "Add an admin"),
-						m("input#admin-email[type=email]", { placeholder: "Email" }),
-						m("input.btn.btn-inline[type=submit]", { value: "Add admin" }),
+					m("p", "Removing permissions will take effect immediately. Adding permissions will require that user to log out and back in again to be available."),
+					m("table.table-compact", [
+						m("thead", [
+							m("th", ""),
+							m("th", "Name"),
+							m("th", "Email"),
+						]),
+						function() {
+							var c = []
+							var a = ctrl.props.admins()
+							var e = Cookies.get("email")
+							// Store this bool so we can stop doing expensive
+							// string comparisons once we've found the user
+							var looking = true
+							for (var i = 0; i < a.length; ++i) {
+								if (looking || a[i].Email === e) {
+									c.unshift(m.component(abot.TableItemUser, ctrl, a[i]))
+									looking = false
+								} else {
+									c.push(m.component(abot.TableItemUser, ctrl, a[i]))
+								}
+							}
+							return c
+						}(),
+					]),
+					m(".well.well-no-border", [
+						m("form", { onsubmit: ctrl.addAdmin }, [
+							m("h4.form-header", "Add an admin"),
+							m("input#admin-email[type=email]", { placeholder: "Email" }),
+							m("input.btn.btn-inline[type=submit]", { value: "Add admin" }),
+						]),
 					]),
 				]),
 			]),

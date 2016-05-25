@@ -72,11 +72,6 @@ func (c *Conn) Driver() driver.Driver {
 	return c.driver
 }
 
-// Receive a email through an opened driver connection.
-func (c *Conn) Receive(from, subj, html string) error {
-	return c.conn.Receive(from, subj, html)
-}
-
 // SendHTML email through the opened driver connection.
 func (c *Conn) SendHTML(to []string, from, subj, html string) error {
 	return c.conn.SendHTML(to, from, subj, html)

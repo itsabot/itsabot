@@ -91,7 +91,7 @@ abot.externalRequest = function(opts) {
 	return m.request(opts)
 }
 abot.prettyDate = function(time) {
-    var date = new Date((time || "").replace(/-/g, "/").replace(/[TZ]/g, " ")),
+    var date = new Date(time || ""),
         diff = (((new Date()).getTime() - date.getTime()) / 1000),
         day_diff = Math.floor(diff / 86400)
     if (isNaN(day_diff) || day_diff < 0 || day_diff >= 31) return
@@ -134,8 +134,10 @@ window.addEventListener('load', function() {
 		"/forgot_password": abot.ForgotPassword,
 		"/reset_password": abot.ResetPassword,
 		"/profile": abot.Profile,
-		"/admin": abot.Admin,
+		"/dashboard": abot.Dashboard,
 		"/training": abot.Training,
+		"/response_panel": abot.ResponsePanel,
+		"/response_panel/conversation": abot.ResponsePanelConversation,
 		"/manage_team": abot.ManageTeam,
 		"/account_connect": abot.AccountConnect,
 		"/:any...": abot.NotFound,

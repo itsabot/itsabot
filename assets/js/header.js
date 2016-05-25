@@ -17,9 +17,6 @@ abot.Header.view = function() {
 			m("a[href=/login]", {
 				config: m.route
 			}, "Log in"),
-			m("a[href=/signup]", {
-				config: m.route
-			}, "Sign up"),
 		]
 	}
 	return m("header", [

@@ -1,12 +1,11 @@
 .plugin-icon {
-	width: 18%;
-	min-width: 100px;
-	padding: 0.5em;
+	width: 100px;
 	display: inline-block;
+	margin-bottom: 1em;
 }
 .plugin-icon img {
-	width: 40%;
-	padding: 1em 0;
+	width: 60%;
+	padding: 0.5em 0;
 	display: block;
 	margin: 0 auto;
 }

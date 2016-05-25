@@ -3,6 +3,9 @@
 	padding: 1em 1.5em 1em 1em;
 	box-sizing: border-box;
 	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+	font-size: 16px;
+	position: relative;
+	bottom: 5px;
 }
 .topbar .topbar-inline {
 	display: inline;

@@ -1,5 +1,9 @@
 .container {
-	height: 100%;
-	min-height: 100%;
+	height: inherit;
+	min-height: inherit;
+	width: 100%;
 	background-color: #F3F3F3;
+	display: table;
+	table-layout: fixed;
+	border-collapse: collapse;
 }

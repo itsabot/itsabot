@@ -23,44 +23,43 @@ abot.Profile.controller = function() {
 		})
 	}
 	ctrl.props = {
-		username: m.prop(""),
+		name: m.prop(""),
 		email: m.prop(""),
-		phones: m.prop([]),
 	}
 	ctrl.data(userId).then(function(data) {
 		ctrl.props.email(data.Email)
-		ctrl.props.username(data.Name)
-		ctrl.props.phones(data.Phones || [])
+		ctrl.props.name(data.Name)
 	}, function(err) {
 		console.error(err)
 	})
 	ctrl.sendView(userId)
 }
 abot.Profile.view = function(ctrl) {
-	return m(".container", [
+	return m(".body", [
 		m.component(abot.Header),
-		m.component(abot.Sidebar, { active: -1 }),
-		m(".main", [
-			m(".topbar", "Profile"),
-			m(".content", [
-				m("h3.top-el", "Account Details"),
-				m("div", [
-					m("label", "Username"),
-					m("div", m("div", ctrl.props.email())),
-				]),
-				m(".form-el", [
-					m("label", "Password"),
-					m("div", m("a[href=#]", "Change password")),
-				]),
-				m(".form-el", [
-					m("label", { for: "username" }, "Name"),
+		m(".container", [
+			m.component(abot.Sidebar, { active: -1 }),
+			m(".main", [
+				m(".topbar", "Profile"),
+				m(".content", [
+					m("h3.top-el", "Account Details"),
 					m("div", [
-						m("input#username[type=text]", {
-							value: ctrl.props.username(),
-						}),
+						m("label", "Email"),
+						m("div", m("div", ctrl.props.email())),
+					]),
+					m(".form-el", [
+						m("label", "Password"),
+						m("div", m("a[href=#]", "Change password")),
+					]),
+					m(".form-el", [
+						m("label", { for: "name" }, "Name"),
+						m("div", [
+							m("input#name[type=text]", {
+								value: ctrl.props.name(),
+							}),
+						]),
 					]),
 				]),
-				m.component(abot.Phones, ctrl.props.phones()),
 			]),
 		]),
 	])

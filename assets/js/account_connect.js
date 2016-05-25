@@ -3,7 +3,7 @@ abot.AccountConnect = {}
 abot.AccountConnect.controller = function() {
 	abot.AccountConnect.checkAuth(function(loggedIn) {
 		if (loggedIn) {
-			return m.route("/profile")
+			return m.route("/profile", null, true)
 		}
 	})
 	var ctrl = this
@@ -76,65 +76,67 @@ abot.AccountConnect.controller = function() {
 	ctrl.fetchAuthTokens()
 }
 abot.AccountConnect.view = function(ctrl) {
-	return m(".container", [
+	return m(".body", [
 		m.component(abot.Header),
-		m.component(abot.Sidebar, { active: 4 }),
-		m(".main", [
-			m(".topbar", "Account Connect"),
-			m(".content", [
-				function() {
-					if (ctrl.props.error().length > 0) {
-						return m(".alert.alert-danger.alert-margin", ctrl.props.error())
-					}
-					if (ctrl.props.success().length > 0) {
-						return m(".alert.alert-success.alert-margin", ctrl.props.success())
-					}
-				}(),
-				m("form", { onsubmit: ctrl.submitAuthToken }, [
-					m("div", [
-						"Connecting your account to ",
-						m("strong", ctrl.hostname),
-						" will enable you to train plugins you've published. If you've published a plugin to " + ctrl.hostname + ", then generate an auth token at ",
-						m("a", {
-							href: abot.itsAbotURL() + "/profile",
-						}, abot.itsAbotURL() + "/profile"),
-						" and paste it here to authenticate yourself."
-					]),
-					m("p", "This has to be done once for each plugin publisher."),
-					m(".form-el", [
-						m("input[type=text]", {
-							placeholder: "Auth Token",
-							value: ctrl.props.token(),
-							onchange: m.withAttr("value", ctrl.props.token),
-						}),
-						m("input.btn.btn-inline[type=submit]", {
-							value: "Connect Account",
-						}),
-					]),
-				]),
-				function() {
-					if (ctrl.props.tokens().length === 0) {
-						return
-					}
-					return m("div", [
-						m("h4", "Account Connect Tokens"),
-						m("table.table-compact", [
-							m("thead", [
-								m("th", ""),
-								m("th", "Auth Token (Last 6)"),
-								m("th", "Added By"),
-							]),
-							function() {
-								var t = ctrl.props.tokens()
-								var els = []
-								for (var i = 0; i < t.length; i++) {
-									els.push(m.component(abot.TableItemToken, ctrl, t[i]))
-								}
-								return els
-							}(),
+		m(".container", [
+			m.component(abot.Sidebar, { active: 4 }),
+			m(".main", [
+				m(".topbar", "Account Connect"),
+				m(".content", [
+					function() {
+						if (ctrl.props.error().length > 0) {
+							return m(".alert.alert-danger.alert-margin", ctrl.props.error())
+						}
+						if (ctrl.props.success().length > 0) {
+							return m(".alert.alert-success.alert-margin", ctrl.props.success())
+						}
+					}(),
+					m("form", { onsubmit: ctrl.submitAuthToken }, [
+						m("div", [
+							"Connecting your account to ",
+							m("strong", ctrl.hostname),
+							" will enable you to train plugins you've published. If you've published a plugin to " + ctrl.hostname + ", then generate an auth token at ",
+							m("a", {
+								href: abot.itsAbotURL() + "/profile",
+							}, abot.itsAbotURL() + "/profile"),
+							" and paste it here to authenticate yourself."
 						]),
-					])
-				}(),
+						m("p", "This has to be done once for each plugin publisher."),
+						m(".form-el", [
+							m("input[type=text]", {
+								placeholder: "Auth Token",
+								value: ctrl.props.token(),
+								onchange: m.withAttr("value", ctrl.props.token),
+							}),
+							m("input.btn.btn-inline[type=submit]", {
+								value: "Connect Account",
+							}),
+						]),
+					]),
+					function() {
+						if (ctrl.props.tokens().length === 0) {
+							return
+						}
+						return m("div", [
+							m("h4", "Account Connect Tokens"),
+							m("table.table-compact", [
+								m("thead", [
+									m("th", ""),
+									m("th", "Auth Token (Last 6)"),
+									m("th", "Added By"),
+								]),
+								function() {
+									var t = ctrl.props.tokens()
+									var els = []
+									for (var i = 0; i < t.length; i++) {
+										els.push(m.component(abot.TableItemToken, ctrl, t[i]))
+									}
+									return els
+								}(),
+							]),
+						])
+					}(),
+				]),
 			]),
 		]),
 	])

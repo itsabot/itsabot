@@ -8,16 +8,20 @@
 .btn {
 	padding: 0.5em 1em;
 	margin: 0.5em 1em 0.5em 0;
+	border: 1px solid #CCC;
+	border-radius: 4px;
+	text-decoration: none;
+	color: black;
 }
 .btn:hover {
-	background-color: #EEE;
+	background-color: white;
 }
 .btn-inline {
 	margin-left: 0.5em;
 }
 .btn-primary {
 	font-weight: 600;
-	width: 100px;
+	min-width: 100px;
 }
 .btn-x {
 	color: red;

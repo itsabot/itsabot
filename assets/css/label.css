@@ -1,3 +1,7 @@
 label {
-	font-weight: 600;
+	font-size: 16px;
+}
+input[type=checkbox] {
+	vertical-align: text-top;
+	margin-right: 0.5em;
 }

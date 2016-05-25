@@ -1,6 +1,9 @@
 (function(abot) {
 abot.Login = {}
 abot.Login.controller = function() {
+	if (abot.isLoggedIn()) {
+		return m.route("/profile", null, true)
+	}
 	var ctrl = this
 	ctrl.login = function(ev) {
 		ev.preventDefault()
@@ -26,7 +29,7 @@ abot.Login.controller = function() {
 			Cookies.set("scopes", data.Scopes, exp, null, null, secure)
 			if (m.route.param("r") == null) {
 				if (abot.isAdmin()) {
-					return m.route("/admin")
+					return m.route("/dashboard")
 				}
 				return m.route("/profile")
 			}
@@ -43,6 +46,9 @@ abot.Login.controller = function() {
 		ctrl.error(err)
 		document.getElementById("err").classList.remove("hidden")
 	}
+	ctrl.focus = function(el) {
+		el.focus()
+	}
 	ctrl.error = m.prop("")
 }
 abot.Login.view = function(ctrl) {
@@ -52,33 +58,32 @@ abot.Login.view = function(ctrl) {
 			m(".centered.content", [
 				m("h1", "Log In"),
 				m(".well.well-form", [
-					m("div", {
-						id: "err",
-						"class": "alert alert-danger alert-margin hidden",
-					}, ctrl.error()),
-					m("form", { onsubmit: ctrl.login }, [
-						m(".form-el", [
-							m("input#email[type=email]", {
-								placeholder: "Email"
-							}),
+					m(".well-padding", [
+						m("div", {
+							id: "err",
+							"class": "alert alert-danger alert-margin hidden",
+						}, ctrl.error()),
+						m("form", { onsubmit: ctrl.login }, [
+							m(".form-el", [
+								m("input#email[type=email]", {
+									placeholder: "Email",
+									config: ctrl.focus,
+								}),
+							]),
+							m(".form-el", [
+								m("input#password[type=password]", {
+									placeholder: "Password"
+								}),
+							]),
+							m("small", [
+								m("a[href=/forgot_password]", {
+									config: m.route,
+								}, "Forgot password?")
+							]),
+							m(".form-el", [
+								m("input.btn#btn[type=submit]", { value: "Log In" }),
+							]),
 						]),
-						m(".form-el", [
-							m("input#password[type=password]", {
-								placeholder: "Password"
-							}),
-						]),
-						m("small", [
-							m("a[href=/forgot_password]", {
-								config: m.route,
-							}, "Forgot password?")
-						]),
-						m(".form-el", [
-							m("input.btn#btn[type=submit]", { value: "Log In" }),
-						]),
-					]),
-					m("small", [
-						m("span", "No account? "),
-						m("a[href=/signup]", { config: m.route }, "Sign Up"),
 					]),
 				]),
 			]),

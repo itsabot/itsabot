@@ -22,7 +22,7 @@ var regexNum = regexp.MustCompile(`\d+`)
 var regexNonWords = regexp.MustCompile(`[^\w\s]`)
 
 // ErrNotFound is thrown when the requested type cannot be found in the string
-var ErrNotFound error = errors.New("couldn't extract requested type from string")
+var ErrNotFound = errors.New("couldn't extract requested type from string")
 
 // ExtractCurrency returns an int64 if a currency is found, and throws an
 // error if one isn't.
@@ -62,14 +62,8 @@ func ExtractYesNo(s string) (bool, error) {
 func ExtractAddress(db *sqlx.DB, u *dt.User, s string) (*dt.Address, bool, error) {
 	addr, err := address.Parse(s)
 	if err != nil {
-		// check if user's address is in DB already
-		log.Debug("Checking if user address already in DB...")
-		if addr, err = u.GetAddress(db, s); err == nil {
-			return addr, true, nil
-		}
 		return nil, false, err
 	}
-
 	type addr2S struct {
 		XMLName  xml.Name `xml:"Address"`
 		ID       string   `xml:"ID,attr"`

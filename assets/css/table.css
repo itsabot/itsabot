@@ -37,3 +37,6 @@ table td.subtle {
 	font-style: italic;
 	color: #AAA;
 }
+table.no-border thead, table.no-border tr {
+	border: none;
+}
