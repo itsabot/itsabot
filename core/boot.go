@@ -136,48 +136,10 @@ func NewServer() (r *httprouter.Router, err error) {
 		log.Debug("no email drivers imported")
 	}
 
-	// Listen for events that need to be sent.
+	// Send any scheduled events on boot and every minute
 	evtChan := make(chan *dt.ScheduledEvent)
-	go func(chan *dt.ScheduledEvent) {
-		q := `UPDATE scheduledevents SET sent=TRUE WHERE id=$1`
-		select {
-		case evt := <-evtChan:
-			log.Debug("received event")
-			// Send event. On error, event will be retried next
-			// minute.
-			if err := evt.Send(smsConn); err != nil {
-				log.Info("failed to send scheduled event", err)
-				return
-			}
-			// Update event as sent
-			if _, err := db.Exec(q); err != nil {
-				log.Info("failed to update scheduled event as sent",
-					err)
-				return
-			}
-		}
-	}(evtChan)
-
-	// Check every minute if there are any scheduled events that need to be
-	// sent.
-	go func(evtChan chan *dt.ScheduledEvent) {
-		q := `SELECT id, content, flexid, flexidtype
-		      FROM scheduledevents
-		      WHERE sent=false AND sendat<=$1`
-		t := time.NewTicker(time.Minute)
-		select {
-		case now := <-t.C:
-			evts := []*dt.ScheduledEvent{}
-			if err := db.Select(&evts, q, now); err != nil {
-				log.Info("failed to queue scheduled event", err)
-				return
-			}
-			for _, evt := range evts {
-				// Queue the event for sending
-				evtChan <- evt
-			}
-		}
-	}(evtChan)
+	go sendEventsTick(evtChan, time.Now())
+	go sendEvents(evtChan, 1*time.Minute)
 
 	// Update cached analytics data on boot and every 15 minutes
 	go updateAnalyticsTick(time.Now())

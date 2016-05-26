@@ -5,8 +5,8 @@ import (
 	"github.com/itsabot/abot/shared/datatypes"
 )
 
-// newMsg builds a message struct with Tokens, Stems, and a Structured Input.
-func newMsg(u *dt.User, cmd string) *dt.Msg {
+// NewMsg builds a message struct with Tokens, Stems, and a Structured Input.
+func NewMsg(u *dt.User, cmd string) *dt.Msg {
 	tokens := TokenizeSentence(cmd)
 	stems := StemTokens(tokens)
 	si := ner.classifyTokens(tokens)
