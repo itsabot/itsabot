@@ -45,7 +45,7 @@ func (c classifier) classifyTokens(tokens []string) *dt.StructuredInput {
 // context in the sentence.
 func buildClassifier() (classifier, error) {
 	ner := classifier{}
-	p := filepath.Join("data", "ner")
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "data", "ner")
 	fi, err := os.Open(filepath.Join(p, "nouns.txt"))
 	if err != nil {
 		return ner, err
@@ -103,7 +103,7 @@ func buildClassifier() (classifier, error) {
 // before any human ever sees them.
 func buildOffensiveMap() (map[string]struct{}, error) {
 	o := map[string]struct{}{}
-	p := filepath.Join("data", "offensive.txt")
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "data", "offensive.txt")
 	fi, err := os.Open(p)
 	if err != nil {
 		return o, err
@@ -170,7 +170,7 @@ func ConfusedLang() string {
 
 // TokenizeSentence returns a sentence broken into tokens. Tokens are individual
 // words as well as punctuation. For example, "Hi! How are you?" becomes
-// []string{"Hi", "!", "How", "are", "you", "?"}
+// []string{"Hi", "!", "How", "are", "you", "?"}.
 func TokenizeSentence(sent string) []string {
 	tokens := []string{}
 	for _, w := range strings.Fields(sent) {
