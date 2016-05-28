@@ -30,7 +30,7 @@ func preprocess(r *http.Request) (*dt.Msg, error) {
 		return nil, err
 	}
 	sendPreProcessingEvent(&req.CMD, u)
-	msg := newMsg(u, req.CMD)
+	msg := NewMsg(u, req.CMD)
 	// TODO trigger training if needed (see buildInput)
 	return msg, nil
 }

@@ -3,6 +3,7 @@ package dt
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/itsabot/abot/core/log"
@@ -54,18 +55,18 @@ type PluginEvents struct {
 // particularly useful for reminders. The method of delivery, e.g. SMS or
 // email, will be determined automatically by Abot at the time of sending the
 // message. Abot will contact the user using that user's the most recently used
-// communication method. This method returns the scheduled event ID in the
-// database for future reference and an error if the event could not be
+// communication method. This method returns an error if the event could not be
 // scheduled.
-func (p *Plugin) Schedule(u *User, content string, sendat time.Time) (uint64,
-	error) {
+func (p *Plugin) Schedule(in *Msg, content string, sendat time.Time) error {
 
-	q := `INSERT INTO scheduledevents (content, userid, sendat)
-	      VALUES ($1, $2, $3)
-	      RETURNING id`
-	var sid uint64
-	err := p.DB.QueryRow(q, content, u.ID, sendat).Scan(&sid)
-	return sid, err
+	if sendat.Before(time.Now()) {
+		return errors.New("cannot schedule time in the past")
+	}
+	q := `INSERT INTO scheduledevents (content, flexid, flexidtype, sendat,
+		pluginname)
+	      VALUES ($1, $2, $3, $4, $5)`
+	_, err := p.DB.Exec(q, content, in.User.FlexID, in.User.FlexIDType, sendat, p.Config.Name)
+	return err
 }
 
 // run is an unexported function that executes a plugin's behavior when the

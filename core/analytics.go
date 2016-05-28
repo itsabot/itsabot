@@ -16,8 +16,9 @@ const (
 	keyVersion    = "version"
 )
 
+// updateAnalytics recursively calls itself to continue running.
 func updateAnalytics(interval time.Duration) {
-	t := time.NewTicker(1 * time.Hour)
+	t := time.NewTicker(time.Hour)
 	select {
 	case now := <-t.C:
 		updateAnalyticsTick(now)

@@ -4,7 +4,7 @@ package timeparse
 
 import (
 	"errors"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +18,21 @@ type timeLocation struct {
 	loc *time.Location
 	utc bool
 }
+
+// timeTransform is an enum type.
+type timeTransform int
+
+// These transform keys allow us to track the type of transform we're making to
+// a time. Use the closest transform you can to the size without going over,
+// e.g. "Next week" would use transform transformDay.
+const (
+	transformInvalid timeTransform = iota
+	transformYear
+	transformMonth
+	transformDay
+	transformHour
+	transformMinute
+)
 
 // TimeContext is a type used to extrapolate a single piece of info, like AMPM
 // or the month across multiple times. If any item in TimeContext is nil, the
@@ -50,8 +65,7 @@ const (
 	pmTime
 )
 
-var timeFormatsNoDay = []string{
-	"15",
+var timeFormats = []string{
 	"15PM",
 	"15:4",
 	"15:4PM",
@@ -65,9 +79,6 @@ var timeFormatsNoDay = []string{
 	"Mon 15:4PM MST",
 	"Mon 15:4:5 MST",
 	"Mon 15:4:5PM MST",
-}
-
-var timeFormatsWithDay = []string{
 	"15:4:5 Jan 2 06",
 	"15:4:5PM Jan 2 06",
 	"15:4:5 Jan 2 2006",
@@ -79,6 +90,8 @@ var timeFormatsWithDay = []string{
 	"Mon Jan 2",
 	"Mon Jan 2 06",
 	"Mon Jan 2 2006",
+	"Jan 2 2006",
+	"Jan 2006",
 	"1/2/06",
 	"1/2/2006",
 	"1/2/06 15:4:5",
@@ -91,103 +104,123 @@ var timeFormatsWithDay = []string{
 	"1-2",
 }
 
-var months = map[string]time.Month{
-	"Jan": time.Month(1),
-	"Feb": time.Month(2),
-	"Mar": time.Month(3),
-	"Apr": time.Month(4),
-	"May": time.Month(5),
-	"Jun": time.Month(6),
-	"Jul": time.Month(7),
-	"Aug": time.Month(8),
-	"Sep": time.Month(9),
-	"Oct": time.Month(10),
-	"Nov": time.Month(11),
-	"Dec": time.Month(12),
+// Parse a natural language string to determine most likely times based on the
+// current system time.
+func Parse(nlTime string) []time.Time {
+	return ParseFromTime(time.Now(), nlTime)
 }
 
-var days = map[string]time.Weekday{
-	"Sun": time.Weekday(0),
-	"Mon": time.Weekday(1),
-	"Tue": time.Weekday(2),
-	"Wed": time.Weekday(3),
-	"Thu": time.Weekday(4),
-	"Fri": time.Weekday(5),
-	"Sat": time.Weekday(6),
-}
-
-func normalizeTime(t string) (normalizedTime string, location *time.Location,
-	relativeTime bool) {
-
+// ParseFromTime parses a natural language string to determine most likely times
+// based on a set time "context." The time context changes the meaning of words
+// like "this Tuesday," "next Tuesday," etc.
+func ParseFromTime(t time.Time, nlTime string) []time.Time {
 	r := strings.NewReplacer(
 		".", "",
 		",", "",
 		"(", "",
 		")", "",
 		"'", "",
+	)
+	nlTime = r.Replace(nlTime)
+	nlTime = strings.ToLower(nlTime)
+	r = strings.NewReplacer(
+		"at ", "",
+		"time", "",
+		"oclock", "",
 		"am", "AM",
 		"pm", "PM",
-		" Am", "AM",
-		" Pm", "PM",
-		" AM", "AM",
-		" A.M", "AM",
-		" P.M", "PM")
-	t = r.Replace(t)
-	t = strings.Title(t)
-	st := strings.Fields(t)
+		" am", "AM",
+		" pm", "PM",
+
+		// 1st, 2nd, 3rd, 4th, 5th, etc.
+		"1st", "1",
+		"2nd", "2",
+		"3rd", "3",
+		"th", "",
+		"21st", "21",
+		"22nd", "22",
+		"23rd", "23",
+		"31st", "31",
+	)
+	nlTime = r.Replace(nlTime)
+	nlTime = strings.Title(nlTime)
+	if nlTime == "Now" {
+		return []time.Time{time.Now()}
+	}
+	st := strings.Fields(nlTime)
+	transform := struct {
+		Transform  int
+		Type       timeTransform
+		Multiplier int
+	}{
+		Multiplier: 1,
+	}
 	stFull := ""
-	relative := false
+	var closeTime bool
+	var idxRel int
 	var loc *time.Location
 	for i := range st {
 		// Normalize days
 		switch st[i] {
 		case "Monday":
 			st[i] = "Mon"
-			relative = true
+			transform.Type = transformDay
 		case "Tuesday", "Tues":
 			st[i] = "Tue"
-			relative = true
+			transform.Type = transformDay
 		case "Wednesday":
 			st[i] = "Wed"
-			relative = true
+			transform.Type = transformDay
 		case "Thursday", "Thur", "Thurs":
 			st[i] = "Thu"
-			relative = true
+			transform.Type = transformDay
 		case "Friday":
 			st[i] = "Fri"
-			relative = true
+			transform.Type = transformDay
 		case "Saturday":
 			st[i] = "Sat"
-			relative = true
+			transform.Type = transformDay
 		case "Sunday":
 			st[i] = "Sun"
-			relative = true
+			transform.Type = transformDay
 
 		// Normalize months
 		case "January":
 			st[i] = "Jan"
+			transform.Type = transformMonth
 		case "February":
 			st[i] = "Feb"
+			transform.Type = transformMonth
 		case "March":
 			st[i] = "Mar"
+			transform.Type = transformMonth
 		case "April":
 			st[i] = "Apr"
+			transform.Type = transformMonth
 		case "May":
 			// No translation needed for May
+			transform.Type = transformMonth
 		case "June":
 			st[i] = "Jun"
+			transform.Type = transformMonth
 		case "July":
 			st[i] = "Jul"
+			transform.Type = transformMonth
 		case "August":
 			st[i] = "Aug"
+			transform.Type = transformMonth
 		case "September", "Sept":
 			st[i] = "Sep"
+			transform.Type = transformMonth
 		case "October":
 			st[i] = "Oct"
+			transform.Type = transformMonth
 		case "November":
 			st[i] = "Nov"
+			transform.Type = transformMonth
 		case "December":
 			st[i] = "Dec"
+			transform.Type = transformMonth
 
 		// If non-deterministic timezone information is provided,
 		// e.g. ET or Eastern rather than EST, then load the location.
@@ -206,93 +239,128 @@ func normalizeTime(t string) (normalizedTime string, location *time.Location,
 			loc = loadLocation("America/New_York")
 		// TODO Add the remaining timezones
 
-		// Handle relative times
-		case "Ago", "Previous", "Prev", "Last", "Next", "Upcoming",
-			"This", "Tomorrow", "Yesterday":
-			relative = true
-
-		// Remove unnecessary but common expressions
-		case "At", "Time", "Oclock":
+		// Handle relative times. This currently does not handle
+		// complex cases like "in 3 months and 2 days"
+		case "Yesterday":
 			st[i] = ""
+			transform.Type = transformDay
+			transform.Transform = 1
+			transform.Multiplier = -1
+		case "Tomorrow":
+			st[i] = ""
+			transform.Transform = 1
+			transform.Type = transformDay
+		case "Today":
+			st[i] = ""
+			closeTime = true
+			transform.Type = transformHour
+		case "Ago", "Last":
+			st[i] = ""
+			transform.Transform = 1
+			transform.Multiplier *= -1
+		// e.g. "In an hour"
+		case "Next", "From", "Now", "In":
+			st[i] = ""
+			transform.Transform = 1
+		case "Later":
+			st[i] = ""
+			transform.Transform = 6
+		case "Hour", "Hours":
+			st[i] = ""
+			idxRel = i
+			closeTime = true
+			transform.Type = transformHour
+		case "Few", "Couple":
+			st[i] = ""
+			transform.Transform = 2
+		case "Min", "Mins", "Minute", "Minutes":
+			st[i] = ""
+			idxRel = i
+			closeTime = true
+			transform.Type = transformMinute
+		case "Day", "Days":
+			st[i] = ""
+			idxRel = i
+			transform.Type = transformDay
+		case "Week", "Weeks":
+			st[i] = ""
+			idxRel = i
+			transform.Type = transformDay
+			transform.Multiplier = 7
+		case "Month", "Months":
+			st[i] = ""
+			idxRel = i
+			transform.Type = transformMonth
+		case "Year", "Years":
+			st[i] = ""
+			idxRel = i
+			transform.Type = transformYear
+
+		// Remove unnecessary but common expressions like "at", "time",
+		// "oclock".
+		case "At", "Time", "Oclock", "This", "The":
+			st[i] = ""
+		case "Noon":
+			st[i] = "12PM"
+		case "Supper", "Dinner":
+			st[i] = "6PM"
 		}
 
-		if st[i] != "" {
+		if len(st[i]) > 0 {
 			stFull += st[i] + " "
 		}
 	}
 	normalized := strings.TrimRight(stFull, " ")
-	return normalized, loc, relative
-}
 
-// Parse a natural language string to determine most likely times based on the
-// current system time.
-func Parse(nlTimes ...string) ([]time.Time, error) {
-	return ParseFromTime(time.Now(), nlTimes...)
-}
+	var timeEmpty bool
+	ts := []time.Time{}
+	tme, err := parseTime(normalized)
+	if err != nil {
+		// Set the hour to 9am
+		timeEmpty = true
+		tme = time.Now().Round(time.Hour)
+		val := 9 - tme.Hour()
+		tme = tme.Add(time.Duration(val) * time.Hour)
+	}
+	if closeTime {
+		tme = time.Now().Round(time.Minute)
+	}
+	ts = append(ts, tme)
 
-// ParseFromTime parses a natural language string to determine most likely times
-// based on a set time "context." The time context changes the meaning of words
-// like "this Tuesday," "next Tuesday," etc.
-func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
-	var times []time.Time
-	tloc := timeLocation{loc: t.Location()}
+	// TODO make more efficient. Handle in switch?
+	tloc := timeLocation{loc: loc}
 	ctx := &TimeContext{ampm: ampmNoTime, tz: tloc}
-	var ti time.Time
-	var rel bool
-	for _, nlTime := range nlTimes {
-		log.Debug("original:", nlTime)
-		var loc *time.Location
-		nlTime, loc, rel = normalizeTime(nlTime)
-		log.Debug("normalized:", nlTime)
-		var day bool
-		var err error
-		if rel {
-			ti = parseTimeRelative(nlTime, t)
-		} else if loc == nil {
-			ti, day, err = parseTime(nlTime)
-		} else {
-			ti, day, err = parseTimeInLocation(nlTime, loc)
-		}
-		if err != nil {
-			log.Debug("could not parse time", nlTime, err)
-			continue
-		}
-		if !rel {
-			ctx = updateContext(ctx, ti, day)
-			if strings.Contains(nlTime, "AM") {
-				ctx.ampm = amTime
-			}
-			if strings.Contains(nlTime, "UTC") {
-				ctx.tz.utc = true
-			}
-		}
-		times = append(times, ti)
+	if strings.Contains(normalized, "AM") {
+		ctx.ampm = amTime
+	}
+	if strings.Contains(normalized, "UTC") {
+		ctx.tz.utc = true
+	}
+	for _, ti := range ts {
+		ctx = updateContext(ctx, ti, false)
 	}
 
 	// Ensure dates are reasonable even in the absence of information.
 	// e.g. 2AM should parse to the current year, not 0000
-	if !rel {
-		ctx = completeContext(ctx, t)
-	}
+	ctx = completeContext(ctx, t)
 
 	// Loop through a second time to apply the discovered context to each
 	// time. Note that this doesn't support context switching,
 	// e.g. "5PM CST or PST" or "5PM EST or 6PM PST", which is rare in
 	// practice. Future versions may be adapted to support it.
 	if ctx.ampm == ampmNoTime {
-		halfLen := len(times)
+		halfLen := len(ts)
 		// Double size of times for AM/PM
-		times = append(times, times...)
-		log.Debug(times)
-		for i := range times {
+		ts = append(ts, ts...)
+		for i := range ts {
 			var hour int
-			t := times[i]
+			t := ts[i]
 			if i < halfLen {
 				hour = t.Hour()
 			} else {
 				hour = t.Hour() + 12
 			}
-			times[i] = time.Date(ctx.year,
+			ts[i] = time.Date(ctx.year,
 				ctx.month,
 				ctx.day,
 				hour,
@@ -302,9 +370,9 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 				ctx.tz.loc)
 		}
 	} else {
-		for i := range times {
-			t := times[i]
-			times[i] = time.Date(ctx.year,
+		for i := range ts {
+			t := ts[i]
+			ts[i] = time.Date(ctx.year,
 				ctx.month,
 				ctx.day,
 				t.Hour(),
@@ -314,7 +382,45 @@ func ParseFromTime(t time.Time, nlTimes ...string) ([]time.Time, error) {
 				ctx.tz.loc)
 		}
 	}
-	return times, nil
+
+	// If there's no relative transform, we're done.
+	if transform.Type == transformInvalid {
+		if timeEmpty {
+			return []time.Time{}
+		}
+		if idxRel == 0 {
+			return ts
+		}
+	}
+
+	// Check our idxRel term for the word that preceeds it. If that's a
+	// number, e.g. 2 days, then that number is our Transform. Note that
+	// this doesn't handle fractional modifiers, like 2.5 days.
+	if idxRel > 0 {
+		val, err := strconv.Atoi(st[idxRel-1])
+		if err == nil {
+			transform.Transform = val
+		}
+	}
+
+	// Apply the transform
+	log.Debugf("timeparse: normalized %q. %+v\n", normalized, transform)
+	for i := range ts {
+		switch transform.Type {
+		case transformYear:
+			ts[i] = ts[i].AddDate(transform.Transform*transform.Multiplier, 0, 0)
+		case transformMonth:
+			ts[i] = ts[i].AddDate(0, transform.Multiplier*transform.Transform, 0)
+		case transformDay:
+			ts[i] = ts[i].AddDate(0, 0, transform.Multiplier*transform.Transform)
+		case transformHour:
+			ts[i] = ts[i].Add(time.Duration(transform.Transform*transform.Multiplier) * time.Hour)
+		case transformMinute:
+			ts[i] = ts[i].Add(time.Duration(transform.Transform*transform.Multiplier) * time.Minute)
+		}
+	}
+	log.Debug("timeparse: parsed times", ts)
+	return ts
 }
 
 func updateContext(orig *TimeContext, t time.Time, day bool) *TimeContext {
@@ -343,18 +449,18 @@ func updateContext(orig *TimeContext, t time.Time, day bool) *TimeContext {
 
 func completeContext(ctx *TimeContext, t time.Time) *TimeContext {
 	if ctx.year == 0 {
-		ctx.year = t.Year()
+		(*ctx).year = t.Year()
 	}
 	if ctx.month == 0 {
-		ctx.month = t.Month()
+		(*ctx).month = t.Month()
 	}
 	if ctx.day == 0 {
-		ctx.day = t.Day()
+		(*ctx).day = t.Day()
 	}
 	// time.Location.String() defaults to "UTC". The bool tz.utc tracks if
 	// that was deliberately UTC.
 	if ctx.tz.loc.String() == "UTC" && ctx.tz.utc == false {
-		ctx.tz.loc = t.Location()
+		(*ctx).tz.loc = t.Location()
 	}
 	return ctx
 }
@@ -362,7 +468,7 @@ func completeContext(ctx *TimeContext, t time.Time) *TimeContext {
 func loadLocation(l string) *time.Location {
 	loc, err := time.LoadLocation(l)
 	if err != nil {
-		log.Debug("could not load location", l)
+		log.Info("failed to load location.", l)
 	}
 	return loc
 }
@@ -372,97 +478,13 @@ func loadLocation(l string) *time.Location {
 //
 // TODO This is a brute-force, "dumb" method of determining the time format and
 // should be improved.
-func parseTime(t string) (time.Time, bool, error) {
-	for _, tf := range timeFormatsNoDay {
+func parseTime(t string) (time.Time, error) {
+	for _, tf := range timeFormats {
 		time, err := time.Parse(tf, t)
 		if err == nil {
-			log.Debug("format", tf)
-			return time, noDay, nil
+			log.Debug("timeparse: found format", tf)
+			return time, nil
 		}
 	}
-	for _, tf := range timeFormatsWithDay {
-		time, err := time.Parse(tf, t)
-		if err == nil {
-			return time, hasDay, nil
-		}
-	}
-	return time.Time{}, noDay, ErrInvalidTimeFormat
-}
-
-func parseTimeInLocation(t string, loc *time.Location) (time.Time, bool, error) {
-	for _, tf := range timeFormatsNoDay {
-		time, err := time.ParseInLocation(tf, t, loc)
-		if err == nil {
-			return time, noDay, nil
-		}
-	}
-	for _, tf := range timeFormatsWithDay {
-		time, err := time.ParseInLocation(tf, t, loc)
-		if err == nil {
-			return time, hasDay, nil
-		}
-	}
-	return time.Time{}, noDay, ErrInvalidTimeFormat
-}
-
-func parseTimeRelative(nlTime string, t time.Time) time.Time {
-	hour := t.Hour()
-	day := t.Day()
-	month := t.Month()
-	year := t.Year()
-	futureTime := 1
-	if strings.Contains(nlTime, "Tomorrow") {
-		day++
-	}
-	if strings.Contains(nlTime, "Yesterday") {
-		day--
-	}
-	if strings.Contains(nlTime, "Month") {
-		// TODO handle relative months
-		// "2 months", "2 months ago" format
-		// "next month", "last month" format
-	}
-	r := regexp.MustCompile(`(Ago|Prev|Previous|Last)\s`)
-	if r.FindString(nlTime) != "" {
-		futureTime = -1
-	}
-	r = regexp.MustCompile(`(Sun|Mon|Tue|Wed|Thu|Fri|Sat)\s`)
-	weekday := r.FindString(nlTime)
-	if weekday != "" {
-		if days[weekday] != t.Weekday() {
-			day = day - int(days[weekday]+t.Weekday()) + 7
-			if futureTime == -1 {
-				day -= 7
-			}
-		} else {
-			day += 7
-		}
-	}
-	r = regexp.MustCompile(
-		`(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s`)
-	m := r.FindString(nlTime)
-	if m != "" {
-		if months[m] > month {
-			month = months[m]
-			if futureTime == -1 {
-				month -= 12
-			}
-		} else if months[m] < month {
-			month = months[m] + 12
-			if futureTime == -1 {
-				month -= 12
-			}
-		} else {
-			month += 12
-		}
-	}
-	return time.Date(
-		year,
-		month,
-		day,
-		hour,
-		t.Minute(),
-		t.Second(),
-		t.Nanosecond(),
-		t.Location())
+	return time.Time{}, ErrInvalidTimeFormat
 }
