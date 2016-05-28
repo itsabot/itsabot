@@ -30,7 +30,7 @@ var ner classifier
 var offensive map[string]struct{}
 var smsConn *sms.Conn
 var emailConn *email.Conn
-var conf = &PluginJSON{}
+var conf = &PluginJSON{Dependencies: map[string]string{}}
 var pluginsGo = []dt.PluginConfig{}
 var envLoaded bool
 
@@ -72,18 +72,19 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err = checkRequiredEnvVars(); err != nil {
 		return nil, err
 	}
-
+	if len(os.Getenv("ABOT_PATH")) == 0 {
+		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
+			"itsabot", "abot")
+		log.Debug("ABOT_PATH not set. defaulting to", p)
+		err = os.Setenv("ABOT_PATH", p)
+		if err != nil {
+			return nil, err
+		}
+	}
 	err = LoadConf()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
 		log.Info("failed loading conf", err)
 		return nil, err
-	}
-	var p string
-	if err == nil {
-		p = filepath.Join(os.Getenv("GOPATH"), "src", conf.ImportPath)
-		if err = os.Setenv("ABOT_PATH", p); err != nil {
-			return nil, err
-		}
 	}
 	err = loadPluginsGo()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
@@ -104,8 +105,8 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err != nil {
 		log.Debug("could not build offensive map", err)
 	}
-	p2 := filepath.Join("assets", "html", "layout.html")
-	if err = loadHTMLTemplate(p, p2); err != nil {
+	p := filepath.Join("assets", "html", "layout.html")
+	if err = loadHTMLTemplate(p); err != nil {
 		log.Info("failed loading HTML template", err)
 		return nil, err
 	}
@@ -202,11 +203,12 @@ func compileAssets() error {
 	return nil
 }
 
-func loadHTMLTemplate(p, p2 string) error {
+func loadHTMLTemplate(p string) error {
 	var err error
-	tmplLayout, err = template.ParseFiles(filepath.Join(p, p2))
+	tmplLayout, err = template.ParseFiles(filepath.Join(
+		os.Getenv("ABOT_PATH"), p))
 	if tmplLayout == nil {
-		tmplLayout, err = template.ParseFiles(p2)
+		tmplLayout, err = template.ParseFiles(p)
 	}
 	return err
 }
@@ -246,15 +248,11 @@ func ConnectDB() (*sqlx.DB, error) {
 
 // LoadConf plugins.json into a usable struct.
 func LoadConf() error {
-	contents, err := ioutil.ReadFile("plugins.json")
-	if err != nil {
-		if err.Error() != "open plugins.json: no such file or directory" {
-			return err
-		}
-		contents, err = ioutil.ReadFile(filepath.Join("..", "plugins.json"))
-		if err != nil {
-			return err
-		}
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.json")
+	okVal := fmt.Sprintf("open %s: no such file or directory", p)
+	contents, err := ioutil.ReadFile(p)
+	if err != nil && err.Error() != okVal {
+		return err
 	}
 	return json.Unmarshal(contents, conf)
 }
@@ -272,8 +270,7 @@ func LoadEnvVars() error {
 			return err
 		}
 	}
-	p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "itsabot",
-		"abot", "abot.env")
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "abot.env")
 	fi, err := os.Open(p)
 	if os.IsNotExist(err) {
 		// Assume the user has loaded their env variables into their
@@ -316,11 +313,11 @@ func LoadEnvVars() error {
 
 // loadPluginsGo loads the plugins.go file into memory.
 func loadPluginsGo() error {
-	contents, err := ioutil.ReadFile("plugins.go")
-	if err != nil {
-		if err.Error() != "open plugins.go: no such file or directory" {
-			return err
-		}
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.go")
+	okVal := fmt.Sprintf("open %s: no such file or directory", p)
+	contents, err := ioutil.ReadFile(p)
+	if err != nil && err.Error() != okVal {
+		return err
 	}
 	var val []byte
 	var foundStart bool
