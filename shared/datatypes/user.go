@@ -98,16 +98,6 @@ func GetUser(db *sqlx.DB, req *Request) (*User, error) {
 	return u, nil
 }
 
-// GetName satisfies the Contactable interface
-func (u *User) GetName() string {
-	return u.Name
-}
-
-// GetEmail satisfies the Contactable interface
-func (u *User) GetEmail() string {
-	return u.Email
-}
-
 // Create a new user in the database.
 func (u *User) Create(db *sqlx.DB, fidT FlexIDType, fid string) error {
 	// Create the password hash
