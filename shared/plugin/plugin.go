@@ -32,9 +32,9 @@ func New(url string) (*dt.Plugin, error) {
 	if err := core.LoadEnvVars(); err != nil {
 		log.Fatal(err)
 	}
-	
+
 	// Read plugin.json data from within plugins.go, unmarshal into struct
-	p := filepath.Join("plugins.go")
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.go")
 	fi, err := os.OpenFile(p, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
