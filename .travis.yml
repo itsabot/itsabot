@@ -27,6 +27,7 @@ install:
         - go install github.com/robfig/glock
         - glock sync github.com/itsabot/abot
         - go install ./...
+        - abot plugin install
 script:
         - export PORT=4200
         - export ABOT_URL=http://localhost
