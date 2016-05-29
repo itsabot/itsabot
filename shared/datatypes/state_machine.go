@@ -299,10 +299,31 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 	}
 
 	// No guards were triggered (go to state), or the state == desiredState,
-	// so reset the state and run OnEntry again.
+	// so reset the state and run OnEntry again unless the plugin is now
+	// complete.
 	sm.state = desiredState
 	sm.stateEntered = false
 	sm.plugin.SetMemory(in, StateKey, desiredState)
 	sm.plugin.SetMemory(in, stateEnteredKey, false)
 	return sm.Handlers[desiredState].OnEntry(in)
+}
+
+// ReplayState returns you to the current state's OnEntry function. This is
+// only useful when you're iterating over results in a state machine. If you're
+// reading this, you should probably be using task.Iterate() instead. If you've
+// already considered task.Iterate(), and you've decided to use this underlying
+// function instead, you should only call it when Complete returns false, like
+// so:
+//
+// Complete: func(in *dt.Msg) (bool, string) {
+//	if p.HasMemory(in, "memkey") {
+//		return true, ""
+//	}
+//	return false, p.SM.ReplayState(in)
+// }
+//
+// That said, the *vast* majority of the time you should NOT be using this
+// function. Instead use task.Iterate(), which uses this function safely.
+func (sm *StateMachine) ReplayState(in *Msg) string {
+	return sm.Handlers[sm.state+1].OnEntry(in)
 }

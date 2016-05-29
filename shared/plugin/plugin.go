@@ -133,7 +133,7 @@ func Register(p *dt.Plugin) error {
 		}
 	}
 	core.AllPlugins = append(core.AllPlugins, p)
-	p.SM.SetStates(p.States)
+	p.SM.SetStates([][]dt.State{p.States})
 	return nil
 }
 
@@ -177,7 +177,10 @@ func SetKeywords(p *dt.Plugin, khs ...dt.KeywordHandler) {
 // SetStates is a convenience function provided to match the API of NewKeywords
 // and AppendTrigger.
 func SetStates(p *dt.Plugin, states [][]dt.State) {
-	p.States = states
+	p.States = []dt.State{}
+	for _, ss := range states {
+		p.States = append(p.States, ss...)
+	}
 }
 
 // AppendTrigger appends the StructuredInput's modified contents to a plugin.
