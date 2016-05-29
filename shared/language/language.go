@@ -19,33 +19,34 @@ import (
 	"github.com/itsabot/abot/core/log"
 )
 
-var yes = map[string]bool{
-	"yes":          true,
-	"yea":          true,
-	"yah":          true,
-	"yeah":         true,
-	"yup":          true,
-	"yesh":         true,
-	"sure":         true,
-	"aye":          true,
-	"ok":           true,
-	"o.k.":         true,
-	"k":            true,
-	"kk":           true,
-	"that's right": true,
-	"thats right":  true,
-	"affirmative":  true,
+var yes = map[string]struct{}{
+	"yes":          struct{}{},
+	"yea":          struct{}{},
+	"yah":          struct{}{},
+	"yeah":         struct{}{},
+	"yup":          struct{}{},
+	"yesh":         struct{}{},
+	"sure":         struct{}{},
+	"aye":          struct{}{},
+	"ok":           struct{}{},
+	"o.k.":         struct{}{},
+	"k":            struct{}{},
+	"kk":           struct{}{},
+	"that's right": struct{}{},
+	"thats right":  struct{}{},
+	"affirmative":  struct{}{},
+	"perfect":      struct{}{},
 }
 
-var no = map[string]bool{
-	"no":          true,
-	"nope":        true,
-	"nah":         true,
-	"not sure":    true,
-	"dunno":       true,
-	"don't know":  true,
-	"do not know": true,
-	"negative":    true,
+var no = map[string]struct{}{
+	"no":          struct{}{},
+	"nope":        struct{}{},
+	"nah":         struct{}{},
+	"not sure":    struct{}{},
+	"dunno":       struct{}{},
+	"don't know":  struct{}{},
+	"do not know": struct{}{},
+	"negative":    struct{}{},
 }
 
 // Join concatenates triggers together, like Recommend() and Broken(), ensuring
@@ -444,14 +445,16 @@ func QuestionLocation(loc string) string {
 // "yeah" returns true.
 func Yes(s string) bool {
 	s = strings.ToLower(s)
-	return yes[s]
+	_, ok := yes[s]
+	return ok
 }
 
 // No determines if a specific word is a "No" response. For example, "nah"
 // returns true.
 func No(s string) bool {
 	s = strings.ToLower(s)
-	return no[s]
+	_, ok := no[s]
+	return ok
 }
 
 // SliceToString converts a slice of strings into a natural-language list with
