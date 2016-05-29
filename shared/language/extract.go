@@ -46,10 +46,12 @@ func ExtractYesNo(s string) (bool, error) {
 	ss := strings.Fields(strings.ToLower(s))
 	for _, w := range ss {
 		w = strings.TrimRight(w, " .,;:!?'\"")
-		if yes[w] {
+		_, ok := yes[w]
+		if ok {
 			return true, nil
 		}
-		if no[w] {
+		_, ok = no[w]
+		if ok {
 			return false, nil
 		}
 	}
