@@ -17,7 +17,7 @@ type Plugin struct {
 	SM          *StateMachine
 	Keywords    *Keywords
 	Trigger     *StructuredInput
-	States      [][]State
+	States      []State
 	DB          *sqlx.DB
 	Log         *log.Logger
 	Events      *PluginEvents
@@ -58,7 +58,6 @@ type PluginEvents struct {
 // communication method. This method returns an error if the event could not be
 // scheduled.
 func (p *Plugin) Schedule(in *Msg, content string, sendat time.Time) error {
-
 	if sendat.Before(time.Now()) {
 		return errors.New("cannot schedule time in the past")
 	}
