@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/itsabot/abot/core/log"
@@ -27,6 +28,9 @@ func updateAnalytics(interval time.Duration) {
 }
 
 func updateAnalyticsTick(t time.Time) {
+	if os.Getenv("ABOT_ENV") == "test" {
+		return
+	}
 	log.Info("updating analytics")
 	createdAt := t.Round(24 * time.Hour)
 

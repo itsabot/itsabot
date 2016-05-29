@@ -96,7 +96,9 @@ func NewServer() (r *httprouter.Router, err error) {
 		log.Debug("could not build classifier", err)
 	}
 	go func() {
-		log.Info("training classifiers")
+		if os.Getenv("ABOT_ENV") != "test" {
+			log.Info("training classifiers")
+		}
 		if err = trainClassifiers(); err != nil {
 			log.Info("could not train classifiers", err)
 		}
@@ -224,7 +226,7 @@ func LoadEnvVars() error {
 	if envLoaded {
 		return nil
 	}
-	
+
 	if len(os.Getenv("ITSABOT_URL")) == 0 {
 		log.Debug("ITSABOT_URL not set, using https://www.itsabot.org")
 		err := os.Setenv("ITSABOT_URL", "https://www.itsabot.org")
