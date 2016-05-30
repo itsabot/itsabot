@@ -1077,7 +1077,12 @@ func hapiDashboard(w http.ResponseWriter, r *http.Request) {
 		writeErrorInternal(w, err)
 		return
 	}
-	automationRate := 1 - float64(needsTraining)/float64(msgCount)
+	var automationRate float64
+	if msgCount == 0 {
+		automationRate = 0
+	} else {
+		automationRate = 1 - float64(needsTraining)/float64(msgCount)
+	}
 	var version float64
 	if err = db.Get(&version, q, keyVersion); err != nil {
 		writeErrorInternal(w, err)
