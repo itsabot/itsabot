@@ -5,25 +5,25 @@ echo "You will be prompted for your password by sudo."
 
 # clear any previous sudo permission
 sudo -k
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
+if [[ "$OSTYPE" == "linux-gnu"  ]]; then
 
     # update your sources
     sudo apt-get update
 
     # install golang
-    if [ $(dpkg-query -W -f='${Status}' golang 2>/dev/null | grep -c "ok installed") -eq 0 ];
+    if [ "$(dpkg-query -W -f='${Status}' golang 2>/dev/null | grep -c "ok installed")" -eq 0  ];
     then
         sudo apt-get install -y golang
     fi
 
     # install git
-    if [ $(dpkg-query -W -f='${Status}' git 2>/dev/null | grep -c "ok installed") -eq 0 ];
+    if [ "$(dpkg-query -W -f='${Status}' git 2>/dev/null | grep -c "ok installed")" -eq 0  ];
     then
         sudo apt-get install -y git
     fi
 
     # install postgresql
-    if [ $(dpkg-query -W -f='${Status}' postgresql 2>/dev/null | grep -c "ok installed") -eq 0 ];
+    if [ "$(dpkg-query -W -f='${Status}' postgresql 2>/dev/null | grep -c "ok installed")" -eq 0  ];
     then
         sudo apt-get install -y postgresql postgresql-contrib
         echo
@@ -39,7 +39,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
         echo "END psql ---------------------"
         echo
     fi
-elif [[ "$OSTYPE" == "darwin"* ]]; then
+elif [[ "$OSTYPE" == "darwin"*  ]]; then
     # This is the code for when we're on OS X
     /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
@@ -71,31 +71,31 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 FILEPATH="$HOME/go"
-printf "Enter a path for your GOPATH: ($FILEPATH) "
-read tempPath
+printf "Enter a path for your GOPATH: %s " "$FILEPATH"
+read -r tempPath
 printf "\n"
 [ -n "$tempPath" ] && FILEPATH=$tempPath
 
-if [ ! -d "$FILEPATH" ]; then
-    sudo mkdir $FILEPATH
+if [ ! -d "$FILEPATH"  ]; then
+    sudo mkdir "$FILEPATH"
 fi
 
 export GOPATH=$FILEPATH
 export PATH=$PATH:$GOPATH/bin
-touch $HOME/.bashrc
-echo "# GOPATH is used to specify directories outside of \$GOROOT" >> $HOME/.bashrc
-echo "# that contain the source for Go projects and their binaries." >> $HOME/.bashrc
-echo "export GOPATH=$FILEPATH" >> $HOME/.bashrc
-echo "# GOPATH/bin stores compiled go binaries" >> $HOME/.bashrc
-echo "export PATH=\$PATH:$GOPATH/bin" >> $HOME/.bashrc
-sudo chown -R $USER $GOPATH
+touch "$HOME/.bashrc"
+echo "# GOPATH is used to specify directories outside of \$GOROOT" >> "$HOME/.bashrc"
+echo "# that contain the source for Go projects and their binaries." >> "$HOME/.bashrc"
+echo "export GOPATH=$FILEPATH" >> "$HOME/.bashrc"
+echo "# GOPATH/bin stores compiled go binaries" >> "$HOME/.bashrc"
+echo "export PATH=\$PATH:$GOPATH/bin" >> "$HOME/.bashrc"
+sudo chown -R "$USER" "$GOPATH"
 
 stty -echo
 printf "Please enter the postgresql password you just setup: "
-read PASS
+read -r PASS
 stty echo
 printf "\n"
 
 go get github.com/itsabot/abot
-cd $GOPATH/src/github.com/itsabot/abot
-cmd/setup.sh postgres:$PASS@127.0.0.1:5432
+cd "$GOPATH/src/github.com/itsabot/abot" || exit
+cmd/setup.sh postgres:"$PASS"@127.0.0.1:5432
