@@ -39,7 +39,7 @@ func (c classifier) classifyTokens(tokens []string) *dt.StructuredInput {
 // and Objects using a simple dictionary lookup. This has the benefit of high
 // speed--constant time, O(1)--with insignificant memory use and high accuracy
 // given false positives (marking something as both a Command and an Object when
-// it's really acting as an Object) are OK. Utlimately this should be a first
+// it's really acting as an Object) are OK. Ultimately this should be a first
 // pass, and any double-marked words should be passed through something like an
 // n-gram Bayesian filter to determine the correct part of speech within its
 // context in the sentence.

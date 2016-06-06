@@ -14,9 +14,9 @@ type OptsIterate struct {
 	// The iterable memory must be a []string.
 	IterableMemKey string
 
-	// ResultMemKey is the key in memory where the selected item is stored.
-	// Use this key to access the results of the Iterable task.
-	ResultMemKey string
+	// ResultMemKey is the key in memory where the selected item's index is
+	// stored. Use this key to access the results of the Iterable task.
+	ResultMemKeyIdx string
 }
 
 // keySelection is the currently active item index in the iterable.
@@ -60,13 +60,13 @@ func Iterate(p *dt.Plugin, label string, opts OptsIterate) []dt.State {
 				}
 				if yes {
 					idx := p.GetMemory(in, keySelection).Int64()
-					p.SetMemory(in, opts.ResultMemKey, idx)
+					p.SetMemory(in, opts.ResultMemKeyIdx, idx)
 					return
 				}
 				// TODO handle "next", "something else", etc.
 			},
 			Complete: func(in *dt.Msg) (bool, string) {
-				if p.HasMemory(in, opts.ResultMemKey) {
+				if p.HasMemory(in, opts.ResultMemKeyIdx) {
 					return true, ""
 				}
 				return false, p.SM.ReplayState(in)

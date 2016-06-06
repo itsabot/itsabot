@@ -6811,6 +6811,7 @@ ramayana
 rambert
 rambouillet
 rameau
+ramen
 rameses
 ramillies
 ramsay
@@ -44274,7 +44275,6 @@ hoverports
 hovers
 hovertrain
 hovertrains
-how
 how-d'ye-do
 how-d'ye-dos
 how-do-you-do
@@ -68537,6 +68537,7 @@ ratches
 ratchet
 ratchets
 rate
+rated
 rateability
 ratel
 ratels
@@ -89433,9 +89434,7 @@ whelk
 whelks
 whelp
 whelps
-when
 whens
-where
 whereabouts
 wherefore
 wheres
@@ -89618,7 +89617,6 @@ whizbang
 whizbangs
 whizz
 whizzes
-who
 who'd
 who'll
 who's
@@ -89661,7 +89659,6 @@ whorls
 whort
 whortleberries
 whortleberry
-why
 whydah
 whys
 wick

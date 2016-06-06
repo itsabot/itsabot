@@ -68,7 +68,7 @@ func GetPlugin(db *sqlx.DB, m *dt.Msg) (p *dt.Plugin, route string, directroute,
 	// Iterate through all intents to see if any plugin has been registered
 	// for the route
 	for _, i := range m.StructuredInput.Intents {
-		route = "__intent_" + strings.ToLower(i)
+		route = "I_" + strings.ToLower(i)
 		log.Debug("searching for route", route)
 		if p = RegPlugins.Get(route); p != nil {
 			// Found route. Return it
@@ -76,29 +76,33 @@ func GetPlugin(db *sqlx.DB, m *dt.Msg) (p *dt.Plugin, route string, directroute,
 		}
 	}
 
+	log.Debug("getting last plugin route")
+	prevPlugin, prevRoute, err := m.GetLastPlugin(db)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, "", false, false, err
+	}
+	log.Debugf("found user's last plugin route: %s - %s\n", prevPlugin,
+		prevRoute)
+
 	// Iterate over all command/object pairs and see if any plugin has been
 	// registered for the resulting route
 	eng := porter2.Stemmer
 	for _, c := range m.StructuredInput.Commands {
-		c = eng.Stem(c)
+		c = strings.ToLower(eng.Stem(c))
 		for _, o := range m.StructuredInput.Objects {
-			route := strings.ToLower(c + "_" + eng.Stem(o))
+			o = strings.ToLower(eng.Stem(o))
+			route := "CO_" + c + "_" + o
 			log.Debug("searching for route", route)
 			if p = RegPlugins.Get(route); p != nil {
 				// Found route. Return it
-				return p, route, true, false, nil
+				followup := prevPlugin == p.Config.Name
+				return p, route, true, followup, nil
 			}
 		}
 	}
 
 	// The user input didn't match any plugins. Let's see if the previous
 	// route does
-	log.Debug("getting last route")
-	prevRoute, err := m.GetLastRoute(db)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, "", false, false, err
-	}
-	log.Debugf("found user's last route: %q\n", prevRoute)
 	if prevRoute != "" {
 		if p = RegPlugins.Get(prevRoute); p != nil {
 			// Prev route matches a pkg! Return it

@@ -60,8 +60,8 @@ func TestMain(m *testing.M) {
 			},
 		},
 		Iterate(p, "", OptsIterate{
-			IterableMemKey: keyMem,
-			ResultMemKey:   keyRes,
+			IterableMemKey:  keyMem,
+			ResultMemKeyIdx: keyRes,
 		}),
 		[]dt.State{
 			{
