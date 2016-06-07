@@ -1,12 +1,15 @@
 package dt
 
+import (
+	"strings"
+
+	"github.com/dchest/stemmer/porter2"
+)
+
 // Keywords maintains sets of Commands and Objects recognized by plugins as well
 // as the functions to be performed when such Commands or Objects are found.
 type Keywords struct {
-	Commands map[string]struct{}
-	Objects  map[string]struct{}
-	Intents  map[string]struct{}
-	Dict     map[string]*KeywordFn
+	Dict map[string]KeywordFn
 }
 
 // KeywordHandler maintains sets of Commands and Objects recognized by plugins as
@@ -34,36 +37,21 @@ func (k *Keywords) handle(m *Msg) string {
 		}
 
 		// If we find an intent function, use that.
-		return (*fn)(m)
+		return fn(m)
 	}
 
 	// No matching intent was found, so check for both Command and Object.
-	var fns []*KeywordFn
+	eng := porter2.Stemmer
 	for _, cmd := range m.StructuredInput.Commands {
-		fn, ok := k.Dict["C_"+cmd]
-		if !ok {
-			continue
-		}
-		fns = append(fns, fn)
-	}
-	if len(fns) == 0 {
-		return ""
-	}
-	idx := -1
-	for _, obj := range m.StructuredInput.Objects {
-		fn2, ok := k.Dict["O_"+obj]
-		if !ok {
-			continue
-		}
-		for i, fn := range fns {
-			if fn2 == fn {
-				idx = i
-				break
+		cmd = strings.ToLower(eng.Stem(cmd))
+		for _, obj := range m.StructuredInput.Objects {
+			obj = strings.ToLower(eng.Stem(obj))
+			fn, ok := k.Dict["CO_"+cmd+"_"+obj]
+			if !ok {
+				continue
 			}
+			return fn(m)
 		}
 	}
-	if idx < 0 {
-		return ""
-	}
-	return (*fns[idx])(m)
+	return ""
 }

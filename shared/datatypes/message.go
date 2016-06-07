@@ -65,24 +65,27 @@ func (m *Msg) Save(db *sqlx.DB) error {
 	return nil
 }
 
-// GetLastRoute for a given user so the previous plugin can be called again if
+// GetLastPlugin for a given user so the previous plugin can be called again if
 // no new trigger is detected.
-func (m *Msg) GetLastRoute(db *sqlx.DB) (string, error) {
-	var route string
+func (m *Msg) GetLastPlugin(db *sqlx.DB) (string, string, error) {
+	var res struct {
+		Plugin string
+		Route  string
+	}
 	var err error
 	if m.User.ID > 0 {
-		q := `SELECT route FROM messages
+		q := `SELECT route, plugin FROM messages
 		      WHERE userid=$1 AND abotsent IS FALSE
 		      ORDER BY createdat DESC`
-		err = db.Get(&route, q, m.User.ID)
+		err = db.Get(&res, q, m.User.ID)
 	} else {
-		q := `SELECT route FROM messages
+		q := `SELECT route, plugin FROM messages
 		      WHERE flexid=$1 AND flexidtype=$2 AND abotsent IS FALSE
 		      ORDER BY createdat DESC`
-		err = db.Get(&route, q, m.User.FlexID, m.User.FlexIDType)
+		err = db.Get(&res, q, m.User.FlexID, m.User.FlexIDType)
 	}
 	if err != nil && err != sql.ErrNoRows {
-		return "", err
+		return "", "", err
 	}
-	return route, nil
+	return res.Plugin, res.Route, nil
 }

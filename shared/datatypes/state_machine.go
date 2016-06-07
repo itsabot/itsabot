@@ -182,6 +182,8 @@ func (sm *StateMachine) Next(in *Msg) (response string) {
 		return
 	}
 
+	sm.LoadState(in)
+
 	// This check prevents a panic when a plugin has been modified to remove
 	// one or more states.
 	if sm.state >= len(sm.Handlers) {
@@ -325,5 +327,7 @@ func (sm *StateMachine) SetState(in *Msg, label string) string {
 // That said, the *vast* majority of the time you should NOT be using this
 // function. Instead use task.Iterate(), which uses this function safely.
 func (sm *StateMachine) ReplayState(in *Msg) string {
-	return sm.Handlers[sm.state+1].OnEntry(in)
+	sm.LoadState(in)
+	sm.plugin.Log.Debug("replaying state", sm.state)
+	return sm.Handlers[sm.state].OnEntry(in)
 }

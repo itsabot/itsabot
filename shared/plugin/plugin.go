@@ -104,7 +104,7 @@ func New(url string) (*dt.Plugin, error) {
 func Register(p *dt.Plugin) error {
 	p.Log.Debug("registering", p.Config.Name)
 	for _, i := range p.Trigger.Intents {
-		s := "__intent_" + strings.ToLower(i)
+		s := "I_" + strings.ToLower(i)
 		oldPlg := core.RegPlugins.Get(s)
 		if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
 			p.Log.Infof("found duplicate plugin or trigger %s on %s",
@@ -112,9 +112,12 @@ func Register(p *dt.Plugin) error {
 		}
 		core.RegPlugins.Set(s, p)
 	}
+	eng := porter2.Stemmer
 	for _, c := range p.Trigger.Commands {
+		c = strings.ToLower(eng.Stem(c))
 		for _, o := range p.Trigger.Objects {
-			s := strings.ToLower(c + "_" + o)
+			o = strings.ToLower(eng.Stem(o))
+			s := "CO_" + c + "_" + o
 			oldPlg := core.RegPlugins.Get(s)
 			if oldPlg != nil && oldPlg.Config.Name != p.Config.Name {
 				p.Log.Info("found duplicate plugin or trigger",
@@ -139,39 +142,38 @@ func Register(p *dt.Plugin) error {
 
 // SetKeywords processes and registers keywords with Abot's core for routing.
 func SetKeywords(p *dt.Plugin, khs ...dt.KeywordHandler) {
-	k := dt.Keywords{
-		Commands: map[string]struct{}{},
-		Objects:  map[string]struct{}{},
-		Intents:  map[string]struct{}{},
-		Dict:     map[string]*dt.KeywordFn{},
+	p.Keywords = &dt.Keywords{
+		Dict: map[string]dt.KeywordFn{},
 	}
-	eng := porter2.Stemmer
 	for _, kh := range khs {
 		for _, intent := range kh.Trigger.Intents {
-			k.Dict["I_"+intent] = &kh.Fn
-			k.Intents[intent] = struct{}{}
+			intent = strings.ToLower(intent)
 			if !language.Contains(p.Trigger.Intents, intent) {
 				p.Trigger.Intents = append(p.Trigger.Intents, intent)
 			}
+			key := "I_" + intent
+			_, exists := p.Keywords.Dict[key]
+			if exists {
+				continue
+			}
+			p.Keywords.Dict[key] = kh.Fn
 		}
+		eng := porter2.Stemmer
 		for _, cmd := range kh.Trigger.Commands {
-			k.Dict["C_"+cmd] = &kh.Fn
-			cmd = eng.Stem(cmd)
-			k.Commands[cmd] = struct{}{}
+			cmd = strings.ToLower(eng.Stem(cmd))
 			if !language.Contains(p.Trigger.Commands, cmd) {
 				p.Trigger.Commands = append(p.Trigger.Commands, cmd)
 			}
-		}
-		for _, obj := range kh.Trigger.Objects {
-			k.Dict["O_"+obj] = &kh.Fn
-			obj = eng.Stem(obj)
-			k.Objects[obj] = struct{}{}
-			if !language.Contains(p.Trigger.Objects, obj) {
-				p.Trigger.Objects = append(p.Trigger.Objects, obj)
+			for _, obj := range kh.Trigger.Objects {
+				obj = strings.ToLower(eng.Stem(obj))
+				if !language.Contains(p.Trigger.Objects, obj) {
+					p.Trigger.Objects = append(p.Trigger.Objects, obj)
+				}
+				key := "CO_" + cmd + "_" + obj
+				p.Keywords.Dict[key] = kh.Fn
 			}
 		}
 	}
-	p.Keywords = &k
 }
 
 // SetStates is a convenience function provided to match the API of NewKeywords
