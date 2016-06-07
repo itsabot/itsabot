@@ -83,17 +83,9 @@ func TestMain(m *testing.M) {
 	if err = plugin.Register(p); err != nil {
 		log.Fatal("failed to register test plugin.", err)
 	}
+	cleanup()
 	exitVal := m.Run()
-	q := `DELETE FROM messages`
-	_, err = p.DB.Exec(q)
-	if err != nil {
-		log.Info("failed to delete messages.", err)
-	}
-	q = `DELETE FROM states`
-	_, err = p.DB.Exec(q)
-	if err != nil {
-		log.Info("failed to delete messages.", err)
-	}
+	cleanup()
 	os.Exit(exitVal)
 }
 
@@ -247,6 +239,7 @@ func runner(t *testing.T, tests []testT, iterable []string) {
 				len(tests), test.Expected, b)
 		}
 	}
+	cleanup()
 }
 
 func request(method, path string, data []byte) (int, string) {
@@ -257,4 +250,17 @@ func request(method, path string, data []byte) (int, string) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w.Code, string(w.Body.Bytes())
+}
+
+func cleanup() {
+	q := `DELETE FROM messages`
+	_, err := p.DB.Exec(q)
+	if err != nil {
+		log.Info("failed to delete messages.", err)
+	}
+	q = `DELETE FROM states`
+	_, err = p.DB.Exec(q)
+	if err != nil {
+		log.Info("failed to delete messages.", err)
+	}
 }
