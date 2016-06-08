@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestSearch(t *testing.T) {
+func TestPluginSearch(t *testing.T) {
 	query := "weather"
 	var byt []byte
 	var err error
@@ -43,6 +43,27 @@ func TestSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(tmp, "Weather") {
+		t.Fatal(err)
+	}
+}
+
+func TestPluginGenerate(t *testing.T) {
+	defer func() {
+		if err := os.RemoveAll("__test"); err != nil {
+			log.Info("failed to clean up __test dir.", err)
+		}
+		if err := os.RemoveAll("test_here"); err != nil {
+			log.Info("failed to clean up __test dir.", err)
+		}
+	}()
+
+	// generate plugin
+	l := log.New("")
+	l.SetFlags(0)
+	if err := generatePlugin(l, "__test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := generatePlugin(l, "TestHere"); err != nil {
 		t.Fatal(err)
 	}
 }
