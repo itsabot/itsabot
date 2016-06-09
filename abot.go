@@ -68,15 +68,7 @@ func main() {
 					Aliases: []string{"i"},
 					Usage:   "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
-						if err := installPlugins(); err != nil {
-							l := log.New("")
-							l.SetFlags(0)
-							// Plugins install failed remove incomplete plugins.go file
-							if errR := os.Remove("plugins.go"); errR != nil {
-								l.Infof("could not remove plugins.go file\n%s", err, errR)
-							}
-							l.Fatalf("could not install plugins\n%s", err)
-						}
+						installPlugins()
 					},
 				},
 				{
@@ -313,19 +305,24 @@ func startConsole(c *cli.Context) error {
 	return nil
 }
 
-func installPlugins() error {
+func installPlugins() {
 	l := log.New("")
 	l.SetFlags(0)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 
+	errChan := make(chan ErrMessage)
 	if err := core.LoadConf(); err != nil {
-		l.Fatal(err)
+		errChan <- ErrMessage{message: "", err: err}
+		return
 	}
-	log.Info("buildPluginFile running installPlugins!")
 	plugins := buildPluginFile(l)
 
 	// Fetch all plugins
-	l.Info("Fetching", len(plugins.Dependencies), "plugins...")
+	if len(plugins.Dependencies) == 1 {
+		l.Infof("Fetching 1 plugin...\n")
+	} else {
+		l.Infof("Fetching %d plugins...\n", len(plugins.Dependencies))
+	}
 	outC, err := exec.
 		Command("/bin/sh", "-c", "go get ./...").
 		CombinedOutput()
@@ -334,12 +331,12 @@ func installPlugins() error {
 		if err.Error() == "exit status 1" {
 			l.Info("Is a plugin trying to import a non-existent package?")
 		}
-		return err
+		errChan <- ErrMessage{message: "", err: err}
+		return
 	}
 
 	// Sync each of them to get dependencies
 	var wg = &sync.WaitGroup{}
-	errChan := make(chan ErrMessage)
 	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
 		wg.Add(1)
@@ -402,7 +399,11 @@ func installPlugins() error {
 			select {
 			// If  the error channel has recieved an error and its message log them both.
 			case errC := <-errChan:
-				l.Info(errC.message, errC.err)
+				// Plugins install failed remove incomplete plugins.go file
+				if errR := os.Remove("plugins.go"); errR != nil {
+					l.Info("could not remove plugins.go file.", errR)
+				}
+				l.Fatalf("could not install plugins. %s\n%s", errC.message, errC.err)
 			default:
 				// Don't block.
 			}
@@ -416,14 +417,13 @@ func installPlugins() error {
 		Command("/bin/sh", "-c", "go get ./...").
 		CombinedOutput()
 	if err != nil {
-		l.Info(string(outC))
-		return err
+		errChan <- ErrMessage{message: string(outC), err: err}
+		return
 	}
 
 	embedPluginConfs(plugins, l)
 	updateGlockfileAndInstall(l)
 	l.Info("Success!")
-	return nil
 }
 
 func updatePlugins() {
@@ -434,7 +434,6 @@ func updatePlugins() {
 	if err := core.LoadConf(); err != nil {
 		l.Fatal(err)
 	}
-	log.Info("buildPluginFile running updatePlugins!")
 	plugins := buildPluginFile(l)
 
 	l.Info("Updating plugins...")
