@@ -32,51 +32,58 @@ func New(url string) (*dt.Plugin, error) {
 	if err := core.LoadEnvVars(); err != nil {
 		log.Fatal(err)
 	}
-
-	// Read plugin.json data from within plugins.go, unmarshal into struct
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.go")
-	fi, err := os.OpenFile(p, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err = fi.Close(); err != nil {
-			log.Info("failed to close file", fi.Name())
-			return
-		}
-	}()
-	var found bool
-	var data string
-	scn := bufio.NewScanner(fi)
-	for scn.Scan() {
-		t := scn.Text()
-		if !found && t != url {
-			continue
-		} else if t == url {
-			found = true
-			continue
-		} else if len(t) >= 1 && t[0] == '}' {
-			data += t
-			break
-		}
-		data += t
-	}
-	if err = scn.Err(); err != nil {
-		return nil, err
-	}
 	db, err := core.ConnectDB()
 	if err != nil {
 		return nil, err
 	}
+
+	// Read plugin.json data from within plugins.go, unmarshal into struct
 	c := dt.PluginConfig{}
-	if len(data) > 0 {
-		if err = json.Unmarshal([]byte(data), &c); err != nil {
+	if len(os.Getenv("ABOT_PATH")) > 0 {
+		p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.go")
+		var scn *bufio.Scanner
+		fi, err := os.OpenFile(p, os.O_RDONLY, 0666)
+		if os.IsNotExist(err) {
+			goto makePlugin
+		}
+		if err != nil {
 			return nil, err
 		}
-		if len(c.Name) == 0 {
-			return nil, ErrMissingPluginName
+		defer func() {
+			if err = fi.Close(); err != nil {
+				log.Info("failed to close file", fi.Name())
+				return
+			}
+		}()
+		var found bool
+		var data string
+		scn = bufio.NewScanner(fi)
+		for scn.Scan() {
+			t := scn.Text()
+			if !found && t != url {
+				continue
+			} else if t == url {
+				found = true
+				continue
+			} else if len(t) >= 1 && t[0] == '}' {
+				data += t
+				break
+			}
+			data += t
+		}
+		if err = scn.Err(); err != nil {
+			return nil, err
+		}
+		if len(data) > 0 {
+			if err = json.Unmarshal([]byte(data), &c); err != nil {
+				return nil, err
+			}
+			if len(c.Name) == 0 {
+				return nil, ErrMissingPluginName
+			}
 		}
 	}
+makePlugin:
 	l := log.New(c.Name)
 	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
 	plg := &dt.Plugin{
