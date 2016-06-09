@@ -65,6 +65,7 @@ func pluginTestScaffoldFile(name string) string {
 	return `package ` + name + `
 
 import (
+	"os"
 	"testing"
 
 	"github.com/itsabot/abot/shared/plugin"
@@ -75,7 +76,7 @@ var r *httprouter.Router
 
 func TestMain(m *testing.M) {
 	r = plugin.TestPrepare()
-	m.Run()
+	os.Exit(m.Run())
 }
 
 func TestKWDemo(t *testing.T) {
