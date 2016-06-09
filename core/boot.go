@@ -57,6 +57,13 @@ func Conf() *PluginJSON {
 	return conf
 }
 
+// DB returns a connection the database. This is used internally across
+// packages, and isn't needed when building plugins. If you're building a
+// plugin, use your plugin's p.DB instead.
+func DB() *sqlx.DB {
+	return db
+}
+
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
 func NewServer() (r *httprouter.Router, err error) {

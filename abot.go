@@ -21,6 +21,7 @@ import (
 	"sync"
 	"text/tabwriter"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -95,6 +96,22 @@ func main() {
 					Usage:   "publish a plugin to itsabot.org",
 					Action: func(c *cli.Context) {
 						publishPlugin(c)
+					},
+				},
+				{
+					Name:    "generate",
+					Aliases: []string{"g"},
+					Usage:   "generate a new plugin with tests",
+					Action: func(c *cli.Context) {
+						l := log.New("")
+						l.SetFlags(0)
+						args := c.Args()
+						if len(args) != 1 {
+							l.Fatal(errors.New(`usage: abot plugin generate "{name}"`))
+						}
+						generatePlugin(l, args.First())
+						l.Info("Created", args.First(), "in",
+							filepath.Join(os.Getenv("PWD"), args.First()))
 					},
 				},
 			},
@@ -518,7 +535,6 @@ func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
 }
 
 func buildPluginFile(l *log.Logger) *core.PluginJSON {
-	log.Info("buildPluginFile running!")
 	// Create plugins.go file, truncate if exists
 	fi, err := os.Create("plugins.go")
 	if err != nil {
@@ -692,4 +708,132 @@ func publishPlugin(c *cli.Context) {
 		log.Fatal("something went wrong", resp.StatusCode)
 	}
 	log.Infof("Success! Published plugin to itsabot.org. View it here: %s/profile", os.Getenv("ITSABOT_URL"))
+}
+
+func generatePlugin(l *log.Logger, name string) error {
+	// Log in to get the maintainer email
+	if os.Getenv("ABOT_ENV") != "test" {
+		p := filepath.Join(os.Getenv("HOME"), ".abot.conf")
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			login()
+		}
+	}
+
+	// Ensure the name and path are unique globally
+	var words []string
+	var lastIdx int
+	name = strings.Replace(name, " ", "_", -1)
+	dirName := name
+	for i, letter := range name {
+		if i == 0 {
+			continue
+		}
+		if unicode.IsUpper(letter) {
+			words = append(words, name[lastIdx:i])
+			lastIdx = i
+		}
+	}
+	words = append(words, name[lastIdx:])
+	dirName = strings.Join(words, "_")
+	dirName = strings.ToLower(dirName)
+	name = strings.ToLower(name)
+
+	// Create the directory
+	if err := os.Mkdir(dirName, 0744); err != nil {
+		return err
+	}
+
+	// Generate a plugin.json file
+	if err := buildPluginJSON(dirName, name); err != nil {
+		log.Info("failed to create plugin.json")
+		return err
+	}
+
+	// Generate name.go and name_test.go files with starter keywords and
+	// state machines
+	if err := buildPluginScaffoldFile(dirName, name); err != nil {
+		log.Info("failed to create plugin scaffold file")
+		return err
+	}
+	if err := buildPluginTestScaffoldFile(dirName, name); err != nil {
+		log.Info("failed to create plugin test scaffold file")
+		return err
+	}
+	return nil
+}
+
+func buildPluginJSON(dirName, name string) error {
+	var maintainer string
+	if os.Getenv("ABOT_ENV") == "test" {
+		maintainer = "test@example.com"
+	} else {
+		fi, err := os.Open(filepath.Join(os.Getenv("HOME"), ".abot.conf"))
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err = fi.Close(); err != nil {
+				log.Info("failed to close plugin.json file.", err)
+			}
+		}()
+		scn := bufio.NewScanner(fi)
+		var lineNum int
+		for scn.Scan() {
+			if lineNum < 1 {
+				lineNum++
+				continue
+			}
+			maintainer = scn.Text()
+			break
+		}
+		if scn.Err() != nil {
+			return err
+		}
+	}
+	b := []byte(`{
+	"Name": "` + name + `",
+	"Maintainer": "` + maintainer + `"
+}`)
+	return ioutil.WriteFile(filepath.Join(dirName, "plugin.json"), b, 0744)
+}
+
+func buildPluginScaffoldFile(dirName, name string) error {
+	fi, err := os.Create(filepath.Join(dirName, dirName+".go"))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = fi.Close()
+		if err != nil {
+			log.Info("failed to close plugin.json.", err)
+		}
+	}()
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	dir = filepath.Join(dir, name)
+	_, err = fi.WriteString(pluginScaffoldFile(dir, name))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func buildPluginTestScaffoldFile(dirName, name string) error {
+	fi, err := os.Create(filepath.Join(dirName, dirName+"_test.go"))
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = fi.Close()
+		if err != nil {
+			log.Info("failed to close plugin.json.", err)
+		}
+	}()
+	_, err = fi.WriteString(pluginTestScaffoldFile(name))
+	if err != nil {
+		return err
+	}
+	return nil
 }
