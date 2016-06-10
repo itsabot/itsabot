@@ -68,7 +68,6 @@ to your plugin.json like so:
 ```json
 {
 	"Version": 0.2,
-	"ImportPath": "github.com/itsabot/abot",
 	"Dependencies": {
 		"github.com/itsabot/plugin_weather": "*"
 	}
