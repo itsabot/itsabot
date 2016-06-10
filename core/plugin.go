@@ -81,8 +81,10 @@ func GetPlugin(db *sqlx.DB, m *dt.Msg) (p *dt.Plugin, route string, directroute,
 	if err != nil && err != sql.ErrNoRows {
 		return nil, "", false, false, err
 	}
-	log.Debugf("found user's last plugin route: %s - %s\n", prevPlugin,
-		prevRoute)
+	if len(prevPlugin) > 0 {
+		log.Debugf("found user's last plugin route: %s - %s\n",
+			prevPlugin, prevRoute)
+	}
 
 	// Iterate over all command/object pairs and see if any plugin has been
 	// registered for the resulting route

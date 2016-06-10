@@ -45,7 +45,8 @@ func TestParse(t *testing.T) {
 			time.Date(n.Year(), n.Month(), n.Day()+1, 2, 0, 0, 0, n.Location()),
 			time.Date(n.Year(), n.Month(), n.Day()+1, 14, 0, 0, 0, n.Location()),
 		},
-		"now": []time.Time{time.Date(n.Year(), n.Month(), n.Day(), n.Hour(), n.Minute(), n.Second(), n.Nanosecond(), n.Location())},
+		"now":  []time.Time{time.Date(n.Year(), n.Month(), n.Day(), n.Hour(), n.Minute(), n.Second(), n.Nanosecond(), n.Location())},
+		"noon": []time.Time{time.Date(n.Year(), n.Month(), n.Day(), 12, 0, 0, 0, n.Location())},
 		/*
 			"2 days ago at 6PM":  []time.Time{time.Date(n.Year(), n.Month(), n.Day()-2, 18, 0, 0, 0, n.Location())},
 			"12PM EST":           []time.Time{time.Date(n.Year(), n.Month(), n.Day(), 12-zone, n.Minute(), 0, 0, n.Location())},
