@@ -221,7 +221,10 @@ func runner(t *testing.T, tests []testT, iterable []string) {
 	}
 	u := os.Getenv("ABOT_URL") + "/"
 	for i, test := range tests {
-		in := core.NewMsg(&user, test.Input)
+		in, err := core.NewMsg(&user, test.Input)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if i == 1 {
 			p.SetMemory(in, keyMem, iterable)
 		}

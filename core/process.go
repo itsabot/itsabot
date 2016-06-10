@@ -30,9 +30,8 @@ func preprocess(r *http.Request) (*dt.Msg, error) {
 		return nil, err
 	}
 	sendPreProcessingEvent(&req.CMD, u)
-	msg := NewMsg(u, req.CMD)
 	// TODO trigger training if needed (see buildInput)
-	return msg, nil
+	return NewMsg(u, req.CMD)
 }
 
 // ProcessText is Abot's core logic. This function processes a user's message,

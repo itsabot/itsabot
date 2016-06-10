@@ -6,7 +6,7 @@ import (
 )
 
 // NewMsg builds a message struct with Tokens, Stems, and a Structured Input.
-func NewMsg(u *dt.User, cmd string) *dt.Msg {
+func NewMsg(u *dt.User, cmd string) (*dt.Msg, error) {
 	tokens := TokenizeSentence(cmd)
 	stems := StemTokens(tokens)
 	si := ner.classifyTokens(tokens)
@@ -29,11 +29,11 @@ func NewMsg(u *dt.User, cmd string) *dt.Msg {
 		Stems:           stems,
 		StructuredInput: si,
 	}
-	/*
-		m, err = addContext(db, m)
-		if err != nil {
-			log.Debug(err)
-		}
-	*/
-	return m
+	if err := saveContext(db, m); err != nil {
+		return nil, err
+	}
+	if err := addContext(db, m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
