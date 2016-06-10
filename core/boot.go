@@ -76,21 +76,12 @@ func NewServer() (r *httprouter.Router, err error) {
 			return nil, fmt.Errorf("could not connect to database: %s", err.Error())
 		}
 	}
-	if err = checkRequiredEnvVars(); err != nil {
-		return nil, err
-	}
-	if len(os.Getenv("ABOT_PATH")) == 0 {
-		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
-			"itsabot", "abot")
-		log.Debug("ABOT_PATH not set. defaulting to", p)
-		err = os.Setenv("ABOT_PATH", p)
-		if err != nil {
-			return nil, err
-		}
-	}
 	err = LoadConf()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
 		log.Info("failed loading conf", err)
+		return nil, err
+	}
+	if err = checkRequiredEnvVars(); err != nil {
 		return nil, err
 	}
 	err = loadPluginsGo()
@@ -233,7 +224,14 @@ func LoadEnvVars() error {
 	if envLoaded {
 		return nil
 	}
-
+	if len(os.Getenv("ABOT_PATH")) == 0 {
+		p := filepath.Join(os.Getenv("GOPATH"), "src", "github.com",
+			"itsabot", "abot")
+		log.Debug("ABOT_PATH not set. defaulting to", p)
+		if err := os.Setenv("ABOT_PATH", p); err != nil {
+			return err
+		}
+	}
 	if len(os.Getenv("ITSABOT_URL")) == 0 {
 		log.Debug("ITSABOT_URL not set, using https://www.itsabot.org")
 		err := os.Setenv("ITSABOT_URL", "https://www.itsabot.org")
