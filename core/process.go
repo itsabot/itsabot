@@ -51,6 +51,8 @@ func ProcessText(r *http.Request) (ret string, err error) {
 	log.Debug("commands:", in.StructuredInput.Commands)
 	log.Debug(" objects:", in.StructuredInput.Objects)
 	log.Debug(" intents:", in.StructuredInput.Intents)
+	log.Debug("  people:", in.StructuredInput.People)
+	log.Debug("   times:", in.StructuredInput.Times)
 	plugin, route, directRoute, followup, pluginErr := GetPlugin(db, in)
 	if pluginErr != nil && pluginErr != errMissingPlugin {
 		return "", pluginErr

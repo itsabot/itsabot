@@ -10,6 +10,7 @@ import (
 	"github.com/dchest/stemmer/porter2"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/helpers/timeparse"
 )
 
 // classifier is a set of common english word stems unique among their
@@ -21,16 +22,73 @@ type classifier map[string]struct{}
 // classifyTokens builds a StructuredInput from a tokenized sentence.
 func (c classifier) classifyTokens(tokens []string) *dt.StructuredInput {
 	var s dt.StructuredInput
+	var sections []string
 	for _, t := range tokens {
-		t = strings.ToLower(t)
-		_, exists := c["C"+t]
+		var found bool
+		lower := strings.ToLower(t)
+		_, exists := c["C"+lower]
 		if exists {
-			s.Commands = append(s.Commands, t)
+			s.Commands = append(s.Commands, lower)
+			found = true
 		}
-		_, exists = c["O"+t]
+		_, exists = c["O"+lower]
 		if exists {
-			s.Objects = append(s.Objects, t)
+			s.Objects = append(s.Objects, lower)
+			found = true
 		}
+
+		// Identify the sex of any people being discussed.
+		var sex dt.Sex
+		_, exists = c["PM"+lower]
+		if exists {
+			_, exists = c["PF"+lower]
+			if exists {
+				sex = dt.SexEither
+			} else {
+				sex = dt.SexMale
+			}
+			person := dt.Person{
+				Name: t,
+				Sex:  sex,
+			}
+			s.People = append(s.People, person)
+			found = true
+		}
+
+		// If we haven't found a male or male+female name yet, check
+		// for female.
+		if sex == dt.SexInvalid {
+			_, exists = c["PF"+lower]
+			if exists {
+				person := dt.Person{
+					Name: t,
+					Sex:  dt.SexFemale,
+				}
+				s.People = append(s.People, person)
+				found = true
+			}
+		}
+
+		// Each time we find an object, add a separator to sections,
+		// enabling us to check for times only along continuous
+		// stretches of a sentence (i.e. a single time won't appear on
+		// either side of the word "Jim" or "Bring")
+		if found || len(sections) == 0 {
+			sections = append(sections, t)
+		} else {
+			switch t {
+			case ".", ",", ";", "?", "-", "_", "=", "+", "#", "@",
+				"!", "$", "%", "^", "&", "*", "(", ")", "'":
+				continue
+			}
+			sections[len(sections)-1] += " " + t
+		}
+	}
+	for _, sec := range sections {
+		if len(sec) == 0 {
+			continue
+		}
+		s.Times = append(s.Times, timeparse.Parse(sec)...)
 	}
 	return &s
 }
@@ -90,6 +148,30 @@ func buildClassifier() (classifier, error) {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		ner["O"+scanner.Text()] = struct{}{}
+	}
+	if err = fi.Close(); err != nil {
+		return ner, err
+	}
+	fi, err = os.Open(filepath.Join(p, "names_female.txt"))
+	if err != nil {
+		return ner, err
+	}
+	scanner = bufio.NewScanner(fi)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		ner["PF"+scanner.Text()] = struct{}{}
+	}
+	if err = fi.Close(); err != nil {
+		return ner, err
+	}
+	fi, err = os.Open(filepath.Join(p, "names_male.txt"))
+	if err != nil {
+		return ner, err
+	}
+	scanner = bufio.NewScanner(fi)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		ner["PM"+scanner.Text()] = struct{}{}
 	}
 	if err = fi.Close(); err != nil {
 		return ner, err
@@ -170,7 +252,9 @@ func ConfusedLang() string {
 
 // TokenizeSentence returns a sentence broken into tokens. Tokens are individual
 // words as well as punctuation. For example, "Hi! How are you?" becomes
-// []string{"Hi", "!", "How", "are", "you", "?"}.
+// []string{"Hi", "!", "How", "are", "you", "?"}. This also expands
+// contractions into the words they represent, e.g. "How're you?" becomes
+// []string{"How", "'", "are", "you", "?"}.
 func TokenizeSentence(sent string) []string {
 	tokens := []string{}
 	for _, w := range strings.Fields(sent) {
@@ -218,6 +302,28 @@ func TokenizeSentence(sent string) []string {
 			if i+1 == len(found) {
 				tokens = append(tokens, w[j+1:])
 			}
+		}
+	}
+
+	// Expand contractions. This isn't perfect and doesn't need to be to
+	// fulfill its purpose, which is fundamentally making it easier to find
+	// times in a sentence containing contractions.
+	for i, t := range tokens {
+		switch t {
+		case "s":
+			tokens[i] = "is"
+		case "re":
+			tokens[i] = "are"
+		case "m":
+			tokens[i] = "am"
+		case "t":
+			tokens[i] = "not"
+		case "ve":
+			tokens[i] = "have"
+		case "ll":
+			tokens[i] = "will"
+		case "d":
+			tokens[i] = "would"
 		}
 	}
 	log.Debug("found tokens", tokens)
