@@ -31,4 +31,5 @@ script:
         - export PORT=4200
         - export ABOT_URL=http://localhost
         - export ITSABOT_URL=https://www.itsabot.org
+        - export ABOT_PATH=$GOPATH/src/github.com/itsabot/abot
         - go test ./...
