@@ -67,8 +67,11 @@ func DB() *sqlx.DB {
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
 func NewServer() (r *httprouter.Router, err error) {
+	if err := LoadEnvVars(); err != nil {
+		log.Fatal(err)
+	}
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
-		return nil, errors.New("must set ABOT_SECRET env var in production to >= 33 characters")
+		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	if db == nil {
 		db, err = ConnectDB()
@@ -290,14 +293,21 @@ func loadPluginsGo() error {
 	}
 	var val []byte
 	var foundStart bool
+	var nestLvl int
 	for _, b := range contents {
 		switch b {
 		case '{':
-			foundStart = true
+			nestLvl++
+			if nestLvl == 1 {
+				foundStart = true
+			}
 		case '}':
-			val = append(val, b)
-			val = append(val, []byte(",")...)
-			foundStart = false
+			nestLvl--
+			if nestLvl == 0 {
+				val = append(val, b)
+				val = append(val, []byte(",")...)
+				foundStart = false
+			}
 		}
 		if !foundStart {
 			continue

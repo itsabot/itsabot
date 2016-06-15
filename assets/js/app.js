@@ -140,6 +140,7 @@ window.addEventListener('load', function() {
 		"/response_panel/conversation": abot.ResponsePanelConversation,
 		"/manage_team": abot.ManageTeam,
 		"/account_connect": abot.AccountConnect,
+		"/settings": abot.Settings,
 		"/:any...": abot.NotFound,
 	})
 })

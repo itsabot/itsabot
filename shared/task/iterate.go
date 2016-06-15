@@ -34,6 +34,9 @@ func Iterate(p *dt.Plugin, label string, opts OptsIterate) []dt.State {
 			OnEntry: func(in *dt.Msg) string {
 				var ss []string
 				mem := p.GetMemory(in, opts.IterableMemKey)
+				if len(mem.Val) == 0 {
+					mem.Val = []byte(`[]`)
+				}
 				err := json.Unmarshal(mem.Val, &ss)
 				if err != nil {
 					p.Log.Info("failed to get iterable memory.", err)

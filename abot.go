@@ -40,9 +40,6 @@ type ErrMessage struct {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	log.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-	if err := core.LoadEnvVars(); err != nil {
-		log.Fatal(err)
-	}
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		{
