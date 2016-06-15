@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/itsabot/abot/core/log"
@@ -44,6 +45,17 @@ type PluginConfig struct {
 	// Usage contains examples of how to interact with the plugin. Users
 	// will encounter these examples after asking for "help" or confusing
 	Usage []string
+
+	// Settings is a collection of options for use by a plugin, such as a
+	// required API key.
+	Settings map[string]*PluginSetting
+}
+
+// PluginSetting defines whether a plugin's setting is required (empty values
+// panic on boot), and whether there's a default value.
+type PluginSetting struct {
+	Required bool
+	Default  string
 }
 
 // PluginEvents allow plugins to listen to events as they happen in Abot core.
@@ -217,6 +229,28 @@ func (p *Plugin) DeleteMemory(in *Msg, k string) {
 		p.Log.Infof("could not delete memory for key %s. %s", k,
 			err.Error())
 	}
+}
+
+// GetSetting retrieves a specific setting's value. It throws a fatal error if
+// the setting has not been declared in the plugin's plugin.json file.
+func (p *Plugin) GetSetting(name string) string {
+	if p.Config.Settings[name] == nil {
+		m := fmt.Sprintf(
+			"missing setting %s. please declare it in the %s's plugin.json",
+			name, p.Config.Name)
+		log.Fatal(m)
+	}
+	var val string
+	q := `SELECT value FROM settings WHERE name=$1 AND pluginname=$2`
+	err := p.DB.Get(&val, q, name, p.Config.Name)
+	if err == sql.ErrNoRows {
+		return p.Config.Settings[name].Default
+	}
+	if err != nil {
+		log.Info("failed to get plugin setting.", err)
+		return ""
+	}
+	return val
 }
 
 // HasMemory is a helper function to simply a common use-case, determing if some

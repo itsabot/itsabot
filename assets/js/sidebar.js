@@ -33,6 +33,12 @@ abot.Sidebar.view = function(_, args) {
 				active: args.active === 4,
 				icon: "link.svg",
 			}),
+			m.component(abot.SidebarItem, {
+				href: "/settings",
+				text: "Settings",
+				active: args.active === 5,
+				icon: "settings.svg",
+			}),
 		]),
 	])
 }

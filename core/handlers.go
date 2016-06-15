@@ -78,6 +78,7 @@ func newRouter() *httprouter.Router {
 	router.HandlerFunc("GET", "/api/admin/remote_tokens.json", hapiRemoteTokens)
 	router.HandlerFunc("POST", "/api/admin/remote_tokens.json", hapiRemoteTokensSubmit)
 	router.HandlerFunc("DELETE", "/api/admin/remote_tokens.json", hapiRemoteTokensDelete)
+	router.HandlerFunc("PUT", "/api/admin/settings.json", hapiSettingsUpdate)
 	router.HandlerFunc("GET", "/api/admin/dashboard.json", hapiDashboard)
 	return router
 }
@@ -535,7 +536,8 @@ func hapiAdminExists(w http.ResponseWriter, r *http.Request) {
 }
 
 // hapiPlugins responds with all of the server's installed plugin
-// configurations from each their respective plugin.json files.
+// configurations from each their respective plugin.json files and
+// database-stored configuration.
 func hapiPlugins(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("ABOT_ENV") != "test" {
 		if !isAdmin(w, r) {
@@ -545,7 +547,44 @@ func hapiPlugins(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeBytes(w, pluginsGo)
+	var settings []struct {
+		Name       string
+		Value      string
+		PluginName string
+	}
+	q := `SELECT name, value, pluginname FROM settings`
+	if err := db.Select(&settings, q); err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	type respT struct {
+		ID         uint64
+		Name       string
+		Icon       string
+		Maintainer string
+		Settings   map[string]string
+	}
+	var resp []respT
+	for _, plugin := range pluginsGo {
+		data := respT{
+			ID:         plugin.ID,
+			Name:       plugin.Name,
+			Icon:       plugin.Icon,
+			Maintainer: plugin.Maintainer,
+			Settings:   map[string]string{},
+		}
+		for k, v := range plugin.Settings {
+			data.Settings[k] = v.Default
+		}
+		for _, setting := range settings {
+			if setting.PluginName != plugin.Name {
+				continue
+			}
+			data.Settings[setting.Name] = setting.Value
+		}
+		resp = append(resp, data)
+	}
+	writeBytes(w, resp)
 }
 
 // hapiConversationsNeedTraining returns a list of all sentences that require a
@@ -672,7 +711,7 @@ func hapiConversation(w http.ResponseWriter, r *http.Request,
 			}
 		}
 		err = db.Get(&val, q, fid, fidT, prefs.Location)
-		if err != sql.ErrNoRows {
+		if err != nil && err != sql.ErrNoRows {
 			writeErrorInternal(w, err)
 			if err = json.Unmarshal(val, &location); err != nil {
 				return
@@ -1017,6 +1056,46 @@ func hapiRemoteTokensDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if rows == 0 {
 		writeErrorBadRequest(w, errors.New("invalid token or email"))
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// hapiSettingsUpdate updates settings in the database for plugins.
+func hapiSettingsUpdate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ABOT_ENV") != "test" {
+		if !isAdmin(w, r) {
+			return
+		}
+		if !isLoggedIn(w, r) {
+			return
+		}
+	}
+	var req map[string]map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeErrorBadRequest(w, err)
+		return
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		writeErrorInternal(w, err)
+		return
+	}
+	for plugin, data := range req {
+		for k, v := range data {
+			q := `INSERT INTO settings (name, value, pluginname)
+			      VALUES ($1, $2, $3)
+			      ON CONFLICT (name, pluginname) DO
+				UPDATE SET value=$2`
+			_, err = tx.Exec(q, k, v, plugin)
+			if err != nil {
+				writeErrorInternal(w, err)
+				return
+			}
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		writeErrorInternal(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
