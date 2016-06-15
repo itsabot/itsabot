@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"fmt"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -218,6 +219,80 @@ func RespondWithNicety(in *dt.Msg) string {
 		}
 	}
 	return ""
+}
+
+// RespondWithHelp replies to the user when he or she asks for "help".
+func RespondWithHelp(in *dt.Msg) string {
+	if len(in.StructuredInput.Commands) != 1 {
+		return ""
+	}
+	if in.StructuredInput.Commands[0] != "help" {
+		return ""
+	}
+	if in.Plugin != nil {
+		use := randUseForPlugin(in.Plugin)
+		use2 := randUseForPlugin(in.Plugin)
+		if use == use2 {
+			return fmt.Sprintf("Try telling me %q", use)
+		}
+		return fmt.Sprintf("Try telling me %q or %q", use, use2)
+	}
+	switch len(pluginsGo) {
+	case 0:
+		return ""
+	case 1:
+		return fmt.Sprintf("Try saying %q", randUse())
+	default:
+		use := randUse()
+		use2 := randUse()
+		if use == use2 {
+			return fmt.Sprintf("Try telling me %q", use)
+		}
+		return fmt.Sprintf("Try telling me %q or %q", use, use2)
+	}
+}
+
+// RespondWithHelpConfused replies to the user when Abot is confused.
+func RespondWithHelpConfused(in *dt.Msg) string {
+	if in.Plugin != nil {
+		use := randUseForPlugin(in.Plugin)
+		use2 := randUseForPlugin(in.Plugin)
+		if use == use2 {
+			return fmt.Sprintf("%s You can try telling me %q",
+				ConfusedLang(), use)
+		}
+		return fmt.Sprintf("%s You can try telling me %q or %q",
+			ConfusedLang(), use, use2)
+	}
+	if len(pluginsGo) == 0 {
+		return ConfusedLang()
+	}
+	use := randUse()
+	use2 := randUse()
+	if use == use2 {
+		return fmt.Sprintf("%s How about %q", ConfusedLang(), use)
+	}
+	return fmt.Sprintf("%s How about %q or %q", ConfusedLang(), use, use2)
+}
+
+// randUse returns a random use from among all plugins.
+func randUse() string {
+	if len(pluginsGo) == 0 {
+		return ""
+	}
+	pluginUses := pluginsGo[rand.Intn(len(pluginsGo))].Usage
+	if pluginUses == nil || len(pluginUses) == 0 {
+		return ""
+	}
+	return pluginUses[rand.Intn(len(pluginUses))]
+}
+
+// randUseForPlugin returns a random use from a specific plugin.
+func randUseForPlugin(plugin *dt.Plugin) string {
+	if plugin.Config.Usage == nil {
+		return ""
+	}
+	return plugin.Config.Usage[rand.Intn(len(plugin.Config.Usage))]
 }
 
 // RespondWithOffense is a one-off function to respond to rude user language by

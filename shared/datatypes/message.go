@@ -17,7 +17,7 @@ type Msg struct {
 	User            *User
 	StructuredInput *StructuredInput
 	Stems           []string
-	Plugin          string
+	Plugin          *Plugin
 	CreatedAt       *time.Time
 	// AbotSent determines if msg is from the user or Abot
 	AbotSent      bool
@@ -27,6 +27,8 @@ type Msg struct {
 	// individual words.
 	Tokens []string
 	Route  string
+
+	Usage []string
 }
 
 // GetMsg returns a message for a given message ID.
@@ -52,11 +54,15 @@ func (m *Msg) Update(db *sqlx.DB) error {
 
 // Save a message to the database, updating the message ID.
 func (m *Msg) Save(db *sqlx.DB) error {
+	var pluginName string
+	if m.Plugin != nil {
+		pluginName = m.Plugin.Config.Name
+	}
 	q := `INSERT INTO messages
 	      (userid, sentence, plugin, route, abotsent, needstraining, flexid,
 		flexidtype, trained)
 	      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
-	row := db.QueryRowx(q, m.User.ID, m.Sentence, m.Plugin, m.Route,
+	row := db.QueryRowx(q, m.User.ID, m.Sentence, pluginName, m.Route,
 		m.AbotSent, m.NeedsTraining, m.User.FlexID, m.User.FlexIDType,
 		m.Trained)
 	if err := row.Scan(&m.ID); err != nil {

@@ -40,6 +40,10 @@ type PluginConfig struct {
 	// ID is the remote ID of the plugin. This is pulled automatically at
 	// time of plugin install from ITSABOT_URL.
 	ID uint64
+
+	// Usage contains examples of how to interact with the plugin. Users
+	// will encounter these examples after asking for "help" or confusing
+	Usage []string
 }
 
 // PluginEvents allow plugins to listen to events as they happen in Abot core.

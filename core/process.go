@@ -57,37 +57,34 @@ func ProcessText(r *http.Request) (ret string, err error) {
 		return "", pluginErr
 	}
 	in.Route = route
-	if plugin == nil {
-		in.Plugin = ""
-	} else {
-		in.Plugin = plugin.Config.Name
-	}
+	in.Plugin = plugin
 	if err = in.Save(db); err != nil {
 		return "", err
 	}
 	sendPostProcessingEvent(in)
 
 	// Determine appropriate response
+	var smAnswered bool
 	resp := &dt.Msg{}
 	resp.AbotSent = true
 	resp.User = in.User
 	resp.Sentence = RespondWithOffense(in)
 	if len(resp.Sentence) > 0 {
-		return resp.Sentence, nil
+		goto saveAndReturn
+	}
+	resp.Sentence = RespondWithHelp(in)
+	if len(resp.Sentence) > 0 {
+		goto saveAndReturn
 	}
 	resp.Sentence = RespondWithNicety(in)
 	if len(resp.Sentence) > 0 {
-		if err = resp.Save(db); err != nil {
-			return "", err
-		}
-		return resp.Sentence, nil
+		goto saveAndReturn
 	}
-	var smAnswered bool
 	if pluginErr != errMissingPlugin {
 		resp.Sentence, smAnswered = dt.CallPlugin(plugin, in, followup)
 	}
 	if len(resp.Sentence) == 0 {
-		resp.Sentence = ConfusedLang()
+		resp.Sentence = RespondWithHelpConfused(in)
 		in.NeedsTraining = true
 		if err = in.Update(db); err != nil {
 			return "", err
@@ -95,7 +92,7 @@ func ProcessText(r *http.Request) (ret string, err error) {
 	} else {
 		state := plugin.GetMemory(in, dt.StateKey).Int64()
 		if plugin != nil && state == 0 && !directRoute && smAnswered {
-			resp.Sentence = ConfusedLang()
+			resp.Sentence = RespondWithHelpConfused(in)
 			in.NeedsTraining = true
 			if err = in.Update(db); err != nil {
 				return "", err
@@ -103,9 +100,10 @@ func ProcessText(r *http.Request) (ret string, err error) {
 		}
 	}
 	if plugin != nil {
-		resp.Plugin = plugin.Config.Name
+		resp.Plugin = plugin
 	}
 	sendPreResponseEvent(in, &resp.Sentence)
+saveAndReturn:
 	if err = resp.Save(db); err != nil {
 		return "", err
 	}
