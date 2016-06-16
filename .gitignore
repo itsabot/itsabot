@@ -2,5 +2,4 @@
 .DS_Store
 client_secret.json
 abot.env
-public/js/main.js
-public/css/main.css
+public/
