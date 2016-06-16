@@ -86,8 +86,15 @@ abot.Settings.view = function(ctrl) {
 							} else {
 								title = m("h3", plugin.Name)
 							}
+							var keys = Object.keys(plugin.Settings)
+							if (keys.length === 0) {
+								return [
+									title,
+									m("div", "No editable settings."),
+								]
+							}
 							var ss = []
-							Object.keys(plugin.Settings).map(function(setting) {
+							keys.map(function(setting) {
 								ss.push(m("tr", [
 									m("td", [
 										m("label", setting),
@@ -105,19 +112,19 @@ abot.Settings.view = function(ctrl) {
 							return m("form.form-align", [
 								title,
 								m("table", [ ss ]),
+								m("#btns.btn-container-left", [
+									m("input[type=button].btn", {
+										onclick: ctrl.discard,
+										value: "Discard Changes",
+									}),
+									m("input[type=button].btn.btn-primary", {
+										onclick: ctrl.save,
+										value: "Save",
+									}),
+								]),
 							])
 						})
 					}(),
-					m("#btns.btn-container-left", [
-						m("input[type=button].btn", {
-							onclick: ctrl.discard,
-							value: "Discard Changes",
-						}),
-						m("input[type=button].btn.btn-primary", {
-							onclick: ctrl.save,
-							value: "Save",
-						}),
-					]),
 				]),
 			]),
 		]),
