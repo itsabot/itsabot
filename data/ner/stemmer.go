@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/agonopol/go-stem"
+	"github.com/dchest/stemmer/porter2"
 )
 
 func main() {
@@ -17,8 +17,9 @@ func main() {
 		}
 	}()
 
+	eng := porter2.Stemmer
 	for word, err := in.ReadSlice('\n'); err == nil; word, err = in.ReadSlice('\n') {
-		_, err := out.Write(stemmer.Stem(word))
+		_, err := out.Write([]byte(eng.Stem(string(word))))
 		if err != nil {
 			log.Fatal(err)
 		}

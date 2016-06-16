@@ -1,9 +1,8 @@
-github.com/agonopol/go-stem 98588501825042276ca6d7cbc73bc8bb56ea8d77
 github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
 github.com/dchest/stemmer f1ab276e6cf5fad3f8db813f22e25b1939c8ef70
-github.com/jbrukh/bayesian bb8c7464612e6af45dda6cc2ba09094015bc4d2c
-github.com/jmoiron/sqlx 398dd5876282499cdfd4cb8ea0f31a672abe9495
+github.com/jbrukh/bayesian a65fd1effddb7bd71c6bb6ca1876e045a7aeac6e
+github.com/jmoiron/sqlx bdae0c3219c3bdb92f3d7c70825018712787c933
 github.com/julienschmidt/httprouter 77366a47451a56bb3ba682481eed85b64fea14e8
-github.com/lib/pq 3cd0097429be7d611bb644ef85b42bfb102ceea4
-golang.org/x/crypto c197bcf24cde29d3f73c7b4ac6fd41f4384e8af6
-golang.org/x/net 4876518f9e71663000c348837735820161a42df7
+github.com/lib/pq ee1442bda7bd1b6a84e913bdb421cb1874ec629d
+golang.org/x/crypto f3241ce8505855877cc8a9717bd61a0f7c4ea83c
+golang.org/x/net d7bf3545bb0dacf009c535b3d3fbf53ac0a339ab
