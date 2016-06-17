@@ -122,9 +122,5 @@ get involved with our
 
 MIT, a copy of which you can find in the repo.
 
-The default plugin icon (puzzle piece) is courtesy of
-[Arthur Shlain](https://thenounproject.com/ArtZ91/) via TheNounProject and
-licensed via Creative Commons Attribution v3.
-
 This project uses a Bayesian classifier library (github.com/jbrukh/bayesian),
 whose BSD-style license you can find in `/core/training/LICENSE.md`.
