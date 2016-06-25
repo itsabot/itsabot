@@ -443,7 +443,7 @@ func hapiForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	secret := randSeq(40)
+	secret := RandSeq(40)
 	q = `INSERT INTO passwordresets (userid, secret) VALUES ($1, $2)`
 	if _, err = db.Exec(q, user.ID, secret); err != nil {
 		writeError(w, err)
@@ -1197,7 +1197,7 @@ func createCSRFToken(u *dt.User) (token string, err error) {
 	q := `INSERT INTO sessions (token, userid, label)
 	      VALUES ($1, $2, 'csrfToken')
 	      ON CONFLICT (userid, label) DO UPDATE SET token=$1`
-	token = randSeq(32)
+	token = RandSeq(32)
 	if _, err := db.Exec(q, token, u.ID); err != nil {
 		return "", err
 	}

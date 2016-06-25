@@ -24,11 +24,13 @@ import (
 	"unicode"
 
 	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/net/websocket"
 
 	"github.com/codegangsta/cli"
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/itsabot.org/socket"
 	_ "github.com/lib/pq" // Postgres driver
 )
 
@@ -673,7 +675,13 @@ func publishPlugin(c *cli.Context) {
 	if len(c.Args().First()) == 0 {
 		log.Fatal("missing plugin's `go get` path")
 	}
-	reqData := struct{ Path string }{Path: c.Args().First()}
+	reqData := struct {
+		Path   string
+		Secret string
+	}{
+		Path:   c.Args().First(),
+		Secret: core.RandSeq(24),
+	}
 	byt, err := json.Marshal(reqData)
 	if err != nil {
 		log.Fatal(err)
@@ -725,10 +733,68 @@ func publishPlugin(c *cli.Context) {
 			log.Fatal(err)
 		}
 	}()
-	if resp.StatusCode != 202 {
-		log.Fatal("something went wrong", resp.StatusCode)
+	if resp.StatusCode == 401 {
+		login()
+		publishPlugin(c)
+	} else if resp.StatusCode != 202 {
+		log.Info("something went wrong. status code", resp.StatusCode)
+		var msg string
+		if err = json.NewDecoder(resp.Body).Decode(&msg); err != nil {
+			log.Fatal(err)
+		}
+		log.Fatal(msg)
 	}
-	log.Infof("Success! Published plugin to itsabot.org. View it here: %s/profile", os.Getenv("ITSABOT_URL"))
+
+	// Make a websocket request to get updates about the publishing process
+	uri, err := url.Parse(os.Getenv("ITSABOT_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ws, err := websocket.Dial("ws://"+uri.Host+"/api/ws", "",
+		os.Getenv("ABOT_URL"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = websocket.Message.Send(ws, reqData.Secret); err != nil {
+		log.Fatal(err)
+	}
+	var msg socket.Msg
+	l := log.New("")
+	l.SetFlags(0)
+	l.Info("> Establishing connection with server...")
+	var established bool
+	var lastMsg string
+	for {
+		websocket.JSON.Receive(ws, &msg)
+		if !established {
+			l.Info("OK")
+			established = true
+		}
+		if msg.Content == lastMsg {
+			log.Info("server hung up. please try again")
+			if err = ws.Close(); err != nil {
+				log.Info("failed to close socket.", err)
+			}
+			return
+		}
+		lastMsg = msg.Content
+		if msg.Type == socket.MsgTypeFinishedSuccess ||
+			msg.Type == socket.MsgTypeFinishedFailed {
+			if err = ws.Close(); err != nil {
+				log.Info("failed to close socket.", err)
+			}
+			return
+		}
+		if len(msg.Content) < 2 {
+			l.Info(msg.Content)
+			continue
+		}
+		tmp := msg.Content[0:2]
+		if tmp == "> " || tmp == "==" {
+			l.Info("")
+		}
+		l.Info(msg.Content)
+	}
 }
 
 func generatePlugin(l *log.Logger, name string) error {

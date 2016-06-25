@@ -235,9 +235,13 @@ func (p *Plugin) DeleteMemory(in *Msg, k string) {
 // the setting has not been declared in the plugin's plugin.json file.
 func (p *Plugin) GetSetting(name string) string {
 	if p.Config.Settings[name] == nil {
+		pluginName := p.Config.Name
+		if len(pluginName) == 0 {
+			pluginName = "plugin"
+		}
 		m := fmt.Sprintf(
 			"missing setting %s. please declare it in the %s's plugin.json",
-			name, p.Config.Name)
+			name, pluginName)
 		log.Fatal(m)
 	}
 	var val string
