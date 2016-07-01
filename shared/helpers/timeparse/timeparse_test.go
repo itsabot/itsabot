@@ -38,7 +38,7 @@ func TestParse(t *testing.T) {
 		"in 30 mins":         []time.Time{time.Date(n.Year(), n.Month(), n.Day(), n.Hour(), n.Minute()+30, 0, 0, n.Location())},
 		"in 2 hours":         []time.Time{time.Date(n.Year(), n.Month(), n.Day(), n.Hour()+2, n.Minute(), 0, 0, n.Location())},
 		"invalid time":       []time.Time{},
-		"May 2050":           []time.Time{time.Date(2050, 5, 1, 9, 0, 0, 0, n.Location())},
+		"May 2050":           []time.Time{time.Date(2050, 5, 1, 0, 0, 0, 0, n.Location())},
 		"June 26 2050":       []time.Time{time.Date(2050, 6, 26, 0, 0, 0, 0, n.Location())},
 		"June 26th 2050":     []time.Time{time.Date(2050, 6, 26, 0, 0, 0, 0, n.Location())},
 		"at 2 tomorrow": []time.Time{
