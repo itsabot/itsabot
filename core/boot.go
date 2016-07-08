@@ -67,9 +67,6 @@ func DB() *sqlx.DB {
 // NewServer connects to the database and boots all plugins before returning a
 // server connection, database connection, and map of offensive words.
 func NewServer() (r *httprouter.Router, err error) {
-	if err := LoadEnvVars(); err != nil {
-		log.Fatal(err)
-	}
 	if len(os.Getenv("ABOT_SECRET")) < 32 && os.Getenv("ABOT_ENV") == "production" {
 		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
