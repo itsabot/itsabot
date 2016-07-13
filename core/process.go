@@ -91,7 +91,7 @@ func ProcessText(r *http.Request) (ret string, err error) {
 		}
 	} else {
 		state := plugin.GetMemory(in, dt.StateKey).Int64()
-		if plugin != nil && state == 0 && !directRoute && smAnswered {
+		if plugin != nil && state == 0 && !directRoute && !smAnswered {
 			resp.Sentence = RespondWithHelpConfused(in)
 			in.NeedsTraining = true
 			if err = in.Update(db); err != nil {
