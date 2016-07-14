@@ -34,9 +34,9 @@ import (
 	_ "github.com/lib/pq" // Postgres driver
 )
 
-type ErrMessage struct {
-	message string
-	err     error
+type errMsg struct {
+	msg string
+	err error
 }
 
 func main() {
@@ -70,7 +70,30 @@ func main() {
 					Aliases: []string{"i"},
 					Usage:   "download and install plugins listed in plugins.json",
 					Action: func(c *cli.Context) {
-						installPlugins()
+						errChan := make(chan errMsg)
+						l := log.New("")
+						l.SetFlags(0)
+						l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+						go func() {
+							select {
+							case errC := <-errChan:
+								if errC.err == nil {
+									// Success
+									l.Info(errC.msg)
+									os.Exit(0)
+								}
+
+								// Plugins install failed, so remove incomplete plugins.go file
+								if errR := os.Remove("plugins.go"); errR != nil {
+									l.Info("could not remove plugins.go file.", errR)
+								}
+								l.Fatalf("could not install plugins.\n%s\n%s", errC.msg, errC.err)
+							}
+						}()
+						installPlugins(l, errChan)
+						for {
+							// Keep the program running until a message is received on the channel
+						}
 					},
 				},
 				{
@@ -307,14 +330,9 @@ func startConsole(c *cli.Context) error {
 	return nil
 }
 
-func installPlugins() {
-	l := log.New("")
-	l.SetFlags(0)
-	l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-
-	errChan := make(chan ErrMessage)
+func installPlugins(l *log.Logger, errChan chan errMsg) {
 	if err := core.LoadConf(); err != nil {
-		errChan <- ErrMessage{message: "", err: err}
+		errChan <- errMsg{msg: "", err: err}
 		return
 	}
 	plugins := buildPluginFile(l)
@@ -325,20 +343,88 @@ func installPlugins() {
 	} else {
 		l.Infof("Fetching %d plugins...\n", len(plugins.Dependencies))
 	}
-	outC, err := exec.
+	_, err := exec.
 		Command("/bin/sh", "-c", "go get ./...").
 		CombinedOutput()
-	if err != nil {
-		l.Info(string(outC))
-		if err.Error() == "exit status 1" {
-			l.Info("Is a plugin trying to import a non-existent package?")
-		}
-		errChan <- ErrMessage{message: "", err: err}
+	if err == nil {
+		syncDependencies(plugins, l, errChan)
 		return
 	}
 
+	// TODO enable versioning for private repos
+	l.Infof("Fetching private repos...\n\n")
+	l.Info("*** This will delete your local plugins to fetch remote copies.")
+	_, err = fmt.Print("Continue? [n]: ")
+	if err != nil {
+		errChan <- errMsg{msg: "", err: err}
+		return
+	}
+	reader := bufio.NewReader(os.Stdin)
+	text, err := reader.ReadString('\n')
+	if err != nil {
+		errChan <- errMsg{msg: "", err: errors.New("failed to read from stdin")}
+		return
+	}
+	if text[0] != 'y' && text[0] != 'Y' {
+		errChan <- errMsg{msg: "Canceled", err: nil}
+		return
+	}
+	wg := &sync.WaitGroup{}
+	for name, _ := range plugins.Dependencies {
+		go clonePrivateRepo(name, errChan, wg)
+	}
+	wg.Wait()
+	syncDependencies(plugins, l, errChan)
+}
+
+func clonePrivateRepo(name string, errChan chan errMsg, wg *sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
+
+	parts := strings.Split(name, "/")
+	if len(parts) < 2 {
+		errChan <- errMsg{msg: "", err: errors.New("invalid dependency path: too few parts")}
+		return
+	}
+
+	// Ensure we don't delete a lower level directory
+	p := filepath.Join(os.Getenv("GOPATH"), "src")
+	tmp := filepath.Join(p, name)
+	if len(tmp)+4 <= len(p) {
+		errChan <- errMsg{msg: "", err: errors.New("invalid dependency path: too short")}
+		return
+	}
+	if strings.Contains(tmp, "..") {
+		errChan <- errMsg{msg: name, err: errors.New("invalid dependency path: contains '..'")}
+		return
+	}
+	cmd := fmt.Sprintf("rm -rf %s", tmp)
+	log.Debug("running:", cmd)
+	outC, err := exec.
+		Command("/bin/sh", "-c", cmd).
+		CombinedOutput()
+	if err != nil {
+		tmp = fmt.Sprintf("failed to fetch %s\n%s", name, string(outC))
+		errChan <- errMsg{msg: tmp, err: err}
+		return
+	}
+	name = strings.Join(parts[1:], "/")
+	cmd = fmt.Sprintf("git clone git@github.com:%s.git %s", name, tmp)
+	log.Debug("running:", cmd)
+	outC, err = exec.
+		Command("/bin/sh", "-c", cmd).
+		CombinedOutput()
+	if err != nil {
+		tmp = fmt.Sprintf("failed to fetch %s\n%s", name, string(outC))
+		errChan <- errMsg{msg: tmp, err: err}
+	}
+}
+
+func syncDependencies(plugins *core.PluginJSON, l *log.Logger,
+	errChan chan errMsg) {
+
 	// Sync each of them to get dependencies
-	var wg = &sync.WaitGroup{}
+	wg := &sync.WaitGroup{}
 	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
 		wg.Add(1)
@@ -357,7 +443,7 @@ func installPlugins() {
 					CombinedOutput()
 				if errB != nil {
 					l.Debug(string(outB))
-					errChan <- ErrMessage{message: "", err: errB}
+					errChan <- errMsg{msg: "", err: errB}
 					return
 				}
 			}
@@ -368,25 +454,25 @@ func installPlugins() {
 			p := struct{ Path string }{Path: url}
 			outB, errB = json.Marshal(p)
 			if errB != nil {
-				errChan <- ErrMessage{message: "failed to build itsabot.org JSON.", err: errB}
+				errChan <- errMsg{msg: "failed to build itsabot.org JSON.", err: errB}
 				return
 			}
 			var u string
 			u = os.Getenv("ITSABOT_URL") + "/api/plugins.json"
 			req, errB := http.NewRequest("PUT", u, bytes.NewBuffer(outB))
 			if errB != nil {
-				errChan <- ErrMessage{message: "failed to build request to itsabot.org.", err: errB}
+				errChan <- errMsg{msg: "failed to build request to itsabot.org.", err: errB}
 				return
 			}
 			client := &http.Client{Timeout: 10 * time.Second}
 			resp, errB := client.Do(req)
 			if errB != nil {
-				errChan <- ErrMessage{message: "failed to update itsabot.org.", err: errB}
+				errChan <- errMsg{msg: "failed to update itsabot.org.", err: errB}
 				return
 			}
 			defer func() {
 				if errB = resp.Body.Close(); errB != nil {
-					errChan <- ErrMessage{message: "", err: errB}
+					errChan <- errMsg{msg: "", err: errB}
 				}
 			}()
 			if resp.StatusCode != 200 {
@@ -395,37 +481,21 @@ func installPlugins() {
 			}
 		}(url, version)
 	}
-	// Continuously wait for errors in the error channel.
-	go func() {
-		for {
-			select {
-			// If  the error channel has recieved an error and its message log them both.
-			case errC := <-errChan:
-				// Plugins install failed remove incomplete plugins.go file
-				if errR := os.Remove("plugins.go"); errR != nil {
-					l.Info("could not remove plugins.go file.", errR)
-				}
-				l.Fatalf("could not install plugins. %s\n%s", errC.message, errC.err)
-			default:
-				// Don't block.
-			}
-		}
-	}()
 	wg.Wait()
+
 	// Ensure dependencies are still there with the latest checked out
 	// versions, and install the plugins
 	l.Info("Installing plugins...")
-	outC, err = exec.
+	outC, err := exec.
 		Command("/bin/sh", "-c", "go get ./...").
 		CombinedOutput()
 	if err != nil {
-		errChan <- ErrMessage{message: string(outC), err: err}
+		errChan <- errMsg{msg: string(outC), err: err}
 		return
 	}
-
 	embedPluginConfs(plugins, l)
 	updateGlockfileAndInstall(l)
-	l.Info("Success!")
+	errChan <- errMsg{msg: "Success!"}
 }
 
 func updatePlugins() {
