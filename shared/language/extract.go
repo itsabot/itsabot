@@ -20,6 +20,7 @@ import (
 var regexCurrency = regexp.MustCompile(`\d+\.?\d*`)
 var regexNum = regexp.MustCompile(`\d+`)
 var regexNonWords = regexp.MustCompile(`[^\w\s]`)
+var regexEmail = regexp.MustCompile(`\S+@\S+\.\w+`)
 
 // ErrNotFound is thrown when the requested type cannot be found in the string
 var ErrNotFound = errors.New("couldn't extract requested type from string")
@@ -222,6 +223,15 @@ func ExtractCities(db *sqlx.DB, in *dt.Msg) ([]dt.City, error) {
 		return nil, ErrNotFound
 	}
 	return cities, nil
+}
+
+// ExtractEmails from a user's message.
+func ExtractEmails(s string) ([]string, error) {
+	emails := regexEmail.FindAllString(s, -1)
+	if emails == nil {
+		return []string{}, ErrNotFound
+	}
+	return emails, nil
 }
 
 func bigrams(words []string, startIndex int) (bigrams []string) {
