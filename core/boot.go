@@ -208,6 +208,7 @@ func ConnectDB() (*sqlx.DB, error) {
 			dbConnStr += "_test"
 		}
 	}
+	log.Debug("connecting to db")
 	return sqlx.Connect("postgres", dbConnStr)
 }
 
