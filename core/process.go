@@ -104,8 +104,8 @@ func ProcessText(r *http.Request) (ret string, err error) {
 	if plugin != nil {
 		resp.Plugin = plugin
 	}
-	sendPreResponseEvent(in, &resp.Sentence)
 saveAndReturn:
+	sendPreResponseEvent(in, &resp.Sentence)
 	if err = resp.Save(db); err != nil {
 		return "", err
 	}
