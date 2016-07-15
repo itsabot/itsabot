@@ -63,3 +63,16 @@ func TestExtractCities(t *testing.T) {
 		t.Fatal(fmt.Errorf("expected San Francisco, extracted %s", cities[0].Name))
 	}
 }
+
+func TestExtractEmails(t *testing.T) {
+	emails, err := ExtractEmails("my email is test@example.com and my name is bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(emails) != 1 {
+		t.Fatal("expected 1 email, received", emails)
+	}
+	if emails[0] != "test@example.com" {
+		t.Fatal("expected test@example.com, received", emails[0])
+	}
+}
