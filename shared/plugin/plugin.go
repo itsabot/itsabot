@@ -32,7 +32,7 @@ func New(url string) (*dt.Plugin, error) {
 	if err := core.LoadEnvVars(); err != nil {
 		log.Fatal(err)
 	}
-	db, err := core.ConnectDB()
+	db, err := core.ConnectDB("")
 	if err != nil {
 		return nil, err
 	}

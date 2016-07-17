@@ -1,5 +1,11 @@
 package main
 
+import (
+	"os"
+
+	"github.com/itsabot/abot/core"
+)
+
 func pluginScaffoldFile(dir, name string) string {
 	return `package ` + name + `
 
@@ -61,37 +67,11 @@ func kwDemo(in *dt.Msg) string {
 }`
 }
 
-func pluginTestScaffoldFile(name string) string {
-	return `package ` + name + `
-
-import (
-	"os"
-	"testing"
-
-	"github.com/itsabot/abot/shared/plugin"
-	"github.com/julienschmidt/httprouter"
-)
-
-var r *httprouter.Router
-
-func TestMain(m *testing.M) {
-	r = plugin.TestPrepare()
-	os.Exit(m.Run())
-}
-
-func TestKWDemo(t *testing.T) {
-	seqTests := []string{
-		"Show me a demo",
-		"It worked!",
-	}
-	if len(seqTests) % 2 != 0 {
-		t.Fatal("must have an even number of cases covering input -> expected")
-	}
-	for i := 0; i+i < len(seqTests); i += 2 {
-		err := plugin.TestReq(r, seqTests[i], seqTests[i+1])
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-}`
+func serverAbotEnv(name, curDir string) string {
+	return `PORT=` + os.Getenv("PORT") + `
+ABOT_ENV=development
+ABOT_PATH="` + curDir + `"
+ABOT_DATABASE_URL="` + core.DBConnectionString(name) + `"
+ABOT_SECRET=` + core.RandAlphaNumSeq(64) + `
+ABOT_URL=http://localhost:$PORT`
 }

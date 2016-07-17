@@ -104,7 +104,13 @@ func (c classifier) classifyTokens(tokens []string) *dt.StructuredInput {
 // context in the sentence.
 func buildClassifier() (classifier, error) {
 	ner := classifier{}
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "data", "ner")
+	var p string
+	if os.Getenv("ABOT_ENV") == "test" {
+		p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "data",
+			"ner")
+	} else {
+		p = filepath.Join("data", "ner")
+	}
 	fi, err := os.Open(filepath.Join(p, "nouns.txt"))
 	if err != nil {
 		return ner, err
@@ -186,7 +192,7 @@ func buildClassifier() (classifier, error) {
 // before any human ever sees them.
 func buildOffensiveMap() (map[string]struct{}, error) {
 	o := map[string]struct{}{}
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "data", "offensive.txt")
+	p := filepath.Join("data", "offensive.txt")
 	fi, err := os.Open(p)
 	if err != nil {
 		return o, err
@@ -237,7 +243,7 @@ func RespondWithHelp(in *dt.Msg) string {
 		}
 		return fmt.Sprintf("Try telling me %q or %q", use, use2)
 	}
-	switch len(pluginsGo) {
+	switch len(PluginsGo) {
 	case 0:
 		return ""
 	case 1:
@@ -264,7 +270,7 @@ func RespondWithHelpConfused(in *dt.Msg) string {
 		return fmt.Sprintf("%s You can try telling me %q or %q",
 			ConfusedLang(), use, use2)
 	}
-	if len(pluginsGo) == 0 {
+	if len(PluginsGo) == 0 {
 		return ConfusedLang()
 	}
 	use := randUse()
@@ -277,10 +283,10 @@ func RespondWithHelpConfused(in *dt.Msg) string {
 
 // randUse returns a random use from among all plugins.
 func randUse() string {
-	if len(pluginsGo) == 0 {
+	if len(PluginsGo) == 0 {
 		return ""
 	}
-	pluginUses := pluginsGo[rand.Intn(len(pluginsGo))].Usage
+	pluginUses := PluginsGo[rand.Intn(len(PluginsGo))].Usage
 	if pluginUses == nil || len(pluginUses) == 0 {
 		return ""
 	}

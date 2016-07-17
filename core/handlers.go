@@ -121,7 +121,7 @@ func hMain(w http.ResponseWriter, r *http.Request) {
 		if len(ret) > 0 {
 			ret = errMsg
 		}
-		log.Info("failed to process text", err)
+		log.Info("failed to process text.", err)
 		// TODO notify plugins listening for errors
 	}
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -565,7 +565,7 @@ func hapiPlugins(w http.ResponseWriter, r *http.Request) {
 		Settings   map[string]string
 	}
 	var resp []respT
-	for _, plugin := range pluginsGo {
+	for _, plugin := range PluginsGo {
 		data := respT{
 			ID:         plugin.ID,
 			Name:       plugin.Name,
@@ -1517,7 +1517,7 @@ func writeErrorBadRequest(w http.ResponseWriter, err error) {
 }
 
 func writeErrorInternal(w http.ResponseWriter, err error) {
-	log.Info("failed", err)
+	log.Info("internal error.", err)
 	w.WriteHeader(http.StatusInternalServerError)
 	writeError(w, err)
 }

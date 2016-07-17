@@ -17,19 +17,26 @@ before_script:
         - sudo sh -c 'echo "local all postgres trust" > /etc/postgresql/9.5/main/pg_hba.conf'
         - sudo sh -c 'echo -n "host all all 127.0.0.1/32 trust" >> /etc/postgresql/9.5/main/pg_hba.conf'
         - sudo /etc/init.d/postgresql restart
-        - psql --version
-        - psql -c 'CREATE DATABASE abot_test;' -U postgres
-        - ls db/migrations/up/*.sql | xargs -I{} -- psql -U postgres abot_test -f {}
-        - cat data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
         - go vet ./...
+        - psql -c 'CREATE DATABASE abot_test;' -U postgres
+        - ls base/db/migrations/up/*.sql | xargs -I{} -- psql -U postgres abot_test -f {}
+        - cat base/data/cities.csv | psql -U postgres -d abot_test -c "COPY cities(name, countrycode) FROM stdin DELIMITER ',' CSV;"
 install:
         - go get github.com/robfig/glock
         - go install github.com/robfig/glock
         - glock sync github.com/itsabot/abot
         - go install ./...
+        - abot new abot
 script:
         - export PORT=4200
-        - export ABOT_URL=http://localhost
         - export ITSABOT_URL=https://www.itsabot.org
+        - export ABOT_DATABASE_URL="postgres://postgres@127.0.0.1:5432/abot_test?sslmode=disable"
         - export ABOT_PATH=$GOPATH/src/github.com/itsabot/abot
+        - export ABOT_URL=http://localhost:$PORT
+        - go test
+        - cd core
+        - go test ./...
+        - cd ../shared
+        - go test ./...
+        - cd ../abot
         - go test ./...

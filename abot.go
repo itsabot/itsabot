@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	lg "log"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -30,14 +31,10 @@ import (
 	"github.com/itsabot/abot/core"
 	"github.com/itsabot/abot/core/log"
 	"github.com/itsabot/abot/shared/datatypes"
+	"github.com/itsabot/abot/shared/plugin"
 	"github.com/itsabot/itsabot.org/socket"
 	_ "github.com/lib/pq" // Postgres driver
 )
-
-type errMsg struct {
-	msg string
-	err error
-}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
@@ -48,145 +45,200 @@ func main() {
 	app := cli.NewApp()
 	app.Commands = []cli.Command{
 		{
+			Name:  "new",
+			Usage: "generate a new abot",
+			Action: func(c *cli.Context) error {
+				l := log.New("")
+				l.SetFlags(0)
+				if len(c.Args()) != 1 {
+					l.Fatal("usage: abot new {name}")
+				}
+				if strings.Contains(c.Args().First(), " ") {
+					l.Fatal("name cannot include a space. use camelCase")
+				}
+				err := newAbot(l, c.Args().First(), c.Args().Get(1))
+				if err != nil {
+					l.Fatalf("could not build new abot. %s", err)
+				}
+				l.Info("Success. Created " + c.Args().First())
+				return nil
+			},
+		},
+		{
 			Name:    "server",
 			Aliases: []string{"s"},
 			Usage:   "run server",
-			Action: func(c *cli.Context) {
-				var err error
-				if err = startServer(); err != nil {
-					l := log.New("")
-					l.SetFlags(0)
-					l.Fatalf("could not start server\n%s", err)
+			Action: func(c *cli.Context) error {
+				l := log.New("")
+				l.SetFlags(0)
+				cmd := exec.Command("/bin/sh", "-c", "go build")
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					l.Info(string(out))
+					return err
+				}
+				dir, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				_, file := filepath.Split(dir)
+				cmd = exec.Command("/bin/sh", "-c", "./"+file)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err = cmd.Start(); err != nil {
+					return err
+				}
+				return cmd.Wait()
+			},
+		},
+		{
+			Name:    "install",
+			Aliases: []string{"i"},
+			Usage:   "download and install plugins listed in plugins.json",
+			Action: func(c *cli.Context) error {
+				errChan := make(chan errMsg)
+				l := log.New("")
+				l.SetFlags(0)
+				l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
+				go func() {
+					select {
+					case errC := <-errChan:
+						if errC.err == nil {
+							// Success
+							l.Info(errC.msg)
+							os.Exit(0)
+						}
+
+						// Plugins install failed, so remove incomplete plugins.go file
+						errR := os.Remove("plugins.go")
+						if errR != nil && !os.IsNotExist(errR) {
+							l.Info("could not remove plugins.go file.", errR)
+						}
+						if len(errC.msg) > 0 {
+							l.Fatalf("could not install plugins.\n%s\n%s", errC.msg, errC.err)
+						}
+						l.Fatalf("could not install plugins.\n%s", errC.err)
+					}
+				}()
+				installPlugins(l, errChan)
+				for {
+					// Keep process running until a message is received
 				}
 			},
 		},
 		{
-			Name:    "plugin",
+			Name:  "search",
+			Usage: "search plugins indexed on itsabot.org",
+			Action: func(c *cli.Context) error {
+				l := log.New("")
+				l.SetFlags(0)
+				args := c.Args()
+				if len(args) == 0 || len(args) > 2 {
+					l.Fatal(errors.New(`usage: abot plugin search {term}`))
+				}
+				if err := searchPlugins(args.First()); err != nil {
+					l.Fatalf("could not start console\n%s", err)
+				}
+				return nil
+			},
+		},
+		{
+			Name:    "update",
+			Aliases: []string{"u", "upgrade"},
+			Usage:   "update and install plugins listed in plugins.json",
+			Action: func(c *cli.Context) error {
+				updatePlugins()
+				return nil
+			},
+		},
+		{
+			Name:    "publish",
 			Aliases: []string{"p"},
-			Usage:   "manage and install plugins from plugins.json",
-			Subcommands: []cli.Command{
-				{
-					Name:    "install",
-					Aliases: []string{"i"},
-					Usage:   "download and install plugins listed in plugins.json",
-					Action: func(c *cli.Context) {
-						errChan := make(chan errMsg)
-						l := log.New("")
-						l.SetFlags(0)
-						l.SetDebug(os.Getenv("ABOT_DEBUG") == "true")
-						go func() {
-							select {
-							case errC := <-errChan:
-								if errC.err == nil {
-									// Success
-									l.Info(errC.msg)
-									os.Exit(0)
-								}
-
-								// Plugins install failed, so remove incomplete plugins.go file
-								if errR := os.Remove("plugins.go"); errR != nil {
-									l.Info("could not remove plugins.go file.", errR)
-								}
-								l.Fatalf("could not install plugins.\n%s\n%s", errC.msg, errC.err)
-							}
-						}()
-						installPlugins(l, errChan)
-						for {
-							// Keep the program running until a message is received on the channel
-						}
-					},
-				},
-				{
-					Name:    "search",
-					Aliases: []string{"s"},
-					Usage:   "search plugins indexed on itsabot.org",
-					Action: func(c *cli.Context) {
-						l := log.New("")
-						l.SetFlags(0)
-						args := c.Args()
-						if len(args) == 0 || len(args) > 2 {
-							l.Fatal(errors.New(`usage: abot plugin search "{term}"`))
-						}
-						if err := searchPlugins(args.First()); err != nil {
-							l.Fatalf("could not start console\n%s", err)
-						}
-					},
-				},
-				{
-					Name:    "update",
-					Aliases: []string{"u", "upgrade"},
-					Usage:   "update and install plugins listed in plugins.json",
-					Action: func(c *cli.Context) {
-						updatePlugins()
-					},
-				},
-				{
-					Name:    "publish",
-					Aliases: []string{"p"},
-					Usage:   "publish a plugin to itsabot.org",
-					Action: func(c *cli.Context) {
-						publishPlugin(c)
-					},
-				},
-				{
-					Name:    "generate",
-					Aliases: []string{"g"},
-					Usage:   "generate a new plugin with tests",
-					Action: func(c *cli.Context) {
-						l := log.New("")
-						l.SetFlags(0)
-						args := c.Args()
-						if len(args) != 1 {
-							l.Fatal(errors.New(`usage: abot plugin generate "{name}"`))
-						}
-						generatePlugin(l, args.First())
-						l.Info("Created", args.First(), "in",
-							filepath.Join(os.Getenv("PWD"), args.First()))
-					},
-				},
+			Usage:   "publish a plugin to itsabot.org",
+			Action: func(c *cli.Context) error {
+				publishPlugin(c)
+				return nil
+			},
+		},
+		{
+			Name:    "test",
+			Aliases: []string{"t"},
+			Usage:   "tests plugins",
+			Action: func(c *cli.Context) error {
+				lg.SetFlags(0)
+				count, err := testPlugin()
+				if err != nil {
+					return err
+				}
+				if count == 0 {
+					lg.Println("No tests found. Did you run \"abot install\"?")
+					return nil
+				}
+				lg.Printf("Success (%d tests).\n", count)
+				return nil
+			},
+		},
+		{
+			Name:    "generate",
+			Aliases: []string{"g"},
+			Usage:   "generate plugin scaffolding",
+			Action: func(c *cli.Context) error {
+				l := log.New("")
+				l.SetFlags(0)
+				args := c.Args()
+				if len(args) != 1 {
+					l.Fatal(errors.New(`usage: abot generate {name}`))
+				}
+				generatePlugin(l, args.First())
+				l.Info("Created", args.First(), "in",
+					filepath.Join(os.Getenv("PWD"), args.First()))
+				return nil
 			},
 		},
 		{
 			Name:    "login",
 			Aliases: []string{"l"},
 			Usage:   "log into itsabot.org to enable publishing plugins",
-			Action: func(c *cli.Context) {
+			Action: func(c *cli.Context) error {
 				login()
+				return nil
 			},
 		},
 		{
 			Name:    "console",
 			Aliases: []string{"c"},
 			Usage:   "communicate with a running abot server",
-			Action: func(c *cli.Context) {
+			Action: func(c *cli.Context) error {
 				if err := startConsole(c); err != nil {
 					l := log.New("")
 					l.SetFlags(0)
 					l.Fatalf("could not start console\n%s", err)
 				}
+				return nil
+			},
+		},
+		{
+			Name:    "dbconsole",
+			Aliases: []string{"dbc"},
+			Usage:   "communicate with a running abot server",
+			Action: func(c *cli.Context) error {
+				cmd := exec.Command("/bin/sh", "-c", "psql "+os.Getenv("ABOT_DATABASE_URL"))
+				cmd.Stdout = os.Stdout
+				cmd.Stdin = os.Stdin
+				if err := cmd.Start(); err != nil {
+					return err
+				}
+				return cmd.Wait()
 			},
 		},
 	}
-	app.Action = func(c *cli.Context) {
+	app.Action = func(c *cli.Context) error {
 		cli.ShowAppHelp(c)
+		return nil
 	}
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-}
-
-// startServer initializes any clients that are needed, sets up routes, and
-// boots plugins.
-func startServer() error {
-	hr, err := core.NewServer()
-	if err != nil {
-		return err
-	}
-	log.Info("started abot")
-	if err = http.ListenAndServe(":"+os.Getenv("PORT"), hr); err != nil {
-		return err
-	}
-	return nil
 }
 
 func searchPlugins(query string) error {
@@ -250,7 +302,7 @@ func searchItsAbot(q string) ([]byte, error) {
 
 func startConsole(c *cli.Context) error {
 	args := c.Args()
-	if len(args) == 0 || len(args) >= 3 {
+	if len(args) >= 3 {
 		return errors.New("usage: abot console {abotAddress} {userPhone}")
 	}
 	var addr, phone string
@@ -343,11 +395,17 @@ func installPlugins(l *log.Logger, errChan chan errMsg) {
 	} else {
 		l.Infof("Fetching %d plugins...\n", len(plugins.Dependencies))
 	}
-	_, err := exec.
+	outC, err := exec.
 		Command("/bin/sh", "-c", "go get ./...").
 		CombinedOutput()
 	if err == nil {
 		syncDependencies(plugins, l, errChan)
+		return
+	}
+
+	// Show errors only when it's not a private repo issue
+	if !strings.Contains(string(outC), "fatal: could not read Username for") {
+		errChan <- errMsg{msg: string(outC), err: err}
 		return
 	}
 
@@ -727,14 +785,14 @@ func login() {
 	log.Info("Success!")
 }
 
-func publishPlugin(c *cli.Context) {
+func publishPlugin(c *cli.Context) error {
 	p := filepath.Join(os.Getenv("HOME"), ".abot.conf")
 	fi, err := os.Open(p)
 	if err != nil {
 		if err.Error() == fmt.Sprintf("open %s: no such file or directory", p) {
 			login()
 			publishPlugin(c)
-			return
+			return nil
 		}
 		log.Fatal(err)
 	}
@@ -848,7 +906,7 @@ func publishPlugin(c *cli.Context) {
 			if err = ws.Close(); err != nil {
 				log.Info("failed to close socket.", err)
 			}
-			return
+			return nil
 		}
 		lastMsg = msg.Content
 		if msg.Type == socket.MsgTypeFinishedSuccess ||
@@ -856,7 +914,7 @@ func publishPlugin(c *cli.Context) {
 			if err = ws.Close(); err != nil {
 				log.Info("failed to close socket.", err)
 			}
-			return
+			return nil
 		}
 		if len(msg.Content) < 2 {
 			l.Info(msg.Content)
@@ -915,10 +973,6 @@ func generatePlugin(l *log.Logger, name string) error {
 		log.Info("failed to create plugin scaffold file")
 		return err
 	}
-	if err := buildPluginTestScaffoldFile(dirName, name); err != nil {
-		log.Info("failed to create plugin test scaffold file")
-		return err
-	}
 	return nil
 }
 
@@ -952,7 +1006,11 @@ func buildPluginJSON(dirName, name string) error {
 	}
 	b := []byte(`{
 	"Name": "` + name + `",
-	"Maintainer": "` + maintainer + `"
+	"Maintainer": "` + maintainer + `",
+	"Usage": ["Show me a demo"],
+	"Tests": [
+		{"Show me a demo": ["demo"]}
+	]
 }`)
 	return ioutil.WriteFile(filepath.Join(dirName, "plugin.json"), b, 0744)
 }
@@ -980,20 +1038,147 @@ func buildPluginScaffoldFile(dirName, name string) error {
 	return nil
 }
 
-func buildPluginTestScaffoldFile(dirName, name string) error {
-	fi, err := os.Create(filepath.Join(dirName, dirName+"_test.go"))
+// newAbot creates a new directory for a new Abot project. It's similar to
+// `rails new`.
+func newAbot(l *log.Logger, name, dbconnstr string) error {
+	// Create a new directory for the project
+	if err := os.Mkdir(name, 0777); err != nil {
+		return err
+	}
+	if err := os.Chdir(name); err != nil {
+		return err
+	}
+
+	// Generate abot.env
+	fi, err := os.Create("abot.env")
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err = fi.Close()
-		if err != nil {
-			log.Info("failed to close plugin.json.", err)
+		if err = fi.Close(); err != nil {
+			l.Info("failed to close abot.env.", err)
 		}
 	}()
-	_, err = fi.WriteString(pluginTestScaffoldFile(name))
+	dir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
+	_, err = fi.WriteString(serverAbotEnv(name, dir))
+	if err != nil {
+		return err
+	}
+
+	// Copy and modify base files
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "base", "plugins.json")
+	if err = core.CopyFileContents(p, "plugins.json"); err != nil {
+		return err
+	}
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "server.go.x")
+	if err = core.CopyFileContents(p, "server.go"); err != nil {
+		return err
+	}
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", ".gitignore")
+	if err = core.CopyFileContents(p, ".gitignore"); err != nil {
+		return err
+	}
+	fi2, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err = fi2.Close(); err != nil {
+			l.Info("failed to close .gitignore.", err)
+		}
+	}()
+	_, err = fi2.WriteString(name)
+	if err != nil {
+		l.Fatal("failed to write to .gitignore.", err)
+	}
+
+	// Walk the base/assets dir, copying all files
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "assets")
+	if err = filepath.Walk(p, recursiveCopy); err != nil {
+		return err
+	}
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "cmd")
+	if err = filepath.Walk(p, recursiveCopy); err != nil {
+		return err
+	}
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "data")
+	if err = filepath.Walk(p, recursiveCopy); err != nil {
+		return err
+	}
+	p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "db")
+	if err = filepath.Walk(p, recursiveCopy); err != nil {
+		return err
+	}
+
+	// Run cmd/dbsetup.sh
+	cmd := exec.Command("/bin/sh", "-c", "cmd/dbsetup.sh "+dbconnstr)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err = cmd.Run(); err != nil {
+		l.Info("Fix the errors above, then re-run cmd/dbsetup.sh")
+		return err
+	}
+
+	// TODO analytics on a new Abot project
 	return nil
+}
+
+func recursiveCopy(pth string, info os.FileInfo, err error) error {
+	if err != nil {
+		return err
+	}
+
+	parts := strings.Split(pth, string(os.PathSeparator))
+	pth = ""
+	for i := len(parts) - 1; i > 0; i-- {
+		if parts[i] == "base" {
+			break
+		}
+		pth = filepath.Join(parts[i], pth)
+	}
+
+	// Handle directories
+	if info.IsDir() {
+		if err = os.Mkdir(pth, 0777); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Handle files
+	p := filepath.Join(os.Getenv("ABOT_PATH"), "base", pth)
+	core.CopyFileContents(p, pth)
+	return nil
+}
+
+func testPlugin() (int, error) {
+	if err := core.LoadPluginsGo(); err != nil {
+		return 0, err
+	}
+	r := plugin.TestPrepare()
+	plugin.TestCleanup()
+	var count int
+	for _, plg := range core.PluginsGo {
+		log.Info("loading", plg.Name)
+		for _, test := range plg.Tests {
+			log.Info("running", test)
+			count++
+			for in, exps := range test {
+				err := plugin.TestReq(r, in, exps)
+				if err != nil {
+					return count, err
+				}
+			}
+		}
+	}
+	plugin.TestCleanup()
+	return count, nil
+}
+
+type errMsg struct {
+	msg string
+	err error
 }
