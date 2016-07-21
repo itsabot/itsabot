@@ -39,6 +39,7 @@ credentials/host if needed. Projects should be named with camelCasing.
 
 ```
 $ abot new yourproject [username[:password]@host[:port]]
+Success! Created yourproject
 ```
 
 If you don't pass anything to the command, the Postgres parameters will default
@@ -50,15 +51,12 @@ file if you want to use this password-less default.
 During setup, if the `psql` binary is unavailable, the script will skip the
 database setup. To setup the database on an different machine, you can run
 `cmd/dbsetup.sh` on the host that has Postgres / `psql` available. This script
-takes the same Postgres parameter as `abot new`:
+takes the same Postgres parameter as `abot new`.
+
+Once the script completes, launch the server:
 
 ```
-$ cmd/dbsetup.sh [username[:password]@host[:port]]
-```
-
-Once the script completes, launch the server
-
-```
+$ cd yourproject
 $ abot server
 ```
 
