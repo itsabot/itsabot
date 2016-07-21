@@ -49,6 +49,11 @@ type PluginConfig struct {
 	// Settings is a collection of options for use by a plugin, such as a
 	// required API key.
 	Settings map[string]*PluginSetting
+
+	// Tests contains a set of questions with a list of expected responses.
+	// The complex data structure enables developers to test plugin inputs
+	// against randomized or uncertain responses.
+	Tests []map[string][]string
 }
 
 // PluginSetting defines whether a plugin's setting is required (empty values

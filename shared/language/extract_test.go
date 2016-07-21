@@ -20,7 +20,7 @@ func TestMain(m *testing.M) {
 func TestExtractCities(t *testing.T) {
 	var cities []dt.City
 	in := &dt.Msg{}
-	db, err := core.ConnectDB()
+	db, err := core.ConnectDB("")
 	if err != nil {
 		t.Fatal(err)
 	}

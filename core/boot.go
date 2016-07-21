@@ -31,7 +31,7 @@ var offensive map[string]struct{}
 var smsConn *sms.Conn
 var emailConn *email.Conn
 var conf = &PluginJSON{Dependencies: map[string]string{}}
-var pluginsGo = []dt.PluginConfig{}
+var PluginsGo = []dt.PluginConfig{}
 var envLoaded bool
 
 // bClassifiers holds the trained bayesian classifiers for our plugins. The key
@@ -74,7 +74,7 @@ func NewServer() (r *httprouter.Router, err error) {
 		return nil, errors.New("must set ABOT_SECRET env var in production to >= 32 characters")
 	}
 	if db == nil {
-		db, err = ConnectDB()
+		db, err = ConnectDB("")
 		if err != nil {
 			return nil, fmt.Errorf("could not connect to database: %s", err.Error())
 		}
@@ -87,7 +87,7 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err = checkRequiredEnvVars(); err != nil {
 		return nil, err
 	}
-	err = loadPluginsGo()
+	err = LoadPluginsGo()
 	if err != nil && os.Getenv("ABOT_ENV") != "test" {
 		log.Info("failed loading plugins.go", err)
 		return nil, err
@@ -108,7 +108,13 @@ func NewServer() (r *httprouter.Router, err error) {
 	if err != nil {
 		log.Debug("could not build offensive map", err)
 	}
-	p := filepath.Join("assets", "html", "layout.html")
+	var p string
+	if os.Getenv("ABOT_ENV") == "test" {
+		p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "assets",
+			"html", "layout.html")
+	} else {
+		p = filepath.Join("assets", "html", "layout.html")
+	}
 	if err = loadHTMLTemplate(p); err != nil {
 		log.Info("failed loading HTML template", err)
 		return nil, err
@@ -170,8 +176,7 @@ func compileAssets() error {
 
 func loadHTMLTemplate(p string) error {
 	var err error
-	tmplLayout, err = template.ParseFiles(filepath.Join(
-		os.Getenv("ABOT_PATH"), p))
+	tmplLayout, err = template.ParseFiles(filepath.Join(p))
 	if tmplLayout == nil {
 		tmplLayout, err = template.ParseFiles(p)
 	}
@@ -196,25 +201,41 @@ func checkRequiredEnvVars() error {
 	return nil
 }
 
-// ConnectDB opens a connection to the database.
-func ConnectDB() (*sqlx.DB, error) {
+// ConnectDB opens a connection to the database. The name is the name of the
+// database to connect to. If empty, it defaults to the current directory's
+// name.
+func ConnectDB(name string) (*sqlx.DB, error) {
+	if len(name) == 0 {
+		dir, err := os.Getwd()
+		if err != nil {
+			return nil, err
+		}
+		name = filepath.Base(dir)
+	}
+	dbConnStr := DBConnectionString(name)
+	log.Debug("connecting to db")
+	return sqlx.Connect("postgres", dbConnStr)
+}
+
+// DBConnectionString returns the connection parameters for connecting to the
+// database.
+func DBConnectionString(name string) string {
 	dbConnStr := os.Getenv("ABOT_DATABASE_URL")
 	if dbConnStr == "" {
 		dbConnStr = "host=127.0.0.1 user=postgres"
 	}
 	if len(dbConnStr) <= 11 || dbConnStr[:11] != "postgres://" {
-		dbConnStr += " sslmode=disable dbname=abot"
+		dbConnStr += " sslmode=disable dbname=" + name
 		if strings.ToLower(os.Getenv("ABOT_ENV")) == "test" {
 			dbConnStr += "_test"
 		}
 	}
-	log.Debug("connecting to db")
-	return sqlx.Connect("postgres", dbConnStr)
+	return dbConnStr
 }
 
 // LoadConf plugins.json into a usable struct.
 func LoadConf() error {
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.json")
+	p := filepath.Join("plugins.json")
 	okVal := fmt.Sprintf("open %s: no such file or directory", p)
 	contents, err := ioutil.ReadFile(p)
 	if err != nil && err.Error() != okVal {
@@ -243,7 +264,7 @@ func LoadEnvVars() error {
 			return err
 		}
 	}
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "abot.env")
+	p := filepath.Join("abot.env")
 	fi, err := os.Open(p)
 	if os.IsNotExist(err) {
 		// Assume the user has loaded their env variables into their
@@ -266,15 +287,20 @@ func LoadEnvVars() error {
 			continue
 		}
 		key := strings.TrimSpace(fields[0])
-		if key == "" {
+		if len(key) == 0 {
 			continue
 		}
-		val := strings.TrimSpace(os.Getenv(key))
-		if val == "" {
-			val = strings.TrimSpace(fields[1])
-			if err = os.Setenv(key, val); err != nil {
-				return err
+		if len(os.Getenv(fields[0])) > 0 {
+			continue
+		}
+		val := strings.TrimSpace(fields[1])
+		if len(val) >= 2 {
+			if val[0] == '"' || val[0] == '\'' {
+				val = val[1 : len(val)-1]
 			}
+		}
+		if err = os.Setenv(key, val); err != nil {
+			return err
 		}
 	}
 	if err = scn.Err(); err != nil {
@@ -284,9 +310,9 @@ func LoadEnvVars() error {
 	return nil
 }
 
-// loadPluginsGo loads the plugins.go file into memory.
-func loadPluginsGo() error {
-	p := filepath.Join(os.Getenv("ABOT_PATH"), "plugins.go")
+// LoadPluginsGo loads the plugins.go file into memory.
+func LoadPluginsGo() error {
+	p := filepath.Join("plugins.go")
 	okVal := fmt.Sprintf("open %s: no such file or directory", p)
 	contents, err := ioutil.ReadFile(p)
 	if err != nil && err.Error() != okVal {
@@ -320,12 +346,12 @@ func loadPluginsGo() error {
 	}
 	val = append([]byte("["), val...)
 	val = append(val[:len(val)-1], []byte("]")...)
-	return json.Unmarshal(val, &pluginsGo)
+	return json.Unmarshal(val, &PluginsGo)
 }
 
 // trainClassifiers trains classifiers for each plugin.
 func trainClassifiers() error {
-	for _, pconf := range pluginsGo {
+	for _, pconf := range PluginsGo {
 		ss, err := fetchTrainingSentences(pconf.ID, pconf.Name)
 		if err != nil {
 			return err

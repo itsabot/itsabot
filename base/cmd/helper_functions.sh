@@ -90,7 +90,7 @@ function run_chk { _run "$1" "$2" 0 "${@:3}"; }
 function run_warn { _run "$1" "$2" 1 "${@:3}"; }
 function run { _run "$1" "$2" 2 "${@:3}"; }
 
-# database connection parameter setup
+# database connection parameter setup (legacy)
 # if the user specifies any database connection string at all, they must
 # specify at least username and hostname. this avoids having to guess if a
 # single string without ':" or '@' is referencing a username or hostname.
@@ -100,9 +100,10 @@ function parse_db_params {
 		DB_USER='postgres'
 		DB_HOST='127.0.0.1'
 		DB_PORT=5432
+		DB_NAME=${PWD##*/}
 		return 0
 	fi
-	pattern='^([^:\/]+)(:([^@\/]*))?@([^:\/?]+)(:([0-9]+))?$'
+	pattern='^([^:\/]+)(:([^@\/]*))?@([^:\/?]+)(:([0-9]+))?(/(database))?$'
 	[[ "$1" =~ $pattern ]] || {
 		echo -e "usage: $0 [username[:password]@host[:port=5432]]\n"
 		echo "error: unable to parse database string"
@@ -113,4 +114,5 @@ function parse_db_params {
 	DB_PASS=${BASH_REMATCH[3]}
 	DB_HOST=${BASH_REMATCH[4]}
 	DB_PORT=${BASH_REMATCH[6]:-"5432"}
+	DB_NAME=${BASH_REMATCH[7]}
 }

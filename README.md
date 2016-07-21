@@ -32,16 +32,16 @@ Fetch Abot via `go get`
 
 ```
 $ go get github.com/itsabot/abot
-$ cd $GOPATH/src/github.com/itsabot/abot
 ```
 
-Run the setup script, passing in your Postgres credentials/host if needed.
+Then create a new project anywhere in your `$GOPATH`, passing in your Postgres
+credentials/host if needed. Projects should be named with camelCasing.
 
 ```
-$ cmd/setup.sh [username[:password]@host[:port]]
+$ abot new yourproject [username[:password]@host[:port]]
 ```
 
-If you don't pass anything to the script, the Postgres parameters will default
+If you don't pass anything to the command, the Postgres parameters will default
 to `host = 127.0.0.1`, `port = 5432`, and `username = postgres`.  You may need
 to edit your
 [pg_hba.conf](http://www.postgresql.org/docs/9.5/static/auth-pg-hba-conf.html)
@@ -50,7 +50,11 @@ file if you want to use this password-less default.
 During setup, if the `psql` binary is unavailable, the script will skip the
 database setup. To setup the database on an different machine, you can run
 `cmd/dbsetup.sh` on the host that has Postgres / `psql` available. This script
-takes the same arguments as `cmd/setup.sh`.
+takes the same Postgres parameter as `abot new`:
+
+```
+$ cmd/dbsetup.sh [username[:password]@host[:port]]
+```
 
 Once the script completes, launch the server
 
@@ -63,7 +67,7 @@ Then visit Abot at `localhost:4200`.
 ## Usage
 
 First configure the plugins you want to import, such as `weather`. Add them
-to your plugin.json like so:
+to your plugins.json like so:
 
 ```json
 {
@@ -77,18 +81,19 @@ to your plugin.json like so:
 Then run the following in your terminal to download the plugins:
 
 ```bash
-$ abot plugin install
+$ abot install
 Fetching 1 plugin...
 Installing plugin...
 Success!
 ```
 
-That will download the plugins into your `$GOPATH` and install them into Abot.
-Once you've installed the plugins, run Abot again: `abot server`. You can use
-the included Abot console to communicate with Abot locally:
+That will download the plugins into your `$GOPATH` and install them into your
+project.  Once you've installed the plugins, boot the server again: `abot
+server`. You can then use the included Abot console to communicate with Abot
+locally:
 
 ```bash
-$ abot console +13105555555
+$ abot console
 > Hi
 Hello there!
 ```

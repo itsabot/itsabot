@@ -25,21 +25,6 @@ else
 	[ $? -ne 0 ] && exit 1
 fi
 
-PORT="4200"
-ABOT_URL="http://localhost:$PORT"
-ABOT_ENV="development"
-ABOT_SECRET=$(LC_CTYPE=C tr -dc _A-Za-z0-9 < /dev/urandom | head -c 64)
-ABOT_DATABASE_URL="host=$DB_HOST port=$DB_PORT user=$DB_USER"
-[ -n "$DB_PASS" ] && ABOT_DATABASE_URL+=" password=$DB_PASS"
-
-echo "PORT=$PORT
-ABOT_ENV=$ABOT_ENV
-ABOT_URL=$ABOT_URL
-ABOT_DATABASE_URL=$ABOT_DATABASE_URL
-ABOT_SECRET=$ABOT_SECRET" > abot.env
-
-run "installing abot plugins (this may take a minute)" "abot plugin install"
-
 printf "\n* [finished]"
 printf " ***********************************************************\n\n"
 

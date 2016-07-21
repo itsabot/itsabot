@@ -30,7 +30,7 @@ func TestPrepare() *httprouter.Router {
 
 // TestReq tests the input against the expected output. It returns an error if
 // the input does not match the expected output.
-func TestReq(r *httprouter.Router, in, exp string) error {
+func TestReq(r *httprouter.Router, in string, exp []string) error {
 	data := struct {
 		FlexIDType int
 		FlexID     string
@@ -48,8 +48,15 @@ func TestReq(r *httprouter.Router, in, exp string) error {
 	if c != http.StatusOK {
 		return fmt.Errorf("expected %d, got %d. %s", http.StatusOK, c, b)
 	}
-	if !strings.Contains(b, exp) {
-		return fmt.Errorf("expected %q, got %q for %q", exp, b, in)
+	var found bool
+	for _, x := range exp {
+		if strings.Contains(b, x) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("expected %s, got %q for %q", exp, b, in)
 	}
 	return nil
 }

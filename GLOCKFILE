@@ -1,6 +1,6 @@
-github.com/codegangsta/cli 9fec0fad02befc9209347cc6d620e68e1b45f74d
+github.com/codegangsta/cli 11c134509d89c2018675f369955218a180dc7428
 github.com/dchest/stemmer f1ab276e6cf5fad3f8db813f22e25b1939c8ef70
-github.com/itsabot/itsabot.org f819d13313b1355556240381109012acfe586229
+github.com/itsabot/itsabot.org 9dcf65e3c7a6128a997b46f702b0113de7f952a5
 github.com/jbrukh/bayesian a65fd1effddb7bd71c6bb6ca1876e045a7aeac6e
 github.com/jmoiron/sqlx bdae0c3219c3bdb92f3d7c70825018712787c933
 github.com/julienschmidt/httprouter 77366a47451a56bb3ba682481eed85b64fea14e8
