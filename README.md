@@ -59,6 +59,7 @@ $ cmd/dbsetup.sh [username[:password]@host[:port]]
 Once the script completes, launch the server
 
 ```
+$ cd yourproject
 $ abot server
 ```
 
