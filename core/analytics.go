@@ -79,7 +79,7 @@ func updateAnalyticsTick(t time.Time) {
 
 	// Version number
 	client := &http.Client{Timeout: 15 * time.Minute}
-	u := "https://raw.githubusercontent.com/egtann/abot/master/plugins.json"
+	u := "https://raw.githubusercontent.com/itsabot/abot/master/base/plugins.json"
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		log.Info("failed to retrieve version number.", err)
