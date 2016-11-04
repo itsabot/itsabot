@@ -1,12 +1,13 @@
 ![Abot](http://i.imgur.com/WBACSyP.png)
 
-[Website](https://www.itsabot.org) |
 [Getting Started](https://github.com/itsabot/abot/wiki/Getting-Started) |
 [Contributing](https://github.com/itsabot/abot/wiki/How-to-Contribute) |
 [Mailing List](https://groups.google.com/forum/#!forum/abot-discussion)
 
 [![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/itsabot/abot) [![Travis CI](https://img.shields.io/travis/itsabot/abot.svg?style=flat-square)](https://travis-ci.org/itsabot/abot)
- 
+
+**Note: This project is no longer supported, as I no longer have the time to maintain it.**
+
 Abot (pronounced *Eh-Bot*, like the Canadians) is a digital assistant framework
 that enables anyone to easily build a digital assistant similar to Apple's Siri,
 Microsoft's Cortana, Google Now, or Amazon Alexa. Further, Abot supports a
@@ -16,10 +17,6 @@ Unlike those proprietary systems, Abot is open-sourced and extensible. By
 providing an extensible platform onto which anyone can easily add functionality,
 Abot is the first A.I. framework that aims to be available everywhere and—
 ultimately—to do everything.
-
-**Note: This is being developed heavily.** There may be breaking API changes
-in each release until we hit v1.0. Follow our progress on the
-[Roadmap](https://github.com/itsabot/abot/wiki/Roadmap).
 
 ## Installation
 
