@@ -457,7 +457,7 @@ func clonePrivateRepo(name string, errChan chan errMsg, wg *sync.WaitGroup) {
 		return
 	}
 	cmd := fmt.Sprintf("rm -rf %s", tmp)
-	log.Debug("running:", cmd)
+	l.Debug("running:", cmd)
 	outC, err := exec.
 		Command("/bin/sh", "-c", cmd).
 		CombinedOutput()
@@ -468,7 +468,7 @@ func clonePrivateRepo(name string, errChan chan errMsg, wg *sync.WaitGroup) {
 	}
 	name = strings.Join(parts[1:], "/")
 	cmd = fmt.Sprintf("git clone git@github.com:%s.git %s", name, tmp)
-	log.Debug("running:", cmd)
+	l.Debug("running:", cmd)
 	outC, err = exec.
 		Command("/bin/sh", "-c", cmd).
 		CombinedOutput()
@@ -482,6 +482,7 @@ func syncDependencies(plugins *core.PluginJSON, l *log.Logger,
 	errChan chan errMsg) {
 
 	// Sync each of them to get dependencies
+	l.Debug("syncing dependencies")
 	wg := &sync.WaitGroup{}
 	rand.Seed(time.Now().UTC().UnixNano())
 	for url, version := range plugins.Dependencies {
@@ -614,7 +615,7 @@ func updateGlockfileAndInstall(l *log.Logger) {
 }
 
 func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
-	log.Debug("embedding plugin confs")
+	l.Debug("embedding plugin confs")
 
 	// Open plugins.go file for writing
 	fi, err := os.OpenFile("plugins.go", os.O_WRONLY|os.O_APPEND, 0666)
@@ -634,7 +635,7 @@ func embedPluginConfs(plugins *core.PluginJSON, l *log.Logger) {
 	s := "\n\n/*\n"
 	for u := range plugins.Dependencies {
 		s += u + "\n"
-		log.Debug("reading file", p)
+		l.Debug("reading file", p)
 		p = filepath.Join(tokenizedPath[0], "src", u, "plugin.json")
 		fi2, err2 := os.Open(p)
 		if err2 != nil {
