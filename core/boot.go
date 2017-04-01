@@ -106,8 +106,13 @@ func NewServer() (r *httprouter.Router, err error) {
 	}()
 	offensive, err = buildOffensiveMap()
 	if err != nil {
-		log.Debug("could not build offensive map", err)
+		log.Info("could not build offensive map", err)
 	}
+	go func() {
+		if err = trainSpellCheck(); err != nil {
+			log.Info("failed to train spell checker.", err)
+		}
+	}()
 	var p string
 	if os.Getenv("ABOT_ENV") == "test" {
 		p = filepath.Join(os.Getenv("ABOT_PATH"), "base", "assets",

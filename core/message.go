@@ -8,6 +8,7 @@ import (
 // NewMsg builds a message struct with Tokens, Stems, and a Structured Input.
 func NewMsg(u *dt.User, cmd string) (*dt.Msg, error) {
 	tokens := TokenizeSentence(cmd)
+	tokens = spellCheckTokens(tokens)
 	stems := StemTokens(tokens)
 	si := ner.classifyTokens(tokens)
 
